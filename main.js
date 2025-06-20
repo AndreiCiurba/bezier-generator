@@ -1,6 +1,6 @@
 import { generateGrid, points } from './grid.js';
 import { selectedPoints, drawSelectedPath, resetSelectedPoints } from './interactions.js';
-import { drawStringArtCurve, zigzagStripePoints } from './bezier.js';
+import { drawStringArtCurve, generateZigzagFromGrid } from './bezier.js';
 import { handleMousePressed } from './interactions.js';
 
 let panX = 0, panY = 0, zoom = 1;
@@ -66,68 +66,14 @@ function setup() {
   });
 
 
-
-  // zig zag
-//   document.getElementById('generateZigzagFromGridBtn').addEventListener('click', () => {
-//     if (selectedPoints.length < 2) {
-//       console.warn("Select at least 2 points (left and right boundaries).");
-//       return;
-//     }
-  
-//     const zigzagPoints = zigzagStripePoints(points, selectedPoints);
-//     if (zigzagPoints.length < 3) {
-//       console.warn("Not enough points in the stripe to draw curve.");
-//       return;
-//     }
-  
-//     storedCurves.push({
-//       points: zigzagPoints,
-//       colors: [currentStrokeColor1,currentStrokeColor2,currentStrokeColor3]
-//     });
-//   });
-document.getElementById('generateZigzagFromGridBtn').addEventListener('click', () => {
-    if (selectedPoints.length < 2) {
-      console.warn("Select at least 2 points (left and right boundaries).");
-      return;
-    }
-  
-    const x1 = Math.min(...selectedPoints.map(p => p.x));
-    const x2 = Math.max(...selectedPoints.map(p => p.x));
-    const bandWidth = s - 1; // or adjust depending on grid spacing or user input
-  
-    for (let xStart = x1; xStart < x2; xStart += bandWidth) {
-      const xEnd = Math.min(xStart + bandWidth, x2);
-  
-      // Get points in this sub-band
-      const bandPoints = points.filter(p => p.x >= xStart && p.x <= xEnd);
-  
-      // Group by row (y), rounded for robustness
-      const rowMap = new Map();
-      for (const p of bandPoints) {
-        const yKey = Math.round(p.y);
-        if (!rowMap.has(yKey)) rowMap.set(yKey, []);
-        rowMap.get(yKey).push(p);
-      }
-  
-      // Sort rows top to bottom
-      const sortedY = [...rowMap.keys()].sort((a, b) => a - b);
-  
-      const path = [];
-      let leftToRight = true;
-      for (const y of sortedY) {
-        const row = rowMap.get(y).sort((a, b) => a.x - b.x);
-        if (row.length === 0) continue;
-        path.push(...(leftToRight ? row : row.reverse()));
-        leftToRight = !leftToRight;
-      }
-  
-      if (path.length >= 3) {
-        storedCurves.push({
-          points: path,
-          colors: [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3]
-        });
-      }
-    }
+  document.getElementById('generateZigzagFromGridBtn').addEventListener('click', () => {
+    generateZigzagFromGrid(
+      points,
+      windowWidth,
+      s,
+      [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3],
+      (curve) => storedCurves.push(curve)
+    );
   });
 
 }

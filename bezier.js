@@ -72,40 +72,43 @@ export function drawBezierCurve(pointsArray, strokeColor = '#0000ff') {
   }
 }
 
+export function generateZigzagFromGrid(points, windowWidth, s, strokeColors, storeCallback) {
+  const x1 = 0;
+  const x2 = windowWidth;
+  const bandWidth = s / 2 ;
 
-export function zigzagStripePoints(gridPoints, selectedPoints) {
-    if (selectedPoints.length < 2) return [];
-  
-    // Determine horizontal bounds from selected points
-    const xs = selectedPoints.map(p => p.x);
-    const minX = Math.min(...xs);
-    const maxX = Math.max(...xs);
-  
-    // Filter grid points within horizontal bounds (+ small margin)
-    const margin = 5;
-    const stripePoints = gridPoints.filter(p => p.x >= minX - margin && p.x <= maxX + margin);
-  
-    // Group points by their y-coordinate (rows)
-    const rowsMap = new Map();
-    for (const p of stripePoints) {
-      // Use y rounded to nearest integer to bucket rows (you may tweak this)
+  let bandIndex = 0;
+  for (let xStart = x1; xStart < x2; xStart += bandWidth, bandIndex++) {
+    const xEnd = Math.min(xStart + bandWidth, x2);
+    const bandPoints = points.filter(p => p.x >= xStart && p.x <= xEnd);
+
+    // Group points by row (y)
+    const rowMap = new Map();
+    for (const p of bandPoints) {
       const yKey = Math.round(p.y);
-      if (!rowsMap.has(yKey)) rowsMap.set(yKey, []);
-      rowsMap.get(yKey).push(p);
+      if (!rowMap.has(yKey)) rowMap.set(yKey, []);
+      rowMap.get(yKey).push(p);
     }
-  
-    // Sort rows by y ascending
-    const sortedRows = [...rowsMap.entries()].sort((a, b) => a[0] - b[0]);
-  
-    // For each row, sort points left-to-right, and reverse on odd rows to zigzag
-    let zigzagPoints = [];
-    sortedRows.forEach(([_, rowPoints], idx) => {
-      rowPoints.sort((a, b) => a.x - b.x);
-      if (idx % 2 === 1) rowPoints.reverse();  // reverse every odd row for zigzag
-      zigzagPoints = zigzagPoints.concat(rowPoints);
-    });
-  
-    return zigzagPoints;
-  }
 
-  
+    const sortedY = [...rowMap.keys()].sort((a, b) => a - b);
+    const path = [];
+
+    // Alternate band direction
+    const bandGoesLeftToRight = bandIndex % 2 === 0;
+
+    for (const y of sortedY) {
+      let row = rowMap.get(y).sort((a, b) => a.x - b.x);
+      if (!bandGoesLeftToRight) {
+        row = row.reverse();
+      }
+      path.push(...row);
+    }
+
+    if (path.length >= 3) {
+      storeCallback({
+        points: path,
+        colors: strokeColors
+      });
+    }
+  }
+}
