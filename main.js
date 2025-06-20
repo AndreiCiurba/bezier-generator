@@ -13,8 +13,8 @@ const storedCurves = [];
 
 function setup() {
   // Grid parameters
-  const rows = 25;
-  const cols = 25;
+  const rows = 15;
+  const cols = 12;
   const s = 60;  // side length of triangle
   const h = (s * Math.sqrt(3)) / 2;
 
@@ -69,7 +69,7 @@ function setup() {
   document.getElementById('generateZigzagFromGridBtn').addEventListener('click', () => {
     generateZigzagFromGrid(
       points,
-      windowWidth,
+      s * rows,
       s,
       [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3],
       (curve) => storedCurves.push(curve)
