@@ -6,9 +6,9 @@ import { handleMousePressed } from './interactions.js';
 let panX = 0, panY = 0, zoom = 1;
 let isDragging = false, prevMouse;
 
-let currentStrokeColor1 = '#264653';  // Deep Blue
-let currentStrokeColor2 = '#f4a261';  // Warm Orange
-let currentStrokeColor3 = '#e9c46a';    // default stroke color
+  let currentStrokeColor1 = '#AEC8A4';  // Deep Blue
+  let currentStrokeColor2 = '#8A784E';  // Warm Orange
+  let currentStrokeColor3 = '#3B3B1A';    // default stroke color
 const storedCurves = [];
 
 function setup() {
@@ -85,9 +85,18 @@ function setup() {
   });
   
 
-  document.getElementById('burger').addEventListener('click', () => {
-    const uiPanel = document.getElementById('ui');
-    uiPanel.classList.toggle('hidden');
+  const burger = document.getElementById('burger');
+  const ui = document.getElementById('ui');
+  const closeBtn = document.getElementById('closeUiBtn');
+  
+  burger.addEventListener('click', () => {
+    ui.classList.remove('hidden');
+    burger.classList.add('hidden');
+  });
+  
+  closeBtn.addEventListener('click', () => {
+    ui.classList.add('hidden');
+    burger.classList.remove('hidden');
   });
 
 }
