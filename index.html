@@ -14,16 +14,23 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div id="ui">
-    <button id="colorPickerBtn">Select Color</button>
+  <!-- Burger Menu Button -->
+<div id="burger">&#9776;</div>
+
+<!-- Hidden UI Panel -->
+<div id="ui" class="hidden">
+  <div style="font-size: 11px; color: #EEEEEE; text-align: center;">Stroke Colors</div>
+
+  <div id="colorPickerContainer">
     <input type="color" id="strokeColor1" value="#3dac8a" />
     <input type="color" id="strokeColor2" value="#3dac8a" />
     <input type="color" id="strokeColor3" value="#3dac8a" />
-    <button id="resetBtn">Reset</button>
-    <button id="clearAllBtn">Clear All Points</button>
-    <button id="generateZigzagFromGridBtn">Zig-Zag</button>
-
   </div>
+  <button id="resetBtn">Reset</button>
+  <button id="clearAllBtn">Clear All Points</button>
+  <button id="generateZigzagFromGridBtn">Zig-Zag</button>
+  <button id="undoBtn">Undo</button>
+</div>
 
 </body>
 </html>

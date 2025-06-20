@@ -6,9 +6,9 @@ import { handleMousePressed } from './interactions.js';
 let panX = 0, panY = 0, zoom = 1;
 let isDragging = false, prevMouse;
 
-let currentStrokeColor1 = '#0000ff';
-let currentStrokeColor2 = '#00ff00'; 
-let currentStrokeColor3 = '#ff0000';   // default stroke color
+let currentStrokeColor1 = '#264653';  // Deep Blue
+let currentStrokeColor2 = '#f4a261';  // Warm Orange
+let currentStrokeColor3 = '#e9c46a';    // default stroke color
 const storedCurves = [];
 
 function setup() {
@@ -27,7 +27,7 @@ function setup() {
   const colorPicker1 = document.getElementById('strokeColor1');
   const colorPicker2 = document.getElementById('strokeColor2');
   const colorPicker3 = document.getElementById('strokeColor3');
- 
+
 
   colorPicker1.value = currentStrokeColor1;
   colorPicker1.addEventListener('input', (e) => {
@@ -74,6 +74,20 @@ function setup() {
       [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3],
       (curve) => storedCurves.push(curve)
     );
+  });
+
+  const undoBtn = document.getElementById('undoBtn');
+  undoBtn.addEventListener('click', () => {
+    if (storedCurves.length > 0) {
+      storedCurves.pop();
+    }
+    resetSelectedPoints();  // clear current drawing when undoing
+  });
+  
+
+  document.getElementById('burger').addEventListener('click', () => {
+    const uiPanel = document.getElementById('ui');
+    uiPanel.classList.toggle('hidden');
   });
 
 }
