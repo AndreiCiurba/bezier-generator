@@ -140,18 +140,21 @@ function mousePressed() {
   }
   
 
-  function touchStarted() {
-  // Touch events do not set mouseButton, so we skip isDragging for now
-  const worldTouch = createVector(
-    (touchX - panX) / zoom,
-    (touchY - panY) / zoom
-  );
-  handleMousePressed(worldTouch);
-  return false; // prevent default scroll/zoom behavior
+function touchEnded() {
+  const tapDuration = millis() - touchStartTime;
+  const movedDistance = dist(mouseX, mouseY, touchStartX, touchStartY);
+
+  if (tapDuration < 200 && movedDistance < 10) {
+    const worldTouch = screenToWorld(mouseX, mouseY);
+    handleMousePressed(worldTouch);
+  }
+
+  return false;
 }
 
+
 function mouseDragged() {
-  if (isDragging) {
+  if (touches.length === 0 && isDragging) {
     let dx = mouseX - prevMouse.x;
     let dy = mouseY - prevMouse.y;
     panX += dx;
@@ -159,6 +162,7 @@ function mouseDragged() {
     prevMouse.set(mouseX, mouseY);
   }
 }
+
 
 function mouseReleased() {
   isDragging = false;
@@ -173,6 +177,17 @@ function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
 }
 
+function touchStarted() {
+  touchStartTime = millis();
+  touchStartX = mouseX;
+  touchStartY = mouseY;
+  return false;
+}
+
+function screenToWorld(x, y) {
+  return createVector((x - panX) / zoom, (y - panY) / zoom);
+}
+
 // Expose p5 lifecycle methods globally
 window.setup = setup;
 window.draw = draw;
@@ -181,3 +196,5 @@ window.mouseDragged = mouseDragged;
 window.mouseReleased = mouseReleased;
 window.mouseWheel = mouseWheel;
 window.windowResized = windowResized;
+window.touchEnded = touchEnded;
+window.touchStarted = touchStarted;
