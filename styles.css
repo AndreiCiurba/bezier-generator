@@ -10,7 +10,7 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   font-size: 12px;
   color: #b4f4b4;
-  width: 140px;
+  width: 20%;
   box-shadow: 0 4px 8px rgba(0, 80, 0, 0.6);
   display: flex;
   flex-direction: column;
@@ -18,7 +18,7 @@
   opacity: 0.9;
 }
 
-#closeUiBtn {
+#closeUiBtn, #closeColorSubmenuBtn {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -51,10 +51,6 @@
   cursor: pointer;
   user-select: none;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-}
-
-.hidden {
-  display: none;
 }
 
 #ui.hidden {
@@ -107,7 +103,7 @@
   border-radius: 6px;
 }
 
-#resetBtn, #clearAllBtn, #colorPickerBtn, #undoBtn, #generateZigzagFromGridBtn {
+#resetBtn, #clearAllBtn, #colorPickerBtn, #undoBtn, #generateZigzagFromGridBtn, #openFavoritesBtn, #saveCurrentColorBtn, #exportColorsBtn, #importColorsBtn {
   background-color:rgb(255, 204, 0); /* sea green */
   color: rgb(177, 59, 255);
   border: none;
@@ -130,4 +126,97 @@
   opacity: 0.9; /* 40% transparency */
   background-color: rgb(9, 0, 64);
   box-shadow: 0 3px 7px rgb(177, 59, 255);
+}
+
+#colorFavoritesSubmenu {
+  position: absolute;
+  top: 0;
+  left: calc(100% + 10px); /* place it 10px to the right of the main menu */
+  background-color: #393E46; /* match main menu accent style */
+  padding: 10px;
+  border-radius: 8px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 200px;
+  box-shadow: 0 4px 8px rgba(0, 80, 0, 0.4);
+  color: #b4f4b4;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 12px;
+}
+
+
+.hidden {
+  display: none !important;  /* force hide */
+}
+
+
+
+.favorite-color-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.favorite-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid #eeeeee44;
+  transition: transform 0.2s;
+}
+
+.favorite-color:hover {
+  transform: scale(1.1);
+}
+
+.colorTriplet {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  background-color: #222831;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 6px 8px;
+  box-shadow: inset 0 0 4px rgba(0, 255, 170, 0.2);
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+}
+
+.colorTriplet:hover {
+  background-color: #2d3640;
+  box-shadow: 0 2px 6px rgba(0, 255, 170, 0.3);
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #aaa;
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.colorSwatch:hover {
+  transform: scale(1.1);
+  transition: transform 0.15s ease;
+}
+
+.submenu .close-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: #333;
+  font-weight: bold;
+  line-height: 1;
+}
+.submenu .close-btn:hover {
+  color: #f00; /* optional hover color */
 }

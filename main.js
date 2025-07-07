@@ -2,16 +2,20 @@ import { generateGrid, points } from './grid.js';
 import { selectedPoints, drawSelectedPath, resetSelectedPoints } from './interactions.js';
 import { drawStringArtCurve, generateZigzagFromGrid } from './bezier.js';
 import { handleMousePressed } from './interactions.js';
+import {
+  getCurrentColors,
+  storedCurves,
+  setUpColorUI,
+  setCurrentColor ,
+  renderFavoriteTriplets
+} from './colors.js';
 
 let panX = 0, panY = 0, zoom = 1;
 let isDragging = false, prevMouse;
 
-  let currentStrokeColor1 = '#AEC8A4';  // Deep Blue
-  let currentStrokeColor2 = '#8A784E';  // Warm Orange
-  let currentStrokeColor3 = '#3B3B1A';    // default stroke color
-const storedCurves = [];
-
 function setup() {
+  setUpColorUI();
+  renderFavoriteTriplets()
   // Grid parameters
   const rows = 15;
   const cols = 12;
@@ -28,30 +32,21 @@ function setup() {
   const colorPicker2 = document.getElementById('strokeColor2');
   const colorPicker3 = document.getElementById('strokeColor3');
 
+  const [c1, c2, c3] = getCurrentColors();
+  colorPicker1.value = c1;
+  colorPicker2.value = c2;
+  colorPicker3.value = c3;
 
-  colorPicker1.value = currentStrokeColor1;
-  colorPicker1.addEventListener('input', (e) => {
-    currentStrokeColor1 = e.target.value;
-  });
-
-  
-  colorPicker2.value = currentStrokeColor2;
-  colorPicker2.addEventListener('input', (e) => {
-    currentStrokeColor2 = e.target.value;
-  });
-
-  
-  colorPicker3.value = currentStrokeColor3;
-  colorPicker3.addEventListener('input', (e) => {
-    currentStrokeColor3 = e.target.value;
-  });
+  colorPicker1.addEventListener('input', e => setCurrentColor(0, e.target.value));
+  colorPicker2.addEventListener('input', e => setCurrentColor(1, e.target.value));
+  colorPicker3.addEventListener('input', e => setCurrentColor(2, e.target.value));
 
   resetBtn.addEventListener('click', () => {
     if (selectedPoints.length >= 3) {
       // Save current curve with its color
       storedCurves.push({
         points: selectedPoints.map(p => p.copy()),
-        colors: [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3]
+        colors: [colorPicker1.value, colorPicker2.value, colorPicker3.value]
       });
     }
     resetSelectedPoints();
@@ -71,7 +66,7 @@ function setup() {
       points,
       s * rows,
       s,
-      [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3],
+      [c1, c2, c3],
       (curve) => storedCurves.push(curve)
     );
   });
@@ -117,7 +112,7 @@ function draw() {
   // Draw the current in-progress curve with the currently selected color
   if (selectedPoints.length >= 3) {
     // drawBezierCurve(selectedPoints, currentStrokeColor);
-    drawStringArtCurve(selectedPoints, [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3]);
+    drawStringArtCurve(selectedPoints, getCurrentColors());
   }
 
   drawSelectedPath();

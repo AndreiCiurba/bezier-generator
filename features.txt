@@ -1,0 +1,4 @@
+Pre defined pattern sub menu
+Pre defined color sub menu
+Per specific point / each point pattern display
+Import export pattern
