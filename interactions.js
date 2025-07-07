@@ -15,6 +15,8 @@ export function handleMousePressed(worldMouse) {
   }
 }
 
+
+
 export function drawSelectedPath() {
   noFill();
   stroke(0);

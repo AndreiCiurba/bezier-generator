@@ -66,7 +66,7 @@ function setup() {
       points,
       s * rows,
       s,
-      [c1, c2, c3],
+      [colorPicker1.value, colorPicker2.value, colorPicker3.value],
       (curve) => storedCurves.push(curve)
     );
   });
@@ -139,6 +139,16 @@ function mousePressed() {
     }
   }
   
+
+  function touchStarted() {
+  // Touch events do not set mouseButton, so we skip isDragging for now
+  const worldTouch = createVector(
+    (touchX - panX) / zoom,
+    (touchY - panY) / zoom
+  );
+  handleMousePressed(worldTouch);
+  return false; // prevent default scroll/zoom behavior
+}
 
 function mouseDragged() {
   if (isDragging) {
