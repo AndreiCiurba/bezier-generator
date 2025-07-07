@@ -33,6 +33,16 @@
     <button id="importColorsBtn">Import</button>
   </div>
 
+  <div id="patternSubmenu" class="hidden">
+    <button id="closePatternSubmenuBtn">X</button>
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
+    
+    <button id="exportPatternBtn">Export Pattern</button>
+    <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
+    <button id="importPatternBtn">Import Pattern</button>
+    <button id="saveCurrentPatternBtn">Save Current</button>
+  </div>
+
 
   <div id="colorPickerContainer">
     <input type="color" id="strokeColor1" value="#3dac8a" />
@@ -40,6 +50,7 @@
     <input type="color" id="strokeColor3" value="#3dac8a" />
   </div>
 
+  <button id="openPatternBtn">Patterns</button>
   <button id="openFavoritesBtn">Colors</button>
   <button id="resetBtn">Reset</button>
   <button id="clearAllBtn">Clear All Points</button>

@@ -24,7 +24,6 @@ export function setUpColorUI() {
   const colorPicker3 = document.getElementById('strokeColor3');
   const resetBtn = document.getElementById('resetBtn');
   const clearAllBtn = document.getElementById('clearAllBtn');
-  const undoBtn = document.getElementById('undoBtn');
   const generateZigzagFromGridBtn = document.getElementById('generateZigzagFromGridBtn');
 
   const openFavoritesBtn = document.getElementById('openFavoritesBtn');
@@ -32,7 +31,6 @@ export function setUpColorUI() {
   const exportColorsBtn = document.getElementById('exportColorsBtn');
   const importColorsBtn = document.getElementById('importColorsBtn');
   const importColorsInput = document.getElementById('importColorsInput');
-  const favoriteColorsList = document.getElementById('favoriteColorsList');
   const favoritesSubmenu = document.getElementById('colorFavoritesSubmenu');
   
   const colorBurgerBtn = document.getElementById('closeColorSubmenuBtn');
@@ -74,12 +72,7 @@ export function setUpColorUI() {
     window.selectedPoints.length = 0;
     storedCurves.length = 0;
   });
-
-  undoBtn.addEventListener('click', () => {
-    if (storedCurves.length > 0) storedCurves.pop();
-    window.resetSelectedPoints?.();
-  });
-
+  
   generateZigzagFromGridBtn.addEventListener('click', () => {
     window.generateZigzagFromGrid?.(
       window.points,
@@ -144,22 +137,7 @@ export function setUpColorUI() {
     reader.readAsText(file);
   });
   
-  
-  
-  function renderFavoriteColors() {
-    favoriteColorsList.innerHTML = '';
-    favoriteColors.forEach(color => {
-      const swatch = document.createElement('div');
-      swatch.className = 'favorite-color';
-      swatch.style.backgroundColor = color;
-      swatch.title = color;
-      swatch.addEventListener('click', () => {
-        currentStrokeColor1 = color;
-        colorPicker1.value = color;
-      });
-      favoriteColorsList.appendChild(swatch);
-    });
-  }
+
 }
 export function renderFavoriteTriplets() {
     const container = document.getElementById("favoriteTripletsContainer");

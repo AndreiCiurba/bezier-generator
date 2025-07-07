@@ -10,11 +10,16 @@ import {
   renderFavoriteTriplets
 } from './colors.js';
 
+import {
+  setUpPatternUI
+} from './pattern.js'
+
 let panX = 0, panY = 0, zoom = 1;
 let isDragging = false, prevMouse;
 
 function setup() {
   setUpColorUI();
+  setUpPatternUI();
   renderFavoriteTriplets()
   // Grid parameters
   const rows = 15;
