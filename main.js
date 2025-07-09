@@ -14,7 +14,9 @@ import {
   setUpPatternUI,
   patternInUse,
   resetPattern,
-  renderPattern
+  renderPattern,
+  drawPatternPreview,
+  pendingPatternToPlace,
 } from './pattern.js'
 
 let panX = 0, panY = 0, zoom = 1;
@@ -95,6 +97,12 @@ function draw() {
   background(255);
   translate(panX, panY);
   scale(zoom);
+
+  // if (pendingPatternToPlace) {
+  //   // Optional: show preview at mouse
+  //   drawPatternPreview();
+  //   return; // Don't allow other drawing while a pattern is pending
+  // }
 
   drawGrid();
   for (const curve of storedCurves) {
@@ -194,6 +202,12 @@ function touchesMenus() {
   }
   return false;
 }
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    document.getElementById('resetBtn')?.click();
+  }
+});
 
 // Expose p5 lifecycle methods globally
 window.setup = setup;

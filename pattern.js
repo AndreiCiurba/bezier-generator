@@ -1,9 +1,9 @@
 import { storedCurves, getCurrentColors } from './colors.js';
 import { selectedPoints } from './interactions.js';
-import { points } from './grid.js';
-
+import { drawStringArtCurve } from './bezier.js';
+  
 let savedPatterns = [];
-let pendingPatternToPlace = null;
+export let pendingPatternToPlace = null;
 export let patternInUse = false
 
 export function setUpPatternUI() {
@@ -143,4 +143,25 @@ export function renderPattern(origin) {
     points: newPoints,
     colors: pendingPatternToPlace.colors
   });
+}
+
+export function drawPatternPreview() {
+  const mousePos = createVector(mouseX, mouseY);
+  const patternOrigin = createVector(
+    pendingPatternToPlace.points[0].x,
+    pendingPatternToPlace.points[0].y
+  );
+  const offset = p5.Vector.sub(mousePos, patternOrigin);
+
+  const translated = pendingPatternToPlace.points.map(p =>
+    createVector(p.x + offset.x, p.y + offset.y)
+  );
+
+  strokeWeight(2);
+  stroke(0);
+  noFill();
+  beginShape();
+  drawStringArtCurve(translated, getCurrentColors());
+
+  endShape();
 }
