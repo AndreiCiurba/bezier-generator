@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>String Art Grid</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
   <script type="module" src="grid.js"></script>
@@ -10,53 +11,62 @@
   <script type="module" src="interactions.js"></script>
   <script type="module" src="main.js"></script>
 
-    
+
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
   <!-- Burger Menu Button -->
-<div id="burger">&#9776;</div>  
+  <div id="burger">&#9776;</div>
 
-<!-- Hidden UI Panel -->
-<div id="ui" class="hidden">
-  <button id="closeUiBtn" title="Close Menu" aria-label="Close Menu">&times;</button>
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="hidden">
+    <button id="closeUiBtn" title="Close Menu" aria-label="Close Menu">&times;</button>
 
-  
+    <div id="colorFavoritesSubmenu" class="hidden">
+      <button id="closeColorSubmenuBtn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div id="favoriteTripletsContainer"></div>
+      <button id="saveCurrentColorBtn">Save</button>
+      <button id="exportColorsBtn">Export</button>
+      <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
+      <button id="importColorsBtn">Import</button>
+    </div>
 
-  <div id="colorFavoritesSubmenu" class="hidden">
-    <button id="closeColorSubmenuBtn">X</button>
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
-    <div id="favoriteTripletsContainer"></div>
-    <button id="saveCurrentColorBtn">Save</button>
-    <button id="exportColorsBtn">Export</button>
-    <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
-    <button id="importColorsBtn">Import</button>
+    <!-- Pattern Submenu -->
+    <div id="patternSubmenu" class="hidden">
+      <button id="closePatternSubmenuBtn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
+
+      <!-- Save Pattern UI -->
+      <input id="patternNameInput" type="text" placeholder="Pattern name..."
+        style="margin: 4px 0; width: 100%; padding: 2px;" />
+      <button id="saveCurrentPatternBtn">Save Current</button>
+
+      <!-- List of Saved Patterns -->
+      <ul id="savedPatternsList"
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+
+      <button id="exportPatternBtn">Export Pattern</button>
+      <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
+      <button id="importPatternBtn">Import Pattern</button>
+    </div>
+
+
+    <div id="colorPickerContainer">
+      <input type="color" id="strokeColor1" value="#3dac8a" />
+      <input type="color" id="strokeColor2" value="#3dac8a" />
+      <input type="color" id="strokeColor3" value="#3dac8a" />
+    </div>
+
+    <button id="openPatternBtn">Patterns</button>
+    <button id="openFavoritesBtn">Colors</button>
+    <button id="resetBtn">Reset</button>
+    <button id="clearAllBtn">Clear All Points</button>
+    <button id="generateZigzagFromGridBtn">Zig-Zag</button>
+    <button id="undoBtn">Undo</button>
   </div>
-
-  <div id="patternSubmenu" class="hidden">
-    <button id="closePatternSubmenuBtn">X</button>
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
-    
-    <button id="exportPatternBtn">Export Pattern</button>
-    <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
-    <button id="importPatternBtn">Import Pattern</button>
-    <button id="saveCurrentPatternBtn">Save Current</button>
-  </div>
-
-
-  <div id="colorPickerContainer">
-    <input type="color" id="strokeColor1" value="#3dac8a" />
-    <input type="color" id="strokeColor2" value="#3dac8a" />
-    <input type="color" id="strokeColor3" value="#3dac8a" />
-  </div>
-
-  <button id="openPatternBtn">Patterns</button>
-  <button id="openFavoritesBtn">Colors</button>
-  <button id="resetBtn">Reset</button>
-  <button id="clearAllBtn">Clear All Points</button>
-  <button id="generateZigzagFromGridBtn">Zig-Zag</button>
-  <button id="undoBtn">Undo</button>
-</div>
 
 </body>
+
 </html>

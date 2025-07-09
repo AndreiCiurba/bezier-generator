@@ -6,12 +6,15 @@ import {
   getCurrentColors,
   storedCurves,
   setUpColorUI,
-  setCurrentColor ,
+  setCurrentColor,
   renderFavoriteTriplets
 } from './colors.js';
 
 import {
-  setUpPatternUI
+  setUpPatternUI,
+  patternInUse,
+  resetPattern,
+  renderPattern
 } from './pattern.js'
 
 let panX = 0, panY = 0, zoom = 1;
@@ -47,8 +50,8 @@ function setup() {
   colorPicker3.addEventListener('input', e => setCurrentColor(2, e.target.value));
 
   resetBtn.addEventListener('click', () => {
+    resetPattern()
     if (selectedPoints.length >= 3) {
-      // Save current curve with its color
       storedCurves.push({
         points: selectedPoints.map(p => p.copy()),
         colors: [colorPicker1.value, colorPicker2.value, colorPicker3.value]
@@ -61,8 +64,8 @@ function setup() {
   const clearAllBtn = document.getElementById('clearAllBtn');
 
   clearAllBtn.addEventListener('click', () => {
-    selectedPoints.length = 0;   // Clear selected points array
-    storedCurves.length = 0;     // Clear stored curves array
+    selectedPoints.length = 0;
+    storedCurves.length = 0;
   });
 
 
@@ -81,24 +84,22 @@ function setup() {
     if (storedCurves.length > 0) {
       storedCurves.pop();
     }
-    resetSelectedPoints();  // clear current drawing when undoing
+    resetSelectedPoints();
   });
-  
 
   const burger = document.getElementById('burger');
   const ui = document.getElementById('ui');
   const closeBtn = document.getElementById('closeUiBtn');
-  
+
   burger.addEventListener('click', () => {
     ui.classList.remove('hidden');
     burger.classList.add('hidden');
   });
-  
+
   closeBtn.addEventListener('click', () => {
     ui.classList.add('hidden');
     burger.classList.remove('hidden');
   });
-
 }
 
 function draw() {
@@ -107,16 +108,11 @@ function draw() {
   scale(zoom);
 
   drawGrid();
-
-  // Draw all stored curves with their saved colors
   for (const curve of storedCurves) {
-    // drawBezierCurve(curve.points, curve.color);
     drawStringArtCurve(curve.points, curve.colors);
   }
 
-  // Draw the current in-progress curve with the currently selected color
   if (selectedPoints.length >= 3) {
-    // drawBezierCurve(selectedPoints, currentStrokeColor);
     drawStringArtCurve(selectedPoints, getCurrentColors());
   }
 
@@ -132,18 +128,23 @@ function drawGrid() {
 }
 
 function mousePressed() {
-    if (mouseButton === CENTER) {
-      isDragging = true;
-      prevMouse = createVector(mouseX, mouseY);
+  if (touchesMenus()) return;
+
+  if (mouseButton === CENTER) {
+    isDragging = true;
+    prevMouse = createVector(mouseX, mouseY);
+  } else {
+    const worldMouse = createVector(
+      (mouseX - panX) / zoom,
+      (mouseY - panY) / zoom
+    );
+    if (patternInUse) {
+      renderPattern(worldMouse)
     } else {
-      const worldMouse = createVector(
-        (mouseX - panX) / zoom,
-        (mouseY - panY) / zoom
-      );
       handleMousePressed(worldMouse);
     }
   }
-  
+}
 
 function touchEnded() {
   const tapDuration = millis() - touchStartTime;
@@ -151,7 +152,11 @@ function touchEnded() {
 
   if (tapDuration < 200 && movedDistance < 10) {
     const worldTouch = screenToWorld(mouseX, mouseY);
-    handleMousePressed(worldTouch);
+    if (patternInUse) {
+      renderPattern(worldTouch)
+    } else {
+      handleMousePressed(worldTouch);
+    }
   }
 
   return false;
@@ -191,6 +196,14 @@ function touchStarted() {
 
 function screenToWorld(x, y) {
   return createVector((x - panX) / zoom, (y - panY) / zoom);
+}
+
+function touchesMenus() {
+  const el = document.elementFromPoint(mouseX, mouseY);
+  if (el && (el.closest('button') || el.closest('input') || el.closest('#patternSubmenu') || el.closest('#colorFavoritesSubmenu') || el.closest('#ui'))) {
+    return true;
+  }
+  return false;
 }
 
 // Expose p5 lifecycle methods globally

@@ -1,8 +1,6 @@
 // colors.js
 export const storedCurves = [];
 export const favoriteTriplets = [];
-let favoriteColors = [];
-
 
 let currentStrokeColor1 = '#AEC8A4';
 let currentStrokeColor2 = '#8A784E';
@@ -22,9 +20,6 @@ export function setUpColorUI() {
   const colorPicker1 = document.getElementById('strokeColor1');
   const colorPicker2 = document.getElementById('strokeColor2');
   const colorPicker3 = document.getElementById('strokeColor3');
-  const resetBtn = document.getElementById('resetBtn');
-  const clearAllBtn = document.getElementById('clearAllBtn');
-  const generateZigzagFromGridBtn = document.getElementById('generateZigzagFromGridBtn');
 
   const openFavoritesBtn = document.getElementById('openFavoritesBtn');
   const saveColorBtn = document.getElementById('saveCurrentColorBtn');
@@ -38,14 +33,14 @@ export function setUpColorUI() {
   const closeColorSubmenuBtn = document.getElementById('closeColorSubmenuBtn');
   
   colorBurgerBtn.addEventListener('click', () => {
-    colorSubmenu.classList.remove('hidden');  // show submenu
-    colorBurgerBtn.classList.add('hidden');   // hide burger button
+    colorSubmenu.classList.remove('hidden');
+    colorBurgerBtn.classList.add('hidden');
   });
   
   
   closeColorSubmenuBtn.addEventListener('click', () => {
-    colorSubmenu.classList.add('hidden');     // hide submenu
-    colorBurgerBtn.classList.remove('hidden'); // show burger button
+    colorSubmenu.classList.add('hidden');
+    colorBurgerBtn.classList.remove('hidden');
   });
 
 
@@ -57,31 +52,6 @@ export function setUpColorUI() {
   colorPicker1.addEventListener('input', (e) => currentStrokeColor1 = e.target.value);
   colorPicker2.addEventListener('input', (e) => currentStrokeColor2 = e.target.value);
   colorPicker3.addEventListener('input', (e) => currentStrokeColor3 = e.target.value);
-
-  resetBtn.addEventListener('click', () => {
-    if (window.selectedPoints?.length >= 3) {
-      storedCurves.push({
-        points: window.selectedPoints.map(p => p.copy()),
-        colors: [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3]
-      });
-    }
-    window.resetSelectedPoints?.();
-  });
-
-  clearAllBtn.addEventListener('click', () => {
-    window.selectedPoints.length = 0;
-    storedCurves.length = 0;
-  });
-  
-  generateZigzagFromGridBtn.addEventListener('click', () => {
-    window.generateZigzagFromGrid?.(
-      window.points,
-      window.s * window.rows,
-      window.s,
-      [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3],
-      (curve) => storedCurves.push(curve)
-    );
-  });
 
   openFavoritesBtn.addEventListener('click', () => {
     favoritesSubmenu.classList.toggle('hidden');

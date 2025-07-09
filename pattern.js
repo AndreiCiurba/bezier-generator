@@ -1,71 +1,146 @@
+import { storedCurves, getCurrentColors } from './colors.js';
+import { selectedPoints } from './interactions.js';
+import { points } from './grid.js';
+
+let savedPatterns = [];
+let pendingPatternToPlace = null;
+export let patternInUse = false
+
 export function setUpPatternUI() {
   const patternSubmenu = document.getElementById('patternSubmenu');
-  const closePatternSubmenuBtn = document.getElementById('closePatternSubmenuBtn');
-  const openFavoritesBtn = document.getElementById('openPatternBtn');
-  
-  closePatternSubmenuBtn.addEventListener('click', () => {
+  const openPatternBtn = document.getElementById('openPatternBtn');
+  const closePatternBtn = document.getElementById('closePatternSubmenuBtn');
+
+  const exportBtn = document.getElementById('exportPatternBtn');
+  const importBtn = document.getElementById('importPatternBtn');
+  const importInput = document.getElementById('importPatternInput');
+  const saveCurrentBtn = document.getElementById('saveCurrentPatternBtn');
+
+  const nameInput = document.getElementById('patternNameInput');
+  const savedList = document.getElementById('savedPatternsList');
+
+  // Open submenu
+  openPatternBtn.addEventListener('click', () => {
     patternSubmenu.classList.remove('hidden');
-    closePatternSubmenuBtn.classList.add('hidden');
   });
-  
-  
-  closePatternSubmenuBtn.addEventListener('click', () => {
+
+  // Close submenu
+  closePatternBtn.addEventListener('click', () => {
     patternSubmenu.classList.add('hidden');
-    closePatternSubmenuBtn.classList.remove('hidden');
   });
 
-  openFavoritesBtn.addEventListener('click', () => {
-    patternSubmenu.classList.toggle('hidden');
-  });
-
-
-  const savePatternBtn = document.getElementById('saveCurrentPatternBtn');
-  const exportPatternsBtn = document.getElementById('exportPatternBtn');
-  const importPatternsBtn = document.getElementById('importPatternBtn');
-  const importPatternsInput = document.getElementById('importPatternInput');
-
-  savePatternBtn.addEventListener("click", () => {
-  if (window.selectedPoints?.length >= 3) {
-    const pattern = window.selectedPoints.map(p => ({ x: p.x, y: p.y }));
-    if (!favoritePatterns.some(p => JSON.stringify(p) === JSON.stringify(pattern))) {
-    favoritePatterns.push(pattern);
-    renderFavoritePatterns();
-    }
-  }
-  });
-
-  exportPatternsBtn.addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(favoritePatterns)], { type: 'application/json' });
+  // Export saved patterns
+  exportBtn.addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(savedPatterns, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'favorite-patterns.json';
+    a.download = 'patterns.json';
     a.click();
     URL.revokeObjectURL(url);
   });
 
-  importPatternsBtn.addEventListener('click', () => importPatternsInput.click());
-  importPatternsInput?.addEventListener('change', (e) => {
+  // Trigger file input
+  importBtn.addEventListener('click', () => importInput.click());
+
+  // Handle import
+  importInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = (event) => {
       try {
-        const imported = JSON.parse(reader.result);
-        if (Array.isArray(imported) &&
-            imported.every(p => Array.isArray(p) &&
-              p.every(pt => pt && typeof pt.x === 'number' && typeof pt.y === 'number'))) {
-          favoritePatterns.length = 0;
-          favoritePatterns.push(...imported);
-          renderFavoritePatterns();
-        } else {
-          alert('Invalid pattern file format');
+        const data = JSON.parse(event.target.result);
+        if (Array.isArray(data)) {
+          data.forEach(p => {
+            if (p.name && p.points && p.colors) {
+              savedPatterns.push({
+                name: p.name,
+                points: p.points,
+                colors: p.colors
+              });
+            }
+          });
+          renderSavedPatternList();
         }
-      } catch {
-        alert('Invalid pattern file');
+      } catch (err) {
+        alert('Invalid pattern file.');
+        console.error(err);
       }
     };
     reader.readAsText(file);
   });
 
+  // Save current pattern
+  saveCurrentBtn.addEventListener('click', () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      alert("Please enter a name for the pattern.");
+      return;
+    }
+
+    if (selectedPoints.length < 3) {
+      alert("At least 3 points required.");
+      return;
+    }
+
+    const pattern = {
+      name,
+      points: selectedPoints.map(p => ({ x: p.x, y: p.y })),
+      colors: getCurrentColors()
+    };
+
+    savedPatterns.push(pattern);
+    renderSavedPatternList();
+    nameInput.value = '';
+  });
+
+  function renderSavedPatternList() {
+    savedList.innerHTML = '';
+    savedPatterns.forEach((pattern, idx) => {
+      const li = document.createElement('li');
+      li.textContent = pattern.name;
+      li.style.cursor = 'pointer';
+      li.style.marginBottom = '4px';
+      li.addEventListener('click', () => {
+        resetSelectedPatterns();
+        pendingPatternToPlace = pattern;
+        patternInUse = true;
+        li.style.borderStyle = 'solid';
+      });
+      savedList.appendChild(li);
+    });
+  }
+}
+
+export function resetPattern() {
+  patternInUse = false;
+  resetSelectedPatterns();
+}
+
+function resetSelectedPatterns() {
+  const listItems = document.querySelectorAll('#savedPatternsList li');
+  listItems.forEach(li => {
+    li.style.border = 'none';
+  });
+}
+
+export function renderPattern(origin) {
+  if (!pendingPatternToPlace) return;
+
+  const offsetX = pendingPatternToPlace.points[0].x - origin.x;
+  const offsetY = pendingPatternToPlace.points[0].y - origin.y;
+
+  const newPoints = pendingPatternToPlace.points.map(p =>
+    createVector(p.x - offsetX, p.y - offsetY)
+  );
+
+  console.log(origin)
+  console.log(newPoints)
+
+  storedCurves.push({
+    points: newPoints,
+    colors: pendingPatternToPlace.colors
+  });
 }
