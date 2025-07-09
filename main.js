@@ -68,17 +68,6 @@ function setup() {
     storedCurves.length = 0;
   });
 
-
-  document.getElementById('generateZigzagFromGridBtn').addEventListener('click', () => {
-    generateZigzagFromGrid(
-      points,
-      s * rows,
-      s,
-      [colorPicker1.value, colorPicker2.value, colorPicker3.value],
-      (curve) => storedCurves.push(curve)
-    );
-  });
-
   const undoBtn = document.getElementById('undoBtn');
   undoBtn.addEventListener('click', () => {
     if (storedCurves.length > 0) {
@@ -200,7 +189,7 @@ function screenToWorld(x, y) {
 
 function touchesMenus() {
   const el = document.elementFromPoint(mouseX, mouseY);
-  if (el && (el.closest('button') || el.closest('input') || el.closest('#patternSubmenu') || el.closest('#colorFavoritesSubmenu') || el.closest('#ui'))) {
+  if (el && (el.closest('button') || el.closest('input') || el.closest('#patternSubmenu') || el.closest('#colorFavoritesSubmenu') || el.closest('#ui') || el.closest('#burger'))) {
     return true;
   }
   return false;
