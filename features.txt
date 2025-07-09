@@ -1,4 +1,2 @@
 use color from pallette
 pattern start from closest point
-make menu height smaller
-bind esc with reset

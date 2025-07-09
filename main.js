@@ -19,7 +19,7 @@ import {
   pendingPatternToPlace,
 } from './pattern.js'
 
-let panX = 0, panY = 0, zoom = 1;
+export let panX = 0, panY = 0, zoom = 1;
 let isDragging = false, prevMouse;
 
 function setup() {

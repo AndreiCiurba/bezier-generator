@@ -1,7 +1,9 @@
 import { storedCurves, getCurrentColors } from './colors.js';
 import { selectedPoints } from './interactions.js';
 import { drawStringArtCurve } from './bezier.js';
-  
+import { panX, panY, zoom } from './main.js';
+import { points } from './grid.js'
+
 let savedPatterns = [];
 export let pendingPatternToPlace = null;
 export let patternInUse = false
@@ -126,22 +128,34 @@ function resetSelectedPatterns() {
   });
 }
 
-export function renderPattern(origin) {
+export function renderPattern(click) {
   if (!pendingPatternToPlace) return;
 
-  const offsetX = pendingPatternToPlace.points[0].x - origin.x;
-  const offsetY = pendingPatternToPlace.points[0].y - origin.y;
+  const worldMouse = createVector(
+    (click.x - panX) / zoom,
+    (click.y - panY) / zoom
+  );
+
+  let closestGridPoint;
+  for (let p of points) {
+    if (dist(worldMouse.x, worldMouse.y, p.x, p.y) < 10) {
+      closestGridPoint = p.copy()
+      break;
+    }
+  }
+
+  const offsetX = pendingPatternToPlace.points[0].x - closestGridPoint.x;
+  const offsetY = pendingPatternToPlace.points[0].y - closestGridPoint.y;
+
+
 
   const newPoints = pendingPatternToPlace.points.map(p =>
     createVector(p.x - offsetX, p.y - offsetY)
   );
 
-  console.log(origin)
-  console.log(newPoints)
-
   storedCurves.push({
     points: newPoints,
-    colors: pendingPatternToPlace.colors
+    colors: getCurrentColors()
   });
 }
 
