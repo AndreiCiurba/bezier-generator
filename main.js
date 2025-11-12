@@ -1,4 +1,4 @@
-import { generateGrid, points } from './grid.js';
+import { generateGrid, generateGridRotated, points } from './grid.js';
 import { selectedPoints, drawSelectedPath, resetSelectedPoints } from './interactions.js';
 import { drawStringArtCurve, generateZigzagFromGrid } from './bezier.js';
 import { handleMousePressed } from './interactions.js';
@@ -28,12 +28,13 @@ function setup() {
   renderFavoriteTriplets()
   // Grid parameters
   const rows = 15;
-  const cols = 12;
-  const s = 60;  // side length of triangle
+  const cols = 13;
+  const s = 60;
   const h = (s * Math.sqrt(3)) / 2;
 
   createCanvas(windowWidth, windowHeight);
-  generateGrid(rows, cols, s, h, createVector);
+  // generateGrid(rows, cols, s, h, createVector);
+  generateGridRotated(rows, cols, s, h, createVector);
 
   const resetBtn = document.getElementById('resetBtn');
 

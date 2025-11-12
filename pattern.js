@@ -5,6 +5,7 @@ import { panX, panY, zoom } from './main.js';
 import { points } from './grid.js'
 
 let savedPatterns = [];
+
 export let pendingPatternToPlace = null;
 export let patternInUse = false
 
@@ -21,17 +22,14 @@ export function setUpPatternUI() {
   const nameInput = document.getElementById('patternNameInput');
   const savedList = document.getElementById('savedPatternsList');
 
-  // Open submenu
   openPatternBtn.addEventListener('click', () => {
     patternSubmenu.classList.remove('hidden');
   });
 
-  // Close submenu
   closePatternBtn.addEventListener('click', () => {
     patternSubmenu.classList.add('hidden');
   });
 
-  // Export saved patterns
   exportBtn.addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(savedPatterns, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -42,10 +40,7 @@ export function setUpPatternUI() {
     URL.revokeObjectURL(url);
   });
 
-  // Trigger file input
   importBtn.addEventListener('click', () => importInput.click());
-
-  // Handle import
   importInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -73,8 +68,7 @@ export function setUpPatternUI() {
     };
     reader.readAsText(file);
   });
-
-  // Save current pattern
+  
   saveCurrentBtn.addEventListener('click', () => {
     const name = nameInput.value.trim();
     if (!name) {
@@ -146,8 +140,6 @@ export function renderPattern(click) {
 
   const offsetX = pendingPatternToPlace.points[0].x - closestGridPoint.x;
   const offsetY = pendingPatternToPlace.points[0].y - closestGridPoint.y;
-
-
 
   const newPoints = pendingPatternToPlace.points.map(p =>
     createVector(p.x - offsetX, p.y - offsetY)
