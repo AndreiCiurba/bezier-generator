@@ -11,7 +11,7 @@ export function drawBezierCurve(pointsArray, strokeColor = '#0000ff') {
   }
 }
 
-export function drawStringArtCurve(pointsArray, strokeColors = ['#0000ff', '#00ff00', '#ff0000'], segments = 9) {
+export function drawStringArtCurve(pointsArray, strokeColors = ['#0000ff', '#00ff00', '#ff0000'], segments = 8) {
   // Use only the first color from the array
   const strokeColor = strokeColors[0];
 
@@ -30,7 +30,7 @@ export function drawStringArtCurve(pointsArray, strokeColors = ['#0000ff', '#00f
       let t = j / segments;
       let x = lerp(p1.x, p2.x, t);
       let y = lerp(p1.y, p2.y, t);
-      line1Points.push(createVector(x, y));
+      line1Points.push(createVector(x,y));
     }
 
     // Generate points between p2 and p3
@@ -39,36 +39,18 @@ export function drawStringArtCurve(pointsArray, strokeColors = ['#0000ff', '#00f
       let t = j / segments;
       let x = lerp(p2.x, p3.x, t);
       let y = lerp(p2.y, p3.y, t);
-      line2Points.push(createVector(x, y));
+      line2Points.push(createVector(x,y));
     }
 
     // Draw connecting lines
-
-    stroke(strokeColors[0]);
-    // strokeWeight(1);
-    for (let j = 0; j <= segments; j++) {
-      let from = line1Points[j];
-      let to = line2Points[j];
-      line(from.x, from.y, to.x, to.y);
+    for (let j = 0; j < strokeColors.length; j++) {
+      stroke(strokeColors[j]);
+      for (let k = j + 1; k < segments; k++) {
+        let from = line1Points[k];
+        let to = line2Points[k - j];
+        line(from.x, from.y, to.x, to.y);
+      }
     }
-
-    stroke(strokeColors[1]);
-    // strokeWeight(0.6);
-    for (let j = 2; j <= segments; j++) {
-      let from = line1Points[j];
-      let to = line2Points[j - 2];
-      line(from.x, from.y, to.x, to.y);
-    }
-
-
-    stroke(strokeColors[2]);
-    // strokeWeight(0.4);
-    for (let j = 4; j <= segments; j++) {
-      let from = line1Points[j];
-      let to = line2Points[j - 4];
-      line(from.x, from.y, to.x, to.y);
-    }
-
   }
 }
 

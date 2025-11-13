@@ -1,25 +1,21 @@
 // colors.js
 export const storedCurves = [];
-export const favoriteTriplets = [];
+export const favoriteColorBundles = [];
 
-let currentStrokeColor1 = '#AEC8A4';
-let currentStrokeColor2 = '#8A784E';
-let currentStrokeColor3 = '#3B3B1A';
+let currentStrokeColors = ['#AEC8A4', '#8A784E', '#3B3B1A', '#33eaa2', '#11ff11', '#1111ff', '#ff1111'];
 
 export function getCurrentColors() {
-  return [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3];
+  return currentStrokeColors;
 }
 
 export function setCurrentColor(index, value) {
-  if (index === 0) currentStrokeColor1 = value;
-  else if (index === 1) currentStrokeColor2 = value;
-  else if (index === 2) currentStrokeColor3 = value;
+  currentStrokeColors[index] = value;
 }
 
 export function setUpColorUI() {
-  const colorPicker1 = document.getElementById('strokeColor1');
-  const colorPicker2 = document.getElementById('strokeColor2');
-  const colorPicker3 = document.getElementById('strokeColor3');
+  const container = document.getElementById('colorPickerContainer');
+  const colorPickers = container.querySelectorAll('input[type="color"]');
+
 
   const openFavoritesBtn = document.getElementById('openFavoritesBtn');
   const saveColorBtn = document.getElementById('saveCurrentColorBtn');
@@ -27,50 +23,45 @@ export function setUpColorUI() {
   const importColorsBtn = document.getElementById('importColorsBtn');
   const importColorsInput = document.getElementById('importColorsInput');
   const favoritesSubmenu = document.getElementById('colorFavoritesSubmenu');
-  
+
   const colorBurgerBtn = document.getElementById('closeColorSubmenuBtn');
   const colorSubmenu = document.getElementById('colorFavoritesSubmenu');
   const closeColorSubmenuBtn = document.getElementById('closeColorSubmenuBtn');
-  
+
   colorBurgerBtn.addEventListener('click', () => {
     colorSubmenu.classList.remove('hidden');
     colorBurgerBtn.classList.add('hidden');
   });
-  
-  
+
+
   closeColorSubmenuBtn.addEventListener('click', () => {
     colorSubmenu.classList.add('hidden');
     colorBurgerBtn.classList.remove('hidden');
   });
 
-
-
-  colorPicker1.value = currentStrokeColor1;
-  colorPicker2.value = currentStrokeColor2;
-  colorPicker3.value = currentStrokeColor3;
-
-  colorPicker1.addEventListener('input', (e) => currentStrokeColor1 = e.target.value);
-  colorPicker2.addEventListener('input', (e) => currentStrokeColor2 = e.target.value);
-  colorPicker3.addEventListener('input', (e) => currentStrokeColor3 = e.target.value);
+  for (let i = 0; i < colorPickers.length; i++) {
+    colorPickers[i].value = currentStrokeColors[i];
+    colorPickers[i].addEventListener('input', (e) => currentStrokeColors[i] = e.target.value);
+  }
 
   openFavoritesBtn.addEventListener('click', () => {
     favoritesSubmenu.classList.toggle('hidden');
   });
 
   saveColorBtn.addEventListener("click", () => {
-    const triplet = [currentStrokeColor1, currentStrokeColor2, currentStrokeColor3];
-    if (!favoriteTriplets.some(fav => JSON.stringify(fav) === JSON.stringify(triplet))) {
-      favoriteTriplets.push(triplet);
-      renderFavoriteTriplets();
+    const colorBundles = getCurrentColors();
+    if (!favoriteColorBundles.some(fav => JSON.stringify(fav) === JSON.stringify(colorBundles))) {
+      favoriteColorBundles.push(colorBundles);
+      renderFavoriteBundles();
     }
   });
 
   exportColorsBtn.addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify(favoriteTriplets)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(favoriteColorBundles)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'favorite-triplets.json';
+    a.download = 'color-lists.json';
     a.click();
     URL.revokeObjectURL(url);
   });
@@ -78,7 +69,7 @@ export function setUpColorUI() {
   importColorsBtn.addEventListener('click', () => {
     importColorsInput.click();
   });
-  
+
   importColorsInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -86,17 +77,11 @@ export function setUpColorUI() {
     reader.onload = () => {
       try {
         const imported = JSON.parse(reader.result);
-        if (
-          Array.isArray(imported) &&
-          imported.every(
-            triplet => Array.isArray(triplet) &&
-                       triplet.length === 3 &&
-                       triplet.every(c => typeof c === 'string')
-          )
-        ) {
-          favoriteTriplets.length = 0;
-          favoriteTriplets.push(...imported);
-          renderFavoriteTriplets();
+        if (Array.isArray(imported) &&
+          imported.every(bundle => Array.isArray(bundle) && bundle.every(c => typeof c === 'string'))) {
+          favoriteColorBundles.length = 0;
+          favoriteColorBundles.push(...imported);
+          renderFavoriteBundles();
         } else {
           alert('Invalid file format. Please import an array of color triplets.');
         }
@@ -106,42 +91,48 @@ export function setUpColorUI() {
     };
     reader.readAsText(file);
   });
-  
+
 
 }
-export function renderFavoriteTriplets() {
-    const container = document.getElementById("favoriteTripletsContainer");
-    container.innerHTML = "";  // Only clear this sub-container, not the whole submenu
-  
-    favoriteTriplets.forEach(triplet => {
-      const tripletDiv = document.createElement("div");
-      tripletDiv.style.display = "flex";
-      tripletDiv.style.gap = "6px";
-      tripletDiv.style.marginBottom = "6px";
-  
-      triplet.forEach((color, idx) => {
-        const colorBtn = document.createElement("button");
-        colorBtn.style.width = "24px";
-        colorBtn.style.height = "24px";
-        colorBtn.style.border = "1px solid #999";
-        colorBtn.style.backgroundColor = color;
-        colorBtn.title = color;
-  
-        colorBtn.addEventListener("click", () => {
-          if (idx === 0) currentStrokeColor1 = color;
-          if (idx === 1) currentStrokeColor2 = color;
-          if (idx === 2) currentStrokeColor3 = color;
-  
-          // Update the color pickers too:
-          document.getElementById('strokeColor1').value = currentStrokeColor1;
-          document.getElementById('strokeColor2').value = currentStrokeColor2;
-          document.getElementById('strokeColor3').value = currentStrokeColor3;
-        });
-  
-        tripletDiv.appendChild(colorBtn);
+export function renderFavoriteBundles() {
+  const container = document.getElementById("favoriteBundlesContainer");
+  container.innerHTML = "";  // Only clear this sub-container, not the whole submenu
+
+  favoriteColorBundles.forEach(bundle => {
+    const bundleDiv = document.createElement("div");
+    bundleDiv.style.display = "flex";
+    bundleDiv.style.gap = "2px";
+    bundleDiv.style.marginBottom = "6px";
+    bundleDiv.style.width = "100%";
+    bundleDiv.style.alignItems = "stretch";
+
+    bundle.forEach((color, idx) => {
+      const colorBtn = document.createElement("button");
+
+      colorBtn.style.flex = "1 1 0";
+      colorBtn.style.minWidth = "0"; 
+      colorBtn.style.boxSizing = "border-box";
+      colorBtn.style.aspectRatio = "1 / 1";
+      colorBtn.style.backgroundColor = color;
+      colorBtn.style.cursor = "pointer";
+      colorBtn.style.padding = "0";
+      colorBtn.title = color;
+
+      bundleDiv.addEventListener("click", () => {
+        currentStrokeColors[idx] = color;
+        const pickers = document.querySelectorAll('#colorPickerContainer input[type="color"]');
+        if (pickers[idx]) {
+          pickers[idx].value = color;
+        }
+
+        for (let i = 0; i < currentStrokeColors.length; i++) {
+          pickers[i].value = currentStrokeColors[i];
+        }
       });
-  
-      container.appendChild(tripletDiv);
+
+      bundleDiv.appendChild(colorBtn);
     });
-  }
-  
+    container.appendChild(bundleDiv);
+  });
+}
+

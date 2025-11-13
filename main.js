@@ -7,7 +7,7 @@ import {
   storedCurves,
   setUpColorUI,
   setCurrentColor,
-  renderFavoriteTriplets
+  renderFavoriteBundles
 } from './colors.js';
 
 import {
@@ -25,7 +25,7 @@ let isDragging = false, prevMouse;
 function setup() {
   setUpColorUI();
   setUpPatternUI();
-  renderFavoriteTriplets()
+  renderFavoriteBundles()
   // Grid parameters
   const rows = 15;
   const cols = 13;
@@ -39,25 +39,26 @@ function setup() {
   const resetBtn = document.getElementById('resetBtn');
 
   // Setup UI elements
-  const colorPicker1 = document.getElementById('strokeColor1');
-  const colorPicker2 = document.getElementById('strokeColor2');
-  const colorPicker3 = document.getElementById('strokeColor3');
+  const container = document.getElementById('colorPickerContainer');
+  const colorPickers = container.querySelectorAll('input[type="color"]');
 
-  const [c1, c2, c3] = getCurrentColors();
-  colorPicker1.value = c1;
-  colorPicker2.value = c2;
-  colorPicker3.value = c3;
 
-  colorPicker1.addEventListener('input', e => setCurrentColor(0, e.target.value));
-  colorPicker2.addEventListener('input', e => setCurrentColor(1, e.target.value));
-  colorPicker3.addEventListener('input', e => setCurrentColor(2, e.target.value));
+  let currentColors =  getCurrentColors();
+  for (let i = 0; i < colorPickers.length; i++) {
+    colorPickers[i].value = currentColors[i]
+    colorPickers[i].addEventListener('input', e => setCurrentColor(i, e.target.value));
+  }
 
   resetBtn.addEventListener('click', () => {
     resetPattern()
+    let curveColors = []
+    for(let i=0;i<colorPickers.length; i++) {
+      curveColors.push(colorPickers[i].value)
+    }
     if (selectedPoints.length >= 3) {
       storedCurves.push({
         points: selectedPoints.map(p => p.copy()),
-        colors: [colorPicker1.value, colorPicker2.value, colorPicker3.value]
+        colors: curveColors
       });
     }
     resetSelectedPoints();

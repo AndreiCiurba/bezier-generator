@@ -59,53 +59,54 @@
 #ui.hidden {
   display: none;
 }
-
 #colorPickerContainer {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;              /* allow wrapping to next line */
+  justify-content: center;      /* center pickers nicely */
   align-items: center;
-  gap: 6px;
+  gap: 10px;                    /* space between pickers */
   background-color: #393E46;
-  padding: 6px;
-  border-radius: 6px;
+  padding: 10px 1px;
+  border-radius: 10px;
 }
 
-#strokeColor1,
-#strokeColor2,
-#strokeColor3 {
+
+/* unified color picker styling */
+#colorPickerContainer input[type="color"] {
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   border: none;
-  width: 34px;
-  height: 28px;
+  width: 15px;
+  height: 15px;
   border-radius: 6px;
   cursor: pointer;
-  background-color: #00ADB5;
+  background-color: transparent; /* remove gray background behind swatch */
+  padding: 0;
   box-shadow: 0 0 4px rgba(0, 173, 181, 0.4);
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-#strokeColor1:hover,
-#strokeColor2:hover,
-#strokeColor3:hover {
+#colorPickerContainer input[type="color"]:hover {
   transform: scale(1.05);
   box-shadow: 0 0 8px rgba(0, 173, 181, 0.6);
 }
 
-#strokeColor1::-webkit-color-swatch,
-#strokeColor2::-webkit-color-swatch,
-#strokeColor3::-webkit-color-swatch {
+/* remove built-in border/padding on the actual color box */
+#colorPickerContainer input[type="color"]::-webkit-color-swatch {
   border: none;
   border-radius: 6px;
   padding: 0;
 }
 
-#strokeColor1::-moz-color-swatch,
-#strokeColor2::-moz-color-swatch,
-#strokeColor3::-moz-color-swatch {
+#colorPickerContainer input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0; /* key to shrink the thick border effect */
+}
+
+#colorPickerContainer input[type="color"]::-moz-color-swatch {
   border: none;
   border-radius: 6px;
+  padding: 0;
 }
 
 #resetBtn,
