@@ -17,7 +17,7 @@ export function handleMousePressed(worldMouse) {
 
 export function drawSelectedPath() {
   noFill();
-  stroke(0);
+  stroke(100);
   strokeWeight(2);
   for (let i = 0; i < selectedPoints.length - 1; i++) {
     let p1 = selectedPoints[i];

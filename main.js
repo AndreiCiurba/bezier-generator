@@ -96,7 +96,7 @@ function setup() {
 }
 
 function draw() {
-  background(255);
+  background(12);
   translate(panX, panY);
   scale(zoom);
 
@@ -119,7 +119,7 @@ function draw() {
 }
 
 function drawGrid() {
-  stroke(0);
+  stroke(100);
   strokeWeight(1);
   for (const p of points) {
     ellipse(p.x, p.y, 5, 5);
