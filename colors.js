@@ -1,4 +1,4 @@
-// colors.js
+
 export const storedCurves = [];
 export const favoriteColorBundles = [];
 

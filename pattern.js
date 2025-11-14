@@ -3,11 +3,31 @@ import { selectedPoints } from './interactions.js';
 import { drawStringArtCurve } from './bezier.js';
 import { panX, panY, zoom } from './main.js';
 import { points } from './grid.js'
+import { v4 as uuidv4 } from "https://unpkg.com/uuid@9.0.1/dist/esm-browser/index.js";
 
-let savedPatterns = [];
+export let savedPatterns = [];
 
-export let pendingPatternToPlace = null;
+export function findPatternById(id) {
+  for (let p of savedPatterns) {
+    if (p.id == id) {
+      return p;
+    }
+  }
+  return null;
+}
+
+export let selectedPatternId = null;
 export let patternInUse = false
+
+export function getSelectedPatternId() {
+  return selectedPatternId;
+}
+
+export function setSelectedPatternId(id, inUse) {
+  selectedPatternId = id;
+  patternInUse = inUse;
+}
+
 
 export function setUpPatternUI() {
   const patternSubmenu = document.getElementById('patternSubmenu');
@@ -51,8 +71,9 @@ export function setUpPatternUI() {
         const data = JSON.parse(event.target.result);
         if (Array.isArray(data)) {
           data.forEach(p => {
-            if (p.name && p.points && p.colors) {
+            if (p.name && p.points && p.id) {
               savedPatterns.push({
+                id: p.id,
                 name: p.name,
                 points: p.points,
                 colors: p.colors
@@ -68,7 +89,7 @@ export function setUpPatternUI() {
     };
     reader.readAsText(file);
   });
-  
+
   saveCurrentBtn.addEventListener('click', () => {
     const name = nameInput.value.trim();
     if (!name) {
@@ -82,9 +103,10 @@ export function setUpPatternUI() {
     }
 
     const pattern = {
+      id: uuidv4(),
       name,
       points: selectedPoints.map(p => ({ x: p.x, y: p.y })),
-      colors: getCurrentColors()
+      colors: getCurrentColors().slice()
     };
 
     savedPatterns.push(pattern);
@@ -101,9 +123,10 @@ export function setUpPatternUI() {
       li.style.marginBottom = '4px';
       li.addEventListener('click', () => {
         resetSelectedPatterns();
-        pendingPatternToPlace = pattern;
+        selectedPatternId = pattern.id;
         patternInUse = true;
         li.style.borderStyle = 'solid';
+        renderPatternThroughoutTheGrid()
       });
       savedList.appendChild(li);
     });
@@ -112,6 +135,7 @@ export function setUpPatternUI() {
 
 export function resetPattern() {
   patternInUse = false;
+  selectedPatternId = null;
   resetSelectedPatterns();
 }
 
@@ -123,7 +147,10 @@ function resetSelectedPatterns() {
 }
 
 export function renderPattern(click) {
-  if (!pendingPatternToPlace) return;
+  let selectedPattern = findPatternById(selectedPatternId);
+  if (selectedPattern == null) {
+    return;
+  }
 
   const worldMouse = createVector(
     (click.x - panX) / zoom,
@@ -138,28 +165,55 @@ export function renderPattern(click) {
     }
   }
 
-  const offsetX = pendingPatternToPlace.points[0].x - closestGridPoint.x;
-  const offsetY = pendingPatternToPlace.points[0].y - closestGridPoint.y;
+  const offsetX = selectedPattern.points[0].x - closestGridPoint.x;
+  const offsetY = selectedPattern.points[0].y - closestGridPoint.y;
 
-  const newPoints = pendingPatternToPlace.points.map(p =>
+  const newPoints = selectedPattern.points.map(p =>
     createVector(p.x - offsetX, p.y - offsetY)
   );
 
   storedCurves.push({
     points: newPoints,
-    colors: getCurrentColors()
+    colors: selectedPattern.colors,
+    patternId: selectedPatternId
   });
+}
+
+export function renderPatternThroughoutTheGrid() {
+  let selectedPattern = findPatternById(selectedPatternId);
+  if (selectedPattern == null) {
+    return;
+  }
+
+  if (storedCurves.some(c => c.patternId === selectedPatternId)) {
+    return;
+  }
+
+  for (let p of points) {
+    const offsetX = selectedPattern.points[0].x - p.x;
+    const offsetY = selectedPattern.points[0].y - p.y;
+
+    const newPoints = selectedPattern.points.map(point =>
+      createVector(point.x - offsetX, point.y - offsetY)
+    );
+
+    storedCurves.push({
+      points: newPoints,
+      colors: selectedPattern.colors,
+      patternId: selectedPatternId
+    });
+  }
 }
 
 export function drawPatternPreview() {
   const mousePos = createVector(mouseX, mouseY);
   const patternOrigin = createVector(
-    pendingPatternToPlace.points[0].x,
-    pendingPatternToPlace.points[0].y
+    selectedPatternId.points[0].x,
+    selectedPatternId.points[0].y
   );
   const offset = p5.Vector.sub(mousePos, patternOrigin);
 
-  const translated = pendingPatternToPlace.points.map(p =>
+  const translated = selectedPatternId.points.map(p =>
     createVector(p.x + offset.x, p.y + offset.y)
   );
 

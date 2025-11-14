@@ -15,8 +15,9 @@ import {
   patternInUse,
   resetPattern,
   renderPattern,
-  drawPatternPreview,
-  pendingPatternToPlace,
+  getSelectedPatternId,
+  setSelectedPatternId,
+  renderPatternThroughoutTheGrid,
 } from './pattern.js'
 
 export let panX = 0, panY = 0, zoom = 1;
@@ -100,14 +101,12 @@ function draw() {
   translate(panX, panY);
   scale(zoom);
 
-  // if (pendingPatternToPlace) {
-  //   // Optional: show preview at mouse
-  //   drawPatternPreview();
-  //   return; // Don't allow other drawing while a pattern is pending
-  // }
-
   drawGrid();
   for (const curve of storedCurves) {
+    if (curve.patternId === getSelectedPatternId()) {
+      curve.colors = getCurrentColors().slice();
+    }
+
     drawStringArtCurve(curve.points, curve.colors);
   }
 
@@ -137,11 +136,13 @@ function mousePressed() {
       (mouseX - panX) / zoom,
       (mouseY - panY) / zoom
     );
-    if (patternInUse) {
-      renderPattern(worldMouse)
-    } else {
+    
+    // if (patternInUse) {
+    //   // renderPattern(worldMouse)
+    //   renderPatternThroughoutTheGrid()
+    // } else {
       handleMousePressed(worldMouse);
-    }
+    // }
   }
 }
 
@@ -208,6 +209,7 @@ function touchesMenus() {
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     document.getElementById('resetBtn')?.click();
+    setSelectedPatternId(null, false)
   }
 });
 
