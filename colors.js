@@ -91,34 +91,29 @@ export function setUpColorUI() {
     };
     reader.readAsText(file);
   });
-
-
 }
+
 export function renderFavoriteBundles() {
   const container = document.getElementById("favoriteBundlesContainer");
   container.innerHTML = "";  // Only clear this sub-container, not the whole submenu
 
   favoriteColorBundles.forEach(bundle => {
     const bundleDiv = document.createElement("div");
-    bundleDiv.style.display = "flex";
-    bundleDiv.style.gap = "2px";
-    bundleDiv.style.marginBottom = "6px";
-    bundleDiv.style.width = "100%";
-    bundleDiv.style.alignItems = "stretch";
+    bundleDiv.classList.add("bundle");
 
     bundle.forEach((color, idx) => {
       const colorBtn = document.createElement("button");
-
-      colorBtn.style.flex = "1 1 0";
-      colorBtn.style.minWidth = "0"; 
-      colorBtn.style.boxSizing = "border-box";
-      colorBtn.style.aspectRatio = "1 / 1";
+      colorBtn.classList.add("color-btn");
       colorBtn.style.backgroundColor = color;
-      colorBtn.style.cursor = "pointer";
-      colorBtn.style.padding = "0";
       colorBtn.title = color;
 
       bundleDiv.addEventListener("click", () => {
+
+        document.querySelectorAll(".bundle").forEach(b => {
+          b.classList.remove("selected");
+        });
+        bundleDiv.classList.add("selected");
+
         currentStrokeColors[idx] = color;
         const pickers = document.querySelectorAll('#colorPickerContainer input[type="color"]');
         if (pickers[idx]) {
@@ -135,4 +130,3 @@ export function renderFavoriteBundles() {
     container.appendChild(bundleDiv);
   });
 }
-
