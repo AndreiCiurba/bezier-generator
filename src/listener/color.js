@@ -4,8 +4,7 @@ document
   .querySelectorAll('#colorPickerContainer input[type="color"]')
   .forEach((picker, index) => {
 
-    picker.addEventListener("click", (e) => {
-      if (!e.ctrlKey) return;
+    picker.addEventListener("contextmenu", (e) => {
       e.preventDefault();
 
       getCurrentStrokes()[index].enabled =
