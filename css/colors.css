@@ -1,0 +1,21 @@
+.bundle {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 6px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.color-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.bundle.selected {
+  border: 3px solid rgb(162, 162, 162);
+  border-radius: 6px;
+}
