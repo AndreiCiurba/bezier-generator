@@ -1,4 +1,4 @@
-import { storedCurves, getCurrentColors } from './colors.js';
+import { storedCurves, getCurrentStrokes } from './colors.js';
 import { selectedPoints } from './interactions.js';
 import { drawStringArtCurve } from './bezier.js';
 import { panX, panY, zoom } from './main.js';
@@ -109,7 +109,10 @@ export function setUpPatternUI() {
       id: uuidv4(),
       name,
       points: selectedPoints.map(p => ({ x: p.x, y: p.y })),
-      colors: getCurrentColors().slice()
+      colors: getCurrentStrokes().map(c => ({
+        color: c.color,
+        enabled: c.enabled
+      }))
     };
 
     savedPatterns.push(pattern);
@@ -186,7 +189,7 @@ export function renderPattern(click) {
 
   storedCurves.push({
     points: newPoints,
-    colors: selectedPattern.colors,
+    colors: selectedPattern.colors.slice(),
     patternId: selectedPatternId
   });
 }
@@ -234,12 +237,18 @@ export function drawPatternPreview(pattern, mousePos) {
   stroke(0);
   noFill();
   beginShape();
-  drawStringArtCurve(translated, getPatternPreviewColors());
+  drawStringArtCurve(translated, getPatternPreviewStrokes());
   endShape();
 }
 
-function getPatternPreviewColors() {
-  return ['#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff'];
-
+function getPatternPreviewStrokes() {
+  return [
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true },
+    { color: '#ffffffff', enabled: true }
+  ];
 }
-

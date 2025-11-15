@@ -2,14 +2,29 @@
 export const storedCurves = [];
 export const favoriteColorBundles = [];
 
-let currentStrokeColors = ['#AEC8A4', '#8A784E', '#3B3B1A', '#33eaa2', '#11ff11', '#1111ff', '#ff1111'];
+let currentStrokeColors = [
+  { color: '#AEC8A4', enabled: true },
+  { color: '#8A784E', enabled: true },
+  { color: '#3B3B1A', enabled: true },
+  { color: '#33eaa2', enabled: true },
+  { color: '#11ff11', enabled: true },
+  { color: '#1111ff', enabled: true },
+  { color: '#ff1111', enabled: true }
+];
 
-export function getCurrentColors() {
+export function getCurrentColorList() {
+  return currentStrokeColors
+    .filter(entry => entry.enabled)
+    .map(entry => entry.color);
+}
+
+
+export function getCurrentStrokes() {
   return currentStrokeColors;
 }
 
 export function setCurrentColor(index, value) {
-  currentStrokeColors[index] = value;
+  currentStrokeColors[index].color = value;
 }
 
 export function setUpColorUI() {
@@ -40,8 +55,8 @@ export function setUpColorUI() {
   });
 
   for (let i = 0; i < colorPickers.length; i++) {
-    colorPickers[i].value = currentStrokeColors[i];
-    colorPickers[i].addEventListener('input', (e) => currentStrokeColors[i] = e.target.value);
+    colorPickers[i].value = currentStrokeColors[i].color;
+    colorPickers[i].addEventListener('input', (e) => currentStrokeColors[i].color = e.target.value);
   }
 
   openFavoritesBtn.addEventListener('click', () => {
@@ -49,7 +64,7 @@ export function setUpColorUI() {
   });
 
   saveColorBtn.addEventListener("click", () => {
-    const colorBundles = getCurrentColors();
+    const colorBundles = getCurrentColorList();
     if (!favoriteColorBundles.some(fav => JSON.stringify(fav) === JSON.stringify(colorBundles))) {
       favoriteColorBundles.push(colorBundles);
       renderFavoriteBundles();
@@ -114,14 +129,11 @@ export function renderFavoriteBundles() {
         });
         bundleDiv.classList.add("selected");
 
-        currentStrokeColors[idx] = color;
+
+        setCurrentColor(idx, color);
         const pickers = document.querySelectorAll('#colorPickerContainer input[type="color"]');
         if (pickers[idx]) {
           pickers[idx].value = color;
-        }
-
-        for (let i = 0; i < currentStrokeColors.length; i++) {
-          pickers[i].value = currentStrokeColors[i];
         }
       });
 
