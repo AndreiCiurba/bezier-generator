@@ -11,14 +11,15 @@ export function drawBezierCurve(pointsArray, strokeColor = '#0000ff') {
   }
 }
 
-export function drawStringArtCurve(pointsArray, strokeColors, segments = 8) {
-  strokeWeight(0.6);
+export function drawStringArtCurve(pointsArray, strokes, segments = 8) {
+  strokeWeight(0.6)
   noFill();
 
   for (let i = 0; i < pointsArray.length - 2; i++) {
     let p1 = pointsArray[i];
     let p2 = pointsArray[i + 1];
     let p3 = pointsArray[i + 2];
+
     // Generate points between p1 and p2
     let line1Points = [];
     for (let j = 0; j <= segments; j++) {
@@ -38,8 +39,11 @@ export function drawStringArtCurve(pointsArray, strokeColors, segments = 8) {
     }
 
     // Draw connecting lines
-    for (let j = 0; j < strokeColors.length; j++) {
-      stroke(strokeColors[j]);
+    for (let j = 0; j < strokes.length; j++) {
+      if (!strokes[j].enabled) {
+        continue;
+      }
+      stroke(strokes[j].color);
       for (let k = j + 1; k < segments; k++) {
         let from = line1Points[k];
         let to = line2Points[k - j];

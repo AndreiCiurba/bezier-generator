@@ -3,11 +3,10 @@ import { selectedPoints, drawSelectedPath, resetSelectedPoints } from './interac
 import { drawStringArtCurve, generateZigzagFromGrid } from './bezier.js';
 import { handleMousePressed } from './interactions.js';
 import {
-  getCurrentColors,
+  getCurrentStrokes,
   storedCurves,
   setUpColorUI,
-  setCurrentColor,
-  renderFavoriteBundles
+  renderFavoriteBundles,
 } from './colors.js';
 
 import {
@@ -46,18 +45,14 @@ function setup() {
   const container = document.getElementById('colorPickerContainer');
   const colorPickers = container.querySelectorAll('input[type="color"]');
 
-
-  let currentColors = getCurrentColors();
-  for (let i = 0; i < colorPickers.length; i++) {
-    colorPickers[i].value = currentColors[i]
-    colorPickers[i].addEventListener('input', e => setCurrentColor(i, e.target.value));
-  }
-
   resetBtn.addEventListener('click', () => {
     resetPattern()
     let curveColors = []
     for (let i = 0; i < colorPickers.length; i++) {
-      curveColors.push(colorPickers[i].value)
+      curveColors.push({
+        color: colorPickers[i].value,
+        enabled: getCurrentStrokes()[i].enabled
+      })
     }
     if (selectedPoints.length >= 3) {
       storedCurves.push({
@@ -107,14 +102,17 @@ function draw() {
   drawGrid();
   for (const curve of storedCurves) {
     if (curve.patternId === getSelectedPatternId()) {
-      curve.colors = getCurrentColors().slice();
+      curve.colors = getCurrentStrokes().map(c => ({
+        color: c.color,
+        enabled: c.enabled
+      }));;
     }
 
     drawStringArtCurve(curve.points, curve.colors);
   }
 
   if (selectedPoints.length >= 3) {
-    drawStringArtCurve(selectedPoints, getCurrentColors());
+    drawStringArtCurve(selectedPoints, getCurrentStrokes());
   }
 
   drawSelectedPath();
