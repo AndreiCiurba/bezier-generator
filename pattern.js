@@ -19,6 +19,9 @@ export function findPatternById(id) {
 export let selectedPatternId = null;
 export let patternInUse = false
 
+export let previewPattern = null;
+export let previewMouse = null;
+
 export function getSelectedPatternId() {
   return selectedPatternId;
 }
@@ -128,6 +131,15 @@ export function setUpPatternUI() {
         li.style.borderStyle = 'solid';
         renderPatternThroughoutTheGrid()
       });
+
+      li.addEventListener("mousemove", () => {
+        previewPattern = pattern;
+        previewMouse = createVector(mouseX, mouseY);
+      });
+
+      li.addEventListener("mouseleave", () => {
+        previewPattern = null;
+      });
       savedList.appendChild(li);
     });
   }
@@ -205,15 +217,16 @@ export function renderPatternThroughoutTheGrid() {
   }
 }
 
-export function drawPatternPreview() {
-  const mousePos = createVector(mouseX, mouseY);
+export function drawPatternPreview(pattern, mousePos) {
+
   const patternOrigin = createVector(
-    selectedPatternId.points[0].x,
-    selectedPatternId.points[0].y
+    pattern.points[0].x - 140,
+    pattern.points[0].y
   );
+
   const offset = p5.Vector.sub(mousePos, patternOrigin);
 
-  const translated = selectedPatternId.points.map(p =>
+  const translated = pattern.points.map(p =>
     createVector(p.x + offset.x, p.y + offset.y)
   );
 
@@ -221,7 +234,12 @@ export function drawPatternPreview() {
   stroke(0);
   noFill();
   beginShape();
-  drawStringArtCurve(translated, getCurrentColors());
-
+  drawStringArtCurve(translated, getPatternPreviewColors());
   endShape();
 }
+
+function getPatternPreviewColors() {
+  return ['#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff', '#ffffffff'];
+
+}
+
