@@ -18,6 +18,9 @@ import {
   getSelectedPatternId,
   setSelectedPatternId,
   renderPatternThroughoutTheGrid,
+  drawPatternPreview,
+  previewPattern,
+  previewMouse,
 } from './pattern.js'
 
 export let panX = 0, panY = 0, zoom = 1;
@@ -44,7 +47,7 @@ function setup() {
   const colorPickers = container.querySelectorAll('input[type="color"]');
 
 
-  let currentColors =  getCurrentColors();
+  let currentColors = getCurrentColors();
   for (let i = 0; i < colorPickers.length; i++) {
     colorPickers[i].value = currentColors[i]
     colorPickers[i].addEventListener('input', e => setCurrentColor(i, e.target.value));
@@ -53,7 +56,7 @@ function setup() {
   resetBtn.addEventListener('click', () => {
     resetPattern()
     let curveColors = []
-    for(let i=0;i<colorPickers.length; i++) {
+    for (let i = 0; i < colorPickers.length; i++) {
       curveColors.push(colorPickers[i].value)
     }
     if (selectedPoints.length >= 3) {
@@ -115,6 +118,10 @@ function draw() {
   }
 
   drawSelectedPath();
+
+  if (previewPattern && previewMouse) {
+    drawPatternPreview(previewPattern, previewMouse);
+  }
 }
 
 function drawGrid() {
@@ -136,13 +143,8 @@ function mousePressed() {
       (mouseX - panX) / zoom,
       (mouseY - panY) / zoom
     );
-    
-    // if (patternInUse) {
-    //   // renderPattern(worldMouse)
-    //   renderPatternThroughoutTheGrid()
-    // } else {
-      handleMousePressed(worldMouse);
-    // }
+
+    handleMousePressed(worldMouse);
   }
 }
 
