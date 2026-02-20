@@ -40,14 +40,25 @@ export function drawStringArtCurve(pointsArray, strokes, segments = 8) {
 
     // Draw connecting lines
     for (let j = 0; j < strokes.length; j++) {
-      if (!strokes[j].enabled) {
-        continue;
-      }
+      if (!strokes[j].enabled) continue;
+      
       stroke(strokes[j].color);
-      for (let k = j + 1; k < segments; k++) {
-        let from = line1Points[k];
-        let to = line2Points[k - j];
-        line(from.x, from.y, to.x, to.y);
+
+      // 'segments' is 8 in your case (points 0-8)
+      for (let k = 0; k < segments; k++) {
+        // Current mapping: AB[k] connects to BC[k + 1 - j]
+        // For the base layer (j=0), this results in:
+        // AB0 -> BC1, AB1 -> BC2 ... AB7 -> BC8
+        
+        let fromIndex = k;
+        let toIndex = (k + 1) - j; 
+
+        // Safety check to ensure we stay within the nail array (0 to 8)
+        if (toIndex > 0 && toIndex <= segments) {
+          let from = line1Points[fromIndex];
+          let to = line2Points[toIndex];
+          line(from.x, from.y, to.x, to.y);
+        }
       }
     }
   }

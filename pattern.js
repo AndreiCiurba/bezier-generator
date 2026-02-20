@@ -22,6 +22,8 @@ export let patternInUse = false
 export let previewPattern = null;
 export let previewMouse = null;
 
+export let usePatternManually = true;
+
 export function getSelectedPatternId() {
   return selectedPatternId;
 }
@@ -41,6 +43,8 @@ export function setUpPatternUI() {
   const importBtn = document.getElementById('importPatternBtn');
   const importInput = document.getElementById('importPatternInput');
   const saveCurrentBtn = document.getElementById('saveCurrentPatternBtn');
+
+  const togglePatternBtn = document.getElementById('toggleBtn');
 
   const nameInput = document.getElementById('patternNameInput');
   const savedList = document.getElementById('savedPatternsList');
@@ -93,6 +97,17 @@ export function setUpPatternUI() {
     reader.readAsText(file);
   });
 
+  togglePatternBtn.addEventListener('click', () => {
+    if(togglePatternBtn.textContent =="Manual"){
+      togglePatternBtn.textContent ="Auto";
+      usePatternManually = false;
+    }
+    else if(togglePatternBtn.textContent =="Auto"){
+      togglePatternBtn.textContent ="Manual";
+      usePatternManually = true;
+    }
+  });
+
   saveCurrentBtn.addEventListener('click', () => {
     const name = nameInput.value.trim();
     if (!name) {
@@ -130,9 +145,13 @@ export function setUpPatternUI() {
       li.addEventListener('click', () => {
         resetSelectedPatterns();
         selectedPatternId = pattern.id;
-        patternInUse = true;
         li.style.borderStyle = 'solid';
-        renderPatternThroughoutTheGrid()
+
+        setSelectedPatternId(pattern.id, true);
+        if (usePatternManually) {
+        } else {
+          renderPatternThroughoutTheGrid();
+        }
       });
 
       li.addEventListener("mousemove", () => {

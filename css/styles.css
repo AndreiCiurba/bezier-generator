@@ -121,7 +121,8 @@
 #openPatternBtn,
 #exportPatternBtn,
 #importPatternBtn,
-#saveCurrentPatternBtn {
+#saveCurrentPatternBtn,
+#toggleBtn {
   background-color: rgb(255, 204, 0);
   /* sea green */
   color: rgb(177, 59, 255);

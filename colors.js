@@ -9,7 +9,8 @@ let currentStrokeColors = [
   { color: '#33eaa2', enabled: true },
   { color: '#11ff11', enabled: true },
   { color: '#1111ff', enabled: true },
-  { color: '#ff1111', enabled: true }
+  { color: '#ff1111', enabled: true },
+  { color: '#ffffff', enabled: true }
 ];
 
 export function getCurrentColorList() {

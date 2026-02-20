@@ -142,7 +142,11 @@ function mousePressed() {
       (mouseY - panY) / zoom
     );
 
-    handleMousePressed(worldMouse);
+     if (patternInUse) {
+      renderPattern(worldMouse)
+    } else {
+      handleMousePressed(worldMouse);
+    }
   }
 }
 
