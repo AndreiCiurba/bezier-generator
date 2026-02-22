@@ -101,14 +101,15 @@ function draw() {
 
   drawGrid();
   for (const curve of storedCurves) {
-    if (curve.patternId === getSelectedPatternId()) {
-      curve.colors = getCurrentStrokes().map(c => ({
+    if (curve.patternId === getSelectedPatternId() && !curve.previoulsyDrawn) {
+      curve.colors = getCurrentStrokes().slice().map(c => ({
         color: c.color,
         enabled: c.enabled
-      }));;
+      }));
     }
 
     drawStringArtCurve(curve.points, curve.colors);
+    curve.previoulsyDrawn = true
   }
 
   if (selectedPoints.length >= 3) {

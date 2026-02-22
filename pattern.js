@@ -148,8 +148,7 @@ export function setUpPatternUI() {
         li.style.borderStyle = 'solid';
 
         setSelectedPatternId(pattern.id, true);
-        if (usePatternManually) {
-        } else {
+        if (!usePatternManually) {
           renderPatternThroughoutTheGrid();
         }
       });
@@ -209,7 +208,8 @@ export function renderPattern(click) {
   storedCurves.push({
     points: newPoints,
     colors: selectedPattern.colors.slice(),
-    patternId: selectedPatternId
+    patternId: selectedPatternId,
+    previouslyDrawn: false,
   });
 }
 
