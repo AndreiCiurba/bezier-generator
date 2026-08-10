@@ -130,15 +130,18 @@ lot more here than it did for the grid tool.
 ### Step 2b — live alignment-highlighted preview line (✅ implemented, completes backlog item 2)
 
 - **What:** after the first point is placed, a "rubber band" line follows the cursor - a preview
-  of the next segment before you click to commit it. Turns the app's gold button-accent color
-  (`rgb(255, 204, 0)`, same as `--btn-bg`) when it's perfectly horizontal or vertical (within a
-  tolerance), signaling "this segment is straight" - otherwise it's the same grey as the
-  already-committed guide-line segments (`stroke(100)`).
-- **Alignment check:** `isAxisAligned(from, to, tolerance)` in the new, pure, unit-tested
-  `src/freestyle/lineAlignment.js` - true if the two points share (within tolerance) an x or a y.
-  Checked in **screen space** (not world space) so the tolerance reads the same regardless of
-  zoom level - "within a few screen pixels" (4px) feels consistent whether zoomed in or out, unlike
-  a fixed world-space tolerance which would feel stricter/looser as you zoom.
+  of the next segment before you click to commit it. Its color is a continuous grey→red gradient
+  (`rgb(100,100,100)` → `rgb(220,40,40)`) based on how close it is to perfectly horizontal or
+  vertical - full red exactly on axis, grey at/beyond a 50-screen-px falloff range, smoothly
+  interpolated in between. Signals "getting closer to straight" as a gradient rather than a sudden
+  snap. (First cut was a hard on/off color swap to gold at a 4px tolerance; that read as an abrupt
+  jump right at the threshold, so it became a continuous fade instead.)
+- **Alignment math:** `axisMisalignment(from, to)` (smaller of the x/y difference) and
+  `alignmentCloseness(offset, maxDistance)` (0..1, linear falloff) in the pure, unit-tested
+  `src/freestyle/lineAlignment.js`; `lerpColor(colorA, colorB, t)` in the new, pure, unit-tested
+  `src/freestyle/colorGradient.js`. Checked in **screen space** (not world space) so the falloff
+  distance reads the same regardless of zoom level, unlike a fixed world-space distance which
+  would feel stricter/looser as you zoom.
 - **Scope:** only the live, not-yet-placed segment. Once you click, that segment is committed and
   keeps its normal grey forever - `LivePreviewLine` is only ever drawn for `selection.lastPoint`
   (a new getter added to `SelectionStore`) → cursor, nothing retroactive.

@@ -14,9 +14,10 @@ behind each one.
       a bold moderate-grey line every 10 cells, darker-grey minor lines between (`GraphPaperRenderer`
       + pure `graphPaperMath.js`). Drawn in world space, so it pans/zooms with the design. **Plus** a
       live "rubber band" line from the last placed point to the cursor while building a curve,
-      turning the app's gold accent color when it's (within a few screen px, any zoom) perfectly
-      horizontal or vertical - "this segment is straight" (`LivePreviewLine` + pure
-      `lineAlignment.js`). Only the in-progress segment; committed segments keep their normal color.
+      fading through a continuous grey→red gradient as it gets closer to perfectly horizontal or
+      vertical (full red exactly on-axis, grey beyond a 50px screen falloff, any zoom) - "this
+      segment is straight" (`LivePreviewLine` + pure `lineAlignment.js` + `colorGradient.js`).
+      Only the in-progress segment; committed segments keep their normal color.
 - [x] **3. Canvas size pre-selection** — preset dropdown (20×20, 30×30, 30×40, 40×40, 50×50 cm)
       + custom width/height fields, centered on screen. **Default: 20×20cm @ 90 DPI** (709×709px).
 - [ ] **4. Number of colors pre-selection** — not started. Freestyle still uses the fixed 8-slot
