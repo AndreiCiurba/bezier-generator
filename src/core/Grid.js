@@ -67,6 +67,30 @@ export class Grid {
   }
 
   /**
+   * Axis-aligned bounding box of every point in the grid - the actual shape
+   * the current rows/cols/spacing produce (e.g. tall and narrow for a few
+   * cols and many rows, roughly square for a balanced count), not an
+   * assumed fixed shape. Used to center the grid within the canvas.
+   * @returns {{minX:number, minY:number, maxX:number, maxY:number, width:number, height:number}}
+   */
+  boundingBox() {
+    if (this.#points.length === 0) {
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 };
+    }
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const p of this.#points) {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    }
+    return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
+  }
+
+  /**
    * Nearest grid point to `worldPos`, or null if nothing is within `maxDistance`.
    * @param {{x: number, y: number}} worldPos
    * @param {number} maxDistance

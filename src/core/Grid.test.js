@@ -35,4 +35,28 @@ describe('Grid', () => {
 
     expect(grid.findNearestPoint(new Point(0, 0), 10)).toBeNull();
   });
+
+  describe('boundingBox', () => {
+    it('spans exactly from the min to the max point on each axis', () => {
+      const grid = new Grid(config);
+      grid.points.length = 0;
+      grid.points.push(new Point(10, 100), new Point(50, 20), new Point(30, 60));
+
+      expect(grid.boundingBox()).toEqual({ minX: 10, minY: 20, maxX: 50, maxY: 100, width: 40, height: 80 });
+    });
+
+    it('produces a wide box for many rows and few cols, and a tall one for the reverse', () => {
+      const wide = new Grid({ ...config, rows: 15, cols: 2 });
+      const tall = new Grid({ ...config, rows: 2, cols: 15 });
+
+      expect(wide.boundingBox().width).toBeGreaterThan(wide.boundingBox().height);
+      expect(tall.boundingBox().height).toBeGreaterThan(tall.boundingBox().width);
+    });
+
+    it('returns a degenerate zero box for an empty grid rather than +/-Infinity', () => {
+      const grid = new Grid(config);
+      grid.points.length = 0;
+      expect(grid.boundingBox()).toEqual({ minX: 0, minY: 0, maxX: 0, maxY: 0, width: 0, height: 0 });
+    });
+  });
 });

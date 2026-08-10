@@ -83,13 +83,16 @@ lot more here than it did for the grid tool.
 - Dark-themed submenu form fields (`.panel select`/`input[type=text]`/`input[type=number]` in
   `css/styles.css`) - the Canvas Size fields were plain default-browser white boxes; this fixed
   that and, being a shared rule, also themed the Patterns submenu's "name..." field on both pages.
-- **Grid tool gets the same centered/framed treatment.** What was `css/freestyle.css`
-  (freestyle-only: center the canvas, grey page background) turned out to apply equally well to
-  the grid tool once asked for it too, so it's now `css/canvas-frame.css`, loaded by both pages.
-  The grid tool's canvas is inset by a fixed `CANVAS_MARGIN` (30px, both at startup and in
-  `windowResized`) rather than given a fixed size like freestyle - it has no "one physical board"
-  concept, it's meant to pan/zoom over a large lattice, so shrinking-to-fit isn't the goal, just
-  a visible frame instead of bleeding to the window edges.
+- **Grid tool gets the same centered/framed treatment - and then some.** What was
+  `css/freestyle.css` (freestyle-only: center the canvas, grey page background) turned out to
+  apply equally well to the grid tool once asked for it too, so it's now `css/canvas-frame.css`,
+  loaded by both pages. First cut inset the canvas by a fixed margin from the window edges; asked
+  again, the actual want was for the canvas to be *sized to the grid's own bounding box* (whatever
+  shape the current rows/cols/spacing produce - `Grid#boundingBox()`) plus a fixed padding, with
+  the viewport panned so that box sits centered inside it - a square canvas for a roughly-square
+  grid, a tall narrow one for a few columns and many rows, etc. Computed once in the constructor;
+  no `windowResized` needed anymore (the canvas is no longer window-size-dependent), the CSS
+  centering keeps it centered through any resize on its own.
 
 #### Bugs caught during verification
 

@@ -33,9 +33,11 @@ Not backlog items themselves, but built in service of them or as follow-up polis
       out-of-canvas point and drew a line toward it (`touchesMenus()` was checking the wrong page
       coordinates). Also added a canvas-bounds guard as a second line of defense.
 - [x] Grid tool's canvas is now also centered and framed on the grey page background (previously
-      only freestyle was) — same `css/canvas-frame.css` treatment, inset by a fixed margin instead
-      of a fixed size (the grid tool has no "canvas size" concept — it's meant to pan/zoom over a
-      large lattice, not represent one physical board size).
+      only freestyle was) — same `css/canvas-frame.css` treatment. The canvas is sized to the
+      grid's own bounding box (`Grid#boundingBox()`) plus padding, not the window, so it takes the
+      actual shape the current rows/cols produce (square, tall, wide, ...) and the nails fill it
+      evenly instead of hugging the top-left corner. No auto-zoom (pan only, zoom stays 1); stays
+      centered through a window resize via CSS alone, no `windowResized` handler needed anymore.
 
 ## Status legend
 

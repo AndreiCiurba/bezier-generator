@@ -23,10 +23,10 @@ GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
 const NEAREST_NAIL_RADIUS = 10;
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
-// Inset from the window edges so the canvas reads as a centered, framed
-// board on the grey page background (see css/canvas-frame.css) instead of
-// bleeding edge-to-edge.
-const CANVAS_MARGIN = 30;
+// Empty margin around the grid's own bounding box, on every side, when
+// sizing the canvas to it - so the outermost nails don't sit flush against
+// the canvas edge.
+const GRID_PADDING = 50;
 
 /**
  * The whole app, wired together. Replaces main.js as the p5 sketch entry
@@ -37,7 +37,18 @@ const CANVAS_MARGIN = 30;
 export class App {
   constructor() {
     this.grid = new Grid({ layout: 'rotated', ...GRID_CONFIG });
-    this.viewport = new Viewport();
+    // The canvas is sized to the grid's own bounding box (whatever shape
+    // rows/cols/spacing actually produce - square, tall, wide, ...) plus a
+    // padding margin, and the viewport is panned so that box sits centered
+    // within it. Both the canvas element and this pan are computed once,
+    // up front - the CSS that centers the canvas element on the page (see
+    // .centered-canvas) does the rest, including staying centered across a
+    // window resize, with no JS involved.
+    const bbox = this.grid.boundingBox();
+    this.viewport = new Viewport({ x: GRID_PADDING - bbox.minX, y: GRID_PADDING - bbox.minY });
+    this.canvasWidth = bbox.width + GRID_PADDING * 2;
+    this.canvasHeight = bbox.height + GRID_PADDING * 2;
+
     this.palette = new StrokePalette();
     this.favorites = new FavoritesStore();
     this.curves = new CurveStore();
@@ -216,10 +227,6 @@ export class App {
     return false;
   };
 
-  windowResized = () => {
-    resizeCanvas(windowWidth - CANVAS_MARGIN * 2, windowHeight - CANVAS_MARGIN * 2);
-  };
-
   /** Places a point at a screen-space position: stamps a pattern if one is active, otherwise extends the manual selection. */
   #placeAtScreenPoint(screenX, screenY) {
     if (this.patterns.isInUse) {
@@ -232,7 +239,7 @@ export class App {
   }
 
   #createCanvas() {
-    const renderer = createCanvas(windowWidth - CANVAS_MARGIN * 2, windowHeight - CANVAS_MARGIN * 2);
+    const renderer = createCanvas(this.canvasWidth, this.canvasHeight);
     renderer.canvas.classList.add('centered-canvas');
   }
 }
