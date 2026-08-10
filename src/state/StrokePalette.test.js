@@ -34,4 +34,32 @@ describe('StrokePalette', () => {
     palette.setColor(0, '#b');
     expect(snap[0].color).toBe('#a');
   });
+
+  describe('resize', () => {
+    it('shrinking truncates from the end, keeping earlier slots untouched', () => {
+      const palette = new StrokePalette(['#a', '#b', '#c']);
+      palette.setColor(0, '#custom');
+      palette.resize(2);
+      expect(palette.size).toBe(2);
+      expect(palette.getSlot(0).color).toBe('#custom');
+      expect(palette.getSlot(1).color).toBe('#b');
+    });
+
+    it('growing appends new enabled slots without touching existing ones', () => {
+      const palette = new StrokePalette(['#a', '#b']);
+      palette.toggleEnabled(0);
+      palette.resize(4, '#fill');
+      expect(palette.size).toBe(4);
+      expect(palette.getSlot(0)).toEqual({ color: '#a', enabled: false });
+      expect(palette.getSlot(2)).toEqual({ color: '#fill', enabled: true });
+      expect(palette.getSlot(3)).toEqual({ color: '#fill', enabled: true });
+    });
+
+    it('is a no-op when resizing to the current size', () => {
+      const palette = new StrokePalette(['#a', '#b']);
+      palette.resize(2);
+      expect(palette.size).toBe(2);
+      expect(palette.getSlot(0).color).toBe('#a');
+    });
+  });
 });

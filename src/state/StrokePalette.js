@@ -47,6 +47,22 @@ export class StrokePalette {
     return this.#slots[index].enabled;
   }
 
+  /**
+   * Grows or shrinks the slot count. Shrinking truncates from the end;
+   * growing appends new enabled slots in `fillColor`. Existing slots that
+   * remain in range keep their color/enabled state untouched.
+   */
+  resize(newSize, fillColor = '#ffffff') {
+    if (newSize === this.#slots.length) return;
+    if (newSize < this.#slots.length) {
+      this.#slots.length = newSize;
+      return;
+    }
+    for (let i = this.#slots.length; i < newSize; i++) {
+      this.#slots.push({ color: fillColor, enabled: true });
+    }
+  }
+
   /** Deep-cloned snapshot, safe to store on a Curve without aliasing live slot objects. */
   snapshot() {
     return this.#slots.map((s) => ({ color: s.color, enabled: s.enabled }));

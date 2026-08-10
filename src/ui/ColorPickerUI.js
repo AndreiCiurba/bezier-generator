@@ -1,25 +1,41 @@
 /**
- * Wires the 8 `<input type="color">` swatches to a StrokePalette: left-click
- * changes the color, right-click toggles that layer on/off.
+ * Wires the palette's color swatches to a StrokePalette: left-click changes
+ * the color, right-click toggles that layer on/off. Owns creating the
+ * `<input type="color">` elements itself (rather than assuming the markup
+ * already has them) so the count can change - see `rebuild()`, used by
+ * freestyle's color-count picker. The grid tool never resizes its palette,
+ * so for it this just creates the same 8 inputs it always rendered.
  *
  * The original app split this in two: colors.js wired the color-change
  * listener, and src/listener/color.js separately queried the *same* pickers
  * to add both a right-click toggle listener AND a second, redundant
  * color-change listener that duplicated the one in colors.js. This merges
- * both concerns into a single pass over the pickers with one listener each.
+ * both concerns into a single pass, one listener each.
  */
 export class ColorPickerUI {
   /**
-   * @param {HTMLElement} container element wrapping the color inputs
+   * @param {HTMLElement} container element to hold the color inputs (its
+   *   existing children, if any, are discarded and rebuilt from the palette)
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    */
   constructor(container, palette) {
-    this.pickers = [...container.querySelectorAll('input[type="color"]')];
+    this.container = container;
     this.palette = palette;
+    this.pickers = [];
   }
 
   init() {
-    this.pickers.forEach((picker, index) => {
+    this.rebuild();
+  }
+
+  /** Recreates the picker elements to match the palette's current size. Call after resizing the palette. */
+  rebuild() {
+    this.container.innerHTML = '';
+    this.pickers = [];
+
+    for (let index = 0; index < this.palette.size; index++) {
+      const picker = document.createElement('input');
+      picker.type = 'color';
       picker.value = this.palette.getSlot(index).color;
 
       picker.addEventListener('input', () => {
@@ -31,7 +47,11 @@ export class ColorPickerUI {
         const enabled = this.palette.toggleEnabled(index);
         this.#updateEnabledVisual(picker, enabled);
       });
-    });
+
+      this.#updateEnabledVisual(picker, this.palette.getSlot(index).enabled);
+      this.pickers.push(picker);
+      this.container.appendChild(picker);
+    }
   }
 
   /** Reflects a slot's color/enabled state back into its picker, e.g. after applying a favorite bundle. */

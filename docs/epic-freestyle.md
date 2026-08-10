@@ -154,10 +154,38 @@ lot more here than it did for the grid tool.
   outside the canvas bounds (reuses `isWithinBounds` from the earlier bugfix) - same reasoning as
   not placing points off-canvas.
 
+### Step 4 — number of colors (✅ implemented)
+
+- **Coupling:** the weave's `segments` (subdivision fineness) always exactly equals the number of
+  colors - one setting, not two, as decided. Each curve/pattern uses **its own** `colors.length`
+  as `segments` at draw time (not the current live palette size), so a color-count change never
+  alters how curves drawn under a previous count render - they keep their own fineness forever.
+  `StringArtRenderer.drawCurve`'s `segments` param already existed for this; the grid tool doesn't
+  pass it explicitly and keeps relying on the default (its palette never resizes).
+- **Range:** 1–25, validated by pure `parseColorCount` in the new `src/freestyle/colorCount.js`
+  (unit-tested) - rejects out-of-range or non-numeric input with an alert rather than clamping
+  silently.
+- **On change:** clears curves, the in-progress selection, and the active pattern selection - same
+  behavior as a canvas-size change, as decided.
+- **Scope:** freestyle only, as decided - the grid tool's palette stays fixed at 8.
+- **UI:** a small "Colors" number field + Apply button in the main panel, right above the swatches
+  it controls (`ColorCountUI`) - not a dedicated submenu, since it's a single field rather than
+  the multi-field cluster Canvas Size has.
+
+#### Shared-code changes (backward-compatible, grid tool unaffected)
+
+- `StrokePalette#resize(newSize, fillColor)` (new) - grows/shrinks the slot array, preserving
+  in-range slots' color/enabled state; only used by freestyle.
+- `ColorPickerUI` now **creates** its `<input type="color">` elements itself (`rebuild()`) instead
+  of assuming they already exist as static HTML - needed so the count can change at runtime. Both
+  `index.html` and `freestyle/index.html`'s `#colorPickerContainer` are now empty `<div>`s; for the
+  grid tool (palette always 8) this produces the exact same 8 inputs it always had, just generated
+  instead of hand-authored markup.
+
 ### Still to be scoped (later steps, in backlog order)
 
-Item 4 (color count), 6 (hover/grey-out display), 7 (keyboard-driven pattern placement),
-8 (drag-and-drop point editing), 9 (export) — each gets its own clarifying round when we get to it.
+Items 6 (hover/grey-out display), 7 (keyboard-driven pattern placement), 8 (drag-and-drop point
+editing), 9 (export) — each gets its own clarifying round when we get to it.
 
 ## Working agreement for this epic
 

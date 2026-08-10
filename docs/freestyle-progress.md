@@ -21,8 +21,12 @@ behind each one.
       Only the in-progress segment; committed segments keep their normal color.
 - [x] **3. Canvas size pre-selection** — preset dropdown (20×20, 30×30, 30×40, 40×40, 50×50 cm)
       + custom width/height fields, centered on screen. **Default: 20×20cm @ 90 DPI** (709×709px).
-- [ ] **4. Number of colors pre-selection** — not started. Freestyle still uses the fixed 8-slot
-      palette, same as the grid tool.
+- [x] **4. Number of colors pre-selection** — a "Colors" field + Apply button (1–25) resizes the
+      palette (`StrokePalette#resize`, `ColorPickerUI#rebuild` regenerates the swatch inputs).
+      1:1 coupled with weave fineness, as decided: `segments` always equals the color count -
+      each curve/pattern uses its *own* `colors.length`, not the live palette size, so changing
+      the count doesn't alter how already-drawn curves render. Changing the count clears the
+      current design (same as a canvas-size change). Grid tool untouched (still fixed at 8).
 - [x] **5. Freestyle pattern creation** — click anywhere (no snapping) to place control points;
       Reset/Clear All/Undo, colors, favorites, and patterns (save/select/stamp) all work the same
       as the grid tool, minus the Manual/Auto toggle (nothing to auto-stamp across without a grid).

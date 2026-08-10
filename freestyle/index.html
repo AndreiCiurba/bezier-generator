@@ -66,16 +66,15 @@
       <button id="applyCanvasSizeBtn" class="menu-btn">Apply</button>
     </div>
 
-    <div id="colorPickerContainer">
-      <input type="color" id="strokeColor1" value="#3dac8a" />
-      <input type="color" id="strokeColor2" value="#3dac8a" />
-      <input type="color" id="strokeColor3" value="#3dac8a" />
-      <input type="color" id="strokeColor4" value="#3dac8a" />
-      <input type="color" id="strokeColor5" value="#3dac8a" />
-      <input type="color" id="strokeColor6" value="#3dac8a" />
-      <input type="color" id="strokeColor7" value="#3dac8a" />
-      <input type="color" id="strokeColor8" value="#3dac8a" />
+    <!-- Number of colors: also sets the weave's subdivision fineness 1:1 -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
+      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
+
+    <!-- Populated by ColorPickerUI from the palette (size set above) -->
+    <div id="colorPickerContainer"></div>
 
     <button id="openCanvasSizeBtn" class="menu-btn">Canvas Size</button>
     <button id="openPatternBtn" class="menu-btn">Patterns</button>

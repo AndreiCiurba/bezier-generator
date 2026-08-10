@@ -17,6 +17,7 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
+import { ColorCountUI } from './ColorCountUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
@@ -117,6 +118,15 @@ export class FreestyleApp {
       submenuGroup
     ).init();
 
+    new ColorCountUI(
+      {
+        input: document.getElementById('colorCountInput'),
+        applyBtn: document.getElementById('applyColorCountBtn'),
+      },
+      this.palette.size,
+      this.handleColorCountChange
+    ).init();
+
     new MenuUI(
       document.getElementById('burger'),
       document.getElementById('ui'),
@@ -144,12 +154,15 @@ export class FreestyleApp {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      StringArtRenderer.drawCurve(curve.points, curve.colors);
+      // Subdivision fineness always matches this curve's own color count -
+      // not necessarily the *current* palette size, so curves/patterns from
+      // before a color-count change keep rendering exactly as drawn.
+      StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length);
       curve.previouslyDrawn = true;
     }
 
     if (this.selection.isReadyForCurve()) {
-      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll());
+      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll(), this.palette.size);
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawLivePreviewLine();
@@ -183,6 +196,24 @@ export class FreestyleApp {
   handleUndo = () => {
     if (this.curves.count > 0) this.curves.undo();
     this.selection.reset();
+  };
+
+  /**
+   * Resizes the palette to a new number of color slots (also the weave's
+   * subdivision fineness - see the draw loop), clearing the current design
+   * for the same reason a canvas resize does: existing curves keep whatever
+   * color count they were drawn with (rendering stays correct either way -
+   * see the draw loop), but starting fresh avoids the confusion of a
+   * palette that no longer matches what's on screen.
+   */
+  handleColorCountChange = (count) => {
+    this.patterns.clearSelection();
+    this.patternUI.resetSelectionVisual();
+    this.selection.reset();
+    this.curves.clear();
+
+    this.palette.resize(count);
+    this.colorPickerUI.rebuild();
   };
 
   /** Resizes the canvas to a new pixel size, clearing the current design (no grid to reposition points against, so a clean slate is the sane default). */
