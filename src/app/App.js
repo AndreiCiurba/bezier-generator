@@ -167,7 +167,7 @@ export class App {
   };
 
   mousePressed = () => {
-    if (touchesMenus(mouseX, mouseY)) return;
+    if (touchesMenus(winMouseX, winMouseY)) return;
 
     if (mouseButton === CENTER) {
       this.isDragging = true;

@@ -2,6 +2,7 @@ import { Viewport } from '../core/Viewport.js';
 import { CanvasView } from '../core/CanvasView.js';
 import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
+import { isWithinBounds } from '../core/bounds.js';
 import { Curve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
@@ -191,7 +192,7 @@ export class FreestyleApp {
   };
 
   mousePressed = () => {
-    if (touchesMenus(mouseX, mouseY)) return;
+    if (touchesMenus(winMouseX, winMouseY)) return;
 
     if (mouseButton === CENTER) {
       this.isDragging = true;
@@ -236,13 +237,22 @@ export class FreestyleApp {
     return false;
   };
 
-  /** Places a point at a screen-space position: stamps a pattern if one is active, otherwise extends the manual selection - no grid, no snapping, exactly where clicked. */
+  /**
+   * Places a point at a screen-space position: stamps a pattern if one is
+   * active, otherwise extends the manual selection - no grid, no snapping,
+   * exactly where clicked. Ignored if the resulting point falls outside the
+   * canvas (e.g. a stray click that missed a menu element - see
+   * src/ui/menuHitTest.js - or simply a drag that ends past the edge).
+   */
   #placeAtScreenPoint(screenX, screenY) {
+    const worldPos = this.viewport.toWorld(screenX, screenY);
+    if (!isWithinBounds(worldPos, this.canvasWidth, this.canvasHeight)) return;
+
     if (this.patterns.isInUse) {
       this.stamper.stampAtScreenPoint({ x: screenX, y: screenY });
       return;
     }
-    this.selection.add(this.viewport.toWorld(screenX, screenY));
+    this.selection.add(worldPos);
   }
 
   #createCanvas() {
