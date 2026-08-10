@@ -2,6 +2,7 @@
  * Pure math for how thick the woven string-art lines should be, based on
  * how many colors are active - no p5/DOM dependency, so it's directly
  * unit-testable. See StringArtRenderer.drawCurve for where this feeds in.
+ * Shared by the grid tool and freestyle.
  */
 
 // The line weight the app has always used, and still uses at exactly 8
@@ -12,14 +13,15 @@ export const BASELINE_STROKE_WEIGHT = 0.6;
 
 /**
  * Thicker for fewer colors, exactly BASELINE_STROKE_WEIGHT at
- * BASELINE_COLOR_COUNT, gradually thinner for more - an inverse-square-root
- * falloff so it tapers gently at the high end (25 colors is noticeably but
- * not drastically thinner than 8) while still doubling in thickness by 2
- * colors, quadrupling by 1.
+ * BASELINE_COLOR_COUNT, thinner for more - plain inverse proportionality
+ * (double the colors, half the weight), so the falloff stays clearly
+ * visible across the whole range instead of flattening out at the high end
+ * (an earlier inverse-square-root version tapered too gently past 8 to
+ * read as a real change).
  * @param {number} colorCount
  * @returns {number}
  */
 export function strokeWeightForColorCount(colorCount) {
   if (colorCount <= 0) return BASELINE_STROKE_WEIGHT;
-  return BASELINE_STROKE_WEIGHT * Math.sqrt(BASELINE_COLOR_COUNT / colorCount);
+  return (BASELINE_STROKE_WEIGHT * BASELINE_COLOR_COUNT) / colorCount;
 }

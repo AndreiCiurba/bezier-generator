@@ -1,10 +1,10 @@
-import { parseColorCount, MIN_COLORS, MAX_COLORS } from './colorCount.js';
+import { parseColorCount, MIN_COLORS, MAX_COLORS } from '../state/colorCount.js';
 
 /**
  * Wires the "number of colors" field: how many stroke slots the palette has,
- * which (per the app's 1:1 coupling) is also the weave's subdivision count -
- * see FreestyleApp's draw loop, which always passes `colors.length` as the
- * segments argument.
+ * which (per the app's 1:1 coupling) is also the weave's subdivision count
+ * and line weight - see App/FreestyleApp's draw loops, which derive both
+ * from `colors.length` on each curve. Shared by the grid tool and freestyle.
  */
 export class ColorCountUI {
   /**
@@ -21,6 +21,12 @@ export class ColorCountUI {
   init() {
     this.el.input.value = String(this.count);
     this.el.applyBtn.addEventListener('click', () => this.#apply());
+  }
+
+  /** Updates the displayed count without triggering onApply - for when something else (e.g. applying a favorite color bundle) already resized the palette. */
+  setCount(count) {
+    this.count = count;
+    this.el.input.value = String(count);
   }
 
   #apply() {

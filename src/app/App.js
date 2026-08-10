@@ -14,8 +14,10 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
+import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
+import { strokeWeightForColorCount } from '../core/strokeWeight.js';
 
 const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
@@ -90,7 +92,8 @@ export class App {
       this.favorites,
       this.palette,
       this.colorPickerUI,
-      submenuGroup
+      submenuGroup,
+      (newSize) => this.colorCountUI.setCount(newSize)
     ).init();
 
     this.patternUI = new PatternUI(
@@ -113,6 +116,16 @@ export class App {
       submenuGroup
     );
     this.patternUI.init();
+
+    this.colorCountUI = new ColorCountUI(
+      {
+        input: document.getElementById('colorCountInput'),
+        applyBtn: document.getElementById('applyColorCountBtn'),
+      },
+      this.palette.size,
+      this.handleColorCountChange
+    );
+    this.colorCountUI.init();
 
     new MenuUI(
       document.getElementById('burger'),
@@ -141,12 +154,26 @@ export class App {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      StringArtRenderer.drawCurve(curve.points, curve.colors);
+      // Subdivision fineness and line weight always match this curve's own
+      // color count - not necessarily the *current* palette size, so
+      // curves/patterns from before a color-count change keep rendering
+      // exactly as drawn.
+      StringArtRenderer.drawCurve(
+        curve.points,
+        curve.colors,
+        curve.colors.length,
+        strokeWeightForColorCount(curve.colors.length)
+      );
       curve.previouslyDrawn = true;
     }
 
     if (this.selection.isReadyForCurve()) {
-      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll());
+      StringArtRenderer.drawCurve(
+        this.selection.points,
+        this.palette.getAll(),
+        this.palette.size,
+        strokeWeightForColorCount(this.palette.size)
+      );
     }
     CanvasView.drawGuidePath(this.selection.points);
 
@@ -179,6 +206,24 @@ export class App {
   handleUndo = () => {
     if (this.curves.count > 0) this.curves.undo();
     this.selection.reset();
+  };
+
+  /**
+   * Resizes the palette to a new number of color slots (also the weave's
+   * subdivision fineness and line weight - see the draw loop), clearing the
+   * current design: existing curves would keep rendering correctly either
+   * way (each derives its own fineness/weight from its own colors.length),
+   * but starting fresh avoids the confusion of a palette that no longer
+   * matches what's on screen.
+   */
+  handleColorCountChange = (count) => {
+    this.patterns.clearSelection();
+    this.patternUI.resetSelectionVisual();
+    this.selection.reset();
+    this.curves.clear();
+
+    this.palette.resize(count);
+    this.colorPickerUI.rebuild();
   };
 
   mousePressed = () => {

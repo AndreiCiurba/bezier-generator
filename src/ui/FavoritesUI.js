@@ -4,6 +4,10 @@ import { downloadJson, readJsonFile } from '../io/JsonFile.js';
 /**
  * Wires the "Colors" submenu: saving/exporting/importing favorite color
  * bundles, and applying a bundle back onto the palette when clicked.
+ * Applying a bundle whose size differs from the current palette resizes the
+ * palette to match first (e.g. a bundle saved/exported with 11 colors,
+ * later imported and applied against the 8-color default, brings the
+ * palette to 11) - so every color in the bundle actually lands somewhere.
  *
  * Fixes one dead-on-arrival bit of the original: `closeColorSubmenuBtn` had
  * *two* click listeners bound to it (colors.js used the same element ID for
@@ -23,14 +27,16 @@ export class FavoritesUI {
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    * @param {import('./ColorPickerUI.js').ColorPickerUI} colorPickerUI
    * @param {import('./PanelGroup.js').PanelGroup} submenuGroup keeps this and the Patterns submenu mutually exclusive
+   * @param {(newSize: number) => void} [onPaletteResize] called after a bundle apply resizes the palette, so e.g. a color-count field can reflect the new size
    */
-  constructor(elements, favorites, palette, colorPickerUI, submenuGroup) {
+  constructor(elements, favorites, palette, colorPickerUI, submenuGroup, onPaletteResize = () => {}) {
     this.el = elements;
     this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.favorites = favorites;
     this.palette = palette;
     this.colorPickerUI = colorPickerUI;
     this.submenuGroup = submenuGroup;
+    this.onPaletteResize = onPaletteResize;
   }
 
   init() {
@@ -96,8 +102,16 @@ export class FavoritesUI {
   }
 
   #applyBundle(bundleDiv, bundle) {
+    if (bundle.length === 0) return;
+
     document.querySelectorAll('.bundle').forEach((b) => b.classList.remove('selected'));
     bundleDiv.classList.add('selected');
+
+    if (bundle.length !== this.palette.size) {
+      this.palette.resize(bundle.length);
+      this.colorPickerUI.rebuild();
+      this.onPaletteResize(bundle.length);
+    }
 
     bundle.forEach((color, idx) => {
       this.palette.setColor(idx, color);

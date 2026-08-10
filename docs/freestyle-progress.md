@@ -26,13 +26,29 @@ behind each one.
       1:1 coupled with weave fineness, as decided: `segments` always equals the color count -
       each curve/pattern uses its *own* `colors.length`, not the live palette size, so changing
       the count doesn't alter how already-drawn curves render. Changing the count clears the
-      current design (same as a canvas-size change). Grid tool untouched (still fixed at 8).
-      **Plus** line thickness now scales with color count too: exactly today's weight (0.6) at 8
-      colors, thicker for fewer (doubles at 2), gradually thinner up to 25 - an inverse-square-root
-      falloff (`strokeWeightForColorCount`) so the high end tapers gently. E2e-verified: picker
-      count/default confirmed, a clean isolated-line pixel measurement at 1 color confirmed the
-      formula is genuinely wired into rendering (not just computed and discarded), and screenshots
-      across 1/2/8/25 colors show the expected thick→thin progression.
+      current design (same as a canvas-size change). **Now on both pages** - originally
+      freestyle-only, extended to the grid tool on request; the underlying pieces
+      (`colorCount.js`, `ColorCountUI`, `strokeWeight.js`) moved to shared `src/state`/`src/ui`/
+      `src/core` homes accordingly.
+      **Plus** line thickness scales with color count: exactly today's weight (0.6) at 8 colors,
+      thicker for fewer (quadruples at 2), thinner for more - **plain inverse proportionality**
+      (double the colors, half the weight), not the original inverse-square-root, which tapered
+      too gently past 8 to read as a real change ("visually almost unchanged" feedback - the
+      steeper curve fixed that: 25 colors now clearly shows individual thin strands instead of a
+      near-solid wedge).
+      **Plus** newly-added slots (growing the count) get a **random color each**, not repeated
+      white (`src/utils/color.js#randomHexColor`).
+      **Plus** applying a saved favorite color bundle whose size differs from the current palette
+      **auto-resizes the palette to match** (e.g. a bundle saved/exported with 11 colors, applied
+      later against the 8-color default, brings the palette to 11 automatically) -
+      `FavoritesUI#applyBundle`.
+      E2e-verified (twice - the initial version and this expanded one): picker count/default
+      confirmed on both pages; growing the grid tool's palette 3→6 and freestyle's 8→12 both gave
+      distinct random, non-white new colors; an isolated-line pixel measurement at 1 color
+      (7px→10px after the steeper formula) confirmed the new curve is genuinely wired into
+      rendering; screenshots across 1/2/8/25 colors show the much more visible progression; saving
+      an 11-color bundle, resetting to 8, then applying that bundle correctly brought the palette
+      (and the displayed count field) back to 11 on both the picker count and `colorCountInput`.
 - [x] **5. Freestyle pattern creation** — click anywhere (no snapping) to place control points;
       Reset/Clear All/Undo, colors, favorites, and patterns (save/select/stamp) all work the same
       as the grid tool, minus the Manual/Auto toggle (nothing to auto-stamp across without a grid).

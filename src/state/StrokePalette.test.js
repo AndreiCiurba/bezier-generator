@@ -48,11 +48,28 @@ describe('StrokePalette', () => {
     it('growing appends new enabled slots without touching existing ones', () => {
       const palette = new StrokePalette(['#a', '#b']);
       palette.toggleEnabled(0);
-      palette.resize(4, '#fill');
+      palette.resize(4, () => '#fill');
       expect(palette.size).toBe(4);
       expect(palette.getSlot(0)).toEqual({ color: '#a', enabled: false });
       expect(palette.getSlot(2)).toEqual({ color: '#fill', enabled: true });
       expect(palette.getSlot(3)).toEqual({ color: '#fill', enabled: true });
+    });
+
+    it('calls the fill function once per new slot, not once for the whole batch', () => {
+      const palette = new StrokePalette(['#a']);
+      let n = 0;
+      palette.resize(4, () => `#${++n}`);
+      expect(palette.getSlot(1).color).toBe('#1');
+      expect(palette.getSlot(2).color).toBe('#2');
+      expect(palette.getSlot(3).color).toBe('#3');
+    });
+
+    it('defaults to random (well-formed, not all identical) colors when no fill function is given', () => {
+      const palette = new StrokePalette(['#a']);
+      palette.resize(5);
+      const newColors = [1, 2, 3, 4].map((i) => palette.getSlot(i).color);
+      for (const c of newColors) expect(c).toMatch(/^#[0-9a-f]{6}$/);
+      expect(new Set(newColors).size).toBeGreaterThan(1);
     });
 
     it('is a no-op when resizing to the current size', () => {

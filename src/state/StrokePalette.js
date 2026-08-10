@@ -1,3 +1,5 @@
+import { randomHexColor } from '../utils/color.js';
+
 const DEFAULT_COLORS = [
   '#AEC8A4',
   '#8A784E',
@@ -49,17 +51,19 @@ export class StrokePalette {
 
   /**
    * Grows or shrinks the slot count. Shrinking truncates from the end;
-   * growing appends new enabled slots in `fillColor`. Existing slots that
-   * remain in range keep their color/enabled state untouched.
+   * growing appends new enabled slots, each colored by calling `fillColorFn`
+   * once per new slot (default: a random color each, not a single repeated
+   * one - more useful than several identical new swatches). Existing slots
+   * that remain in range keep their color/enabled state untouched.
    */
-  resize(newSize, fillColor = '#ffffff') {
+  resize(newSize, fillColorFn = randomHexColor) {
     if (newSize === this.#slots.length) return;
     if (newSize < this.#slots.length) {
       this.#slots.length = newSize;
       return;
     }
     for (let i = this.#slots.length; i < newSize; i++) {
-      this.#slots.push({ color: fillColor, enabled: true });
+      this.#slots.push({ color: fillColorFn(), enabled: true });
     }
   }
 

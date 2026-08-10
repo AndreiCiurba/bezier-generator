@@ -1,6 +1,7 @@
 /**
- * Pure validation for the freestyle "number of colors" input - no DOM/p5
- * dependency, so it's directly unit-testable.
+ * Pure validation for a "number of colors" input - no DOM/p5 dependency, so
+ * it's directly unit-testable. Shared by the grid tool and freestyle's
+ * color-count pickers.
  */
 
 export const MIN_COLORS = 1;

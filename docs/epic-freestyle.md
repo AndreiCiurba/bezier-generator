@@ -154,48 +154,88 @@ lot more here than it did for the grid tool.
   outside the canvas bounds (reuses `isWithinBounds` from the earlier bugfix) - same reasoning as
   not placing points off-canvas.
 
-### Step 4 — number of colors (✅ implemented)
+### Step 4 — number of colors (✅ implemented, since expanded to both pages)
+
+Landed in two passes: first freestyle-only, then - on request - extended to the grid tool too,
+with the line-weight/random-fill/auto-resize-on-import refinements below added in that second
+pass.
 
 - **Coupling:** the weave's `segments` (subdivision fineness) always exactly equals the number of
   colors - one setting, not two, as decided. Each curve/pattern uses **its own** `colors.length`
   as `segments` at draw time (not the current live palette size), so a color-count change never
   alters how curves drawn under a previous count render - they keep their own fineness forever.
-  `StringArtRenderer.drawCurve`'s `segments` param already existed for this; the grid tool doesn't
-  pass it explicitly and keeps relying on the default (its palette never resizes).
-- **Range:** 1–25, validated by pure `parseColorCount` in the new `src/freestyle/colorCount.js`
-  (unit-tested) - rejects out-of-range or non-numeric input with an alert rather than clamping
-  silently.
+- **Range:** 1–25, validated by pure `parseColorCount` in `src/state/colorCount.js` (unit-tested) -
+  rejects out-of-range or non-numeric input with an alert rather than clamping silently.
 - **On change:** clears curves, the in-progress selection, and the active pattern selection - same
   behavior as a canvas-size change, as decided.
-- **Scope:** freestyle only, as decided - the grid tool's palette stays fixed at 8.
-- **UI:** a small "Colors" number field + Apply button in the main panel, right above the swatches
-  it controls (`ColorCountUI`) - not a dedicated submenu, since it's a single field rather than
-  the multi-field cluster Canvas Size has.
-- **Line weight also scales with color count** (follow-up ask, same step): exactly today's weight
-  (0.6) at 8 colors - changing the count is a no-op for anyone who leaves it at the default -
-  doubling by 2 colors, quadrupling by 1, and gradually thinner up to 25. Inverse-square-root
-  falloff (`strokeWeightForColorCount` in the new, pure, unit-tested `src/freestyle/strokeWeight.js`)
-  rather than straight inverse, so the *thin* end tapers gently instead of collapsing toward a
-  hairline - "slightly decrease" at 25, not "barely visible". `StringArtRenderer.drawCurve` grew a
-  4th `weight` param (default 0.6, so the grid tool - which never passes it - is untouched); each
-  curve/pattern's weight is derived from its own `colors.length`, same "keeps its own fineness"
-  reasoning as the segments coupling above.
-- **E2e-verified** (asked for explicitly - see the `no-e2e` skill): picker count and the
-  `colorCountInput` default both confirmed at 8; a 3-point curve arranged so `colorCount=1`
-  degenerates the weave to one single isolated line (segments=1 only ever draws p1→p3 directly)
-  gave a clean line to pixel-measure, confirming the formula is actually wired into rendering, not
-  just computed and discarded; screenshots across 1/2/8/25 colors show the expected
-  thick-line/sparse-fan → thin-line/dense-fan progression.
+- **Scope: both pages now.** Originally freestyle-only, as decided in the first pass; extended to
+  the grid tool on request in the second. The grid tool gets the identical "Colors" field + Apply
+  button, right above its swatches, same as freestyle.
+- **UI:** a small "Colors" number field + Apply button, right above the swatches it controls
+  (`ColorCountUI`) - not a dedicated submenu, since it's a single field rather than the multi-field
+  cluster Canvas Size has.
 
-#### Shared-code changes (backward-compatible, grid tool unaffected)
+#### Line weight scales with color count too (follow-up in the same step)
 
-- `StrokePalette#resize(newSize, fillColor)` (new) - grows/shrinks the slot array, preserving
-  in-range slots' color/enabled state; only used by freestyle.
-- `ColorPickerUI` now **creates** its `<input type="color">` elements itself (`rebuild()`) instead
-  of assuming they already exist as static HTML - needed so the count can change at runtime. Both
-  `index.html` and `freestyle/index.html`'s `#colorPickerContainer` are now empty `<div>`s; for the
-  grid tool (palette always 8) this produces the exact same 8 inputs it always had, just generated
-  instead of hand-authored markup.
+Exactly today's weight (0.6) at 8 colors - changing the count is a no-op for anyone who leaves it
+at the default - thicker for fewer, thinner for more.
+
+- **First cut:** inverse-square-root falloff, chosen so the thin end would taper "gently" rather
+  than collapse toward a hairline. In practice this flattened out too much past 8 colors to read
+  as a real change ("this seems visually almost unchanged" feedback) - 25 colors still looked like
+  a near-solid wedge because the extra segments' density outweighed the barely-thinner individual
+  lines.
+- **Fixed:** switched to **plain inverse proportionality** (`strokeWeightForColorCount` in
+  `src/core/strokeWeight.js`, pure, unit-tested) - double the colors, half the weight. Quadruples
+  by 2 colors, and by 25 colors the weight is under a third of baseline, which is what actually
+  makes individual strands read as thin instead of merging into a blob.
+- `StringArtRenderer.drawCurve` grew a 4th `weight` param (default 0.6, so any call site that
+  doesn't pass it explicitly is unaffected); each curve/pattern's weight is derived from its own
+  `colors.length`, same "keeps its own fineness" reasoning as the segments coupling above.
+
+#### Newly-added slots get a random color, not white
+
+Growing the count used to fill new slots with a flat `#ffffff`. `StrokePalette#resize` now takes a
+`fillColorFn` (default `randomHexColor` from the new `src/utils/color.js`), called once **per** new
+slot - several new swatches now come in visibly distinct colors instead of a wall of white.
+
+#### Applying a favorite bundle auto-resizes the palette to match
+
+"If I export with 11 colors, it should automatically update it to be 11, even though it's preset
+to 8." `FavoritesUI#applyBundle` now resizes the palette to `bundle.length` first (if different
+from the current size) via the same `StrokePalette#resize`, rebuilds the color pickers, and (via a
+new `onPaletteResize` constructor callback) tells the page's `ColorCountUI` to reflect the new
+count - before applying the bundle's actual colors. Works for any bundle, not just freshly-imported
+ones, since the trigger is *applying* (clicking) a bundle, not the import step itself - a
+multi-bundle import can't have one universal color count, but each bundle you actually click can
+size the palette to itself.
+
+#### E2e-verified (asked for explicitly both times - see the `no-e2e` skill)
+
+First pass: picker count and the `colorCountInput` default confirmed at 8 on freestyle; a 3-point
+curve arranged so `colorCount=1` degenerates the weave to one single isolated line (segments=1
+only ever draws p1→p3 directly) gave a clean line to pixel-measure, confirming the formula was
+actually wired into rendering; screenshots across 1/2/8/25 colors.
+
+Second pass (after the four changes above): same defaults/picker-count checks now also run against
+the grid tool; growing the grid tool's palette 3→6 and freestyle's 8→12 both produced distinct,
+non-white new colors; the same isolated-line measurement at `colorCount=1` grew from 7px to 10px
+under the new (steeper) formula, confirming the change actually reached rendering; screenshots
+across 1/2/8/25 again, now showing a *much* more visible progression (25 colors shows individual
+thin strands, not a near-solid wedge); saved an 11-color bundle, reset the palette to 8, applied
+the saved bundle, and confirmed both the picker count and the `colorCountInput` field correctly
+jumped back to 11.
+
+#### Shared-code changes
+
+- `StrokePalette#resize(newSize, fillColorFn)` - grows/shrinks the slot array, preserving in-range
+  slots' color/enabled state; each new slot gets its own call to `fillColorFn` (default random).
+- `ColorPickerUI` **creates** its `<input type="color">` elements itself (`rebuild()`) instead of
+  assuming they already exist as static HTML - needed so the count can change at runtime. Both
+  `index.html` and `freestyle/index.html`'s `#colorPickerContainer` are empty `<div>`s as a result.
+- `colorCount.js`, `ColorCountUI`, and `strokeWeight.js` all moved out of `src/freestyle/` into
+  shared homes (`src/state/`, `src/ui/`, `src/core/` respectively) once the grid tool needed them
+  too.
 
 ### Still to be scoped (later steps, in backlog order)
 

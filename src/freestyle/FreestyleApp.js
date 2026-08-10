@@ -14,13 +14,13 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
+import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
+import { strokeWeightForColorCount } from '../core/strokeWeight.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
-import { ColorCountUI } from './ColorCountUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
-import { strokeWeightForColorCount } from './strokeWeight.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
 // Default board: 20x20cm at the default DPI.
@@ -78,7 +78,8 @@ export class FreestyleApp {
       this.favorites,
       this.palette,
       this.colorPickerUI,
-      submenuGroup
+      submenuGroup,
+      (newSize) => this.colorCountUI.setCount(newSize)
     ).init();
 
     this.patternUI = new PatternUI(
@@ -119,14 +120,15 @@ export class FreestyleApp {
       submenuGroup
     ).init();
 
-    new ColorCountUI(
+    this.colorCountUI = new ColorCountUI(
       {
         input: document.getElementById('colorCountInput'),
         applyBtn: document.getElementById('applyColorCountBtn'),
       },
       this.palette.size,
       this.handleColorCountChange
-    ).init();
+    );
+    this.colorCountUI.init();
 
     new MenuUI(
       document.getElementById('burger'),
