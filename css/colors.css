@@ -1,9 +1,19 @@
+/**
+ * Favorite color-bundle swatches, rendered by FavoritesUI into
+ * #favoriteBundlesContainer. Tokens live in tokens.css.
+ */
+
 .bundle {
   display: flex;
   gap: 2px;
   margin-bottom: 6px;
   width: 100%;
   align-items: stretch;
+}
+
+.bundle.selected {
+  border: var(--swatch-selected-border);
+  border-radius: 6px;
 }
 
 .color-btn {
@@ -13,9 +23,4 @@
   aspect-ratio: 1 / 1;
   cursor: pointer;
   padding: 0;
-}
-
-.bundle.selected {
-  border: 3px solid rgb(162, 162, 162);
-  border-radius: 6px;
 }

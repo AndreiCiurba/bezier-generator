@@ -1,0 +1,48 @@
+/**
+ * Design tokens shared by colors.css and styles.css. Loaded first (see
+ * index.html) so everything downstream can reference these custom
+ * properties. Centralizing them here means a color/spacing/shadow only
+ * needs to change in one place instead of being hunted down across files.
+ */
+:root {
+  /* Panel surfaces */
+  --panel-bg-main: rgb(138, 120, 78);
+  --panel-bg-submenu: #393e46;
+  --panel-text: #b4f4b4;
+  --panel-radius: 8px;
+  --panel-gap: 6px;
+  --panel-width: 10vw;
+  --panel-shadow-main: 0 4px 8px rgba(0, 80, 0, 0.6);
+  --panel-shadow-submenu: 0 4px 8px rgba(0, 80, 0, 0.4);
+
+  /* Buttons */
+  --btn-bg: rgb(255, 204, 0);
+  --btn-text: rgb(177, 59, 255);
+  --btn-hover-bg: rgb(9, 0, 64);
+  --btn-shadow: 0 2px 5px rgb(177, 59, 255);
+  --btn-shadow-hover: 0 3px 7px rgb(177, 59, 255);
+  --btn-radius: 5px;
+
+  /* Close buttons ("X") */
+  --close-btn-color: #b4f4b4;
+  --close-btn-color-hover: #e0e0e0;
+
+  /* Burger menu icon */
+  --burger-bg: rgba(30, 30, 30, 0.8);
+  --burger-text: #e0e0e0;
+  --burger-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  /* Color pickers */
+  --color-picker-glow: rgba(0, 173, 181, 0.4);
+  --color-picker-glow-hover: rgba(0, 173, 181, 0.6);
+
+  /* Favorite bundle swatches */
+  --swatch-selected-border: 3px solid rgb(162, 162, 162);
+
+  /* Shared */
+  --ui-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  --ui-font-size: 12px;
+  --z-panel-main: 1000;
+  --z-panel-submenu: 1001;
+  --z-burger: 2000;
+}

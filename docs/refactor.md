@@ -114,6 +114,36 @@ provably-inert code, not new risk introduced by moving files around:
 None of these change what a correctly-used session looks like today, except
 (3) and (4), which were outright broken before and now work.
 
+## CSS pass (2026-08-10, same day)
+
+The same modularization treatment, applied to `css/`. No visual change intended or
+observed (verified with the same Playwright screenshot approach as the JS
+refactor) except one: buttons get consistent hover feedback now (see below).
+
+- **`css/tokens.css`** (new, loaded first) - every color/shadow/radius/spacing
+  value used to be a literal repeated across rules; now it's a `:root` custom
+  property defined once and referenced everywhere.
+- **`.panel` class** - `#ui`, `#colorFavoritesSubmenu`, and `#patternSubmenu`
+  had large, byte-for-byte identical rule blocks (submenu vs. submenu) or
+  near-identical ones (`#ui` vs. submenus). Consolidated into a shared base
+  class plus each element's own position/background/shadow specifics.
+- **`.panel-close-btn` class** - the three "X" buttons had duplicated rules,
+  same fix.
+- **`.menu-btn` class** - the original had a single CSS rule selecting 14
+  hardcoded button IDs (2 of which no longer correspond to any element -
+  dead), which every new button had to remember to be added to. Replaced
+  with a class applied directly in the HTML. **Real behavior fix as a
+  result:** the `:hover` version of that rule only listed 5 of the 14 IDs,
+  so 9 of the 14 menu buttons (Save/Export/Import buttons, Colors, Patterns,
+  the Manual/Auto toggle, ...) had no hover feedback at all - clearly
+  drift, not intent. `.menu-btn:hover` now covers all of them.
+- **Dead code removed:** the `#colorPickerBtn`/`#generateZigzagFromGridBtn`
+  selectors (no matching elements), a `#ui.hidden { display: none }` rule
+  that could never win against the `.hidden { display: none !important }`
+  utility it duplicated, and four unused classes (`.favorite-color-list`,
+  `.favorite-color`, `.colorTriplet`, `.colorSwatch`) left over from an
+  earlier favorites-UI iteration that FavoritesUI.js doesn't generate.
+
 ## What changed for deployment
 
 `index.html` now loads a single `<script type="module" src="src/app/bootstrap.js">`
