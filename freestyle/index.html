@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>String Art Freestyle</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script type="module" src="../src/freestyle/bootstrap.js"></script>
+
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/freestyle.css">
+</head>
+
+<body>
+  <a href="../" class="page-nav-link">&larr; Grid</a>
+
+  <!-- Burger Menu Button -->
+  <div id="burger">&#9776;</div>
+
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="panel hidden">
+    <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
+
+    <div id="colorFavoritesSubmenu" class="panel hidden">
+      <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div id="favoriteBundlesContainer"></div>
+      <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+      <button id="exportColorsBtn" class="menu-btn">Export</button>
+      <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
+      <button id="importColorsBtn" class="menu-btn">Import</button>
+    </div>
+
+    <!-- Pattern Submenu (no Manual/Auto toggle here - no grid to auto-stamp across) -->
+    <div id="patternSubmenu" class="panel hidden">
+      <button id="closePatternSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
+
+      <input id="patternNameInput" type="text" placeholder="name..." />
+      <button id="saveCurrentPatternBtn" class="menu-btn">Save Current</button>
+
+      <ul id="savedPatternsList"
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+
+      <button id="exportPatternBtn" class="menu-btn">Export Pattern</button>
+      <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
+      <button id="importPatternBtn" class="menu-btn">Import Pattern</button>
+    </div>
+
+    <!-- Canvas Size Submenu -->
+    <div id="canvasSizeSubmenu" class="panel hidden">
+      <button id="closeCanvasSizeSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Canvas Size</div>
+
+      <select id="canvasSizePreset"></select>
+
+      <input id="canvasWidthInput" type="text" placeholder="width, e.g. 20cm" />
+      <input id="canvasHeightInput" type="text" placeholder="height, e.g. 20cm" />
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px;">
+        DPI
+        <input id="canvasDpiInput" type="number" min="1" step="1" style="width: 100%;" />
+      </label>
+      <button id="applyCanvasSizeBtn" class="menu-btn">Apply</button>
+    </div>
+
+    <div id="colorPickerContainer">
+      <input type="color" id="strokeColor1" value="#3dac8a" />
+      <input type="color" id="strokeColor2" value="#3dac8a" />
+      <input type="color" id="strokeColor3" value="#3dac8a" />
+      <input type="color" id="strokeColor4" value="#3dac8a" />
+      <input type="color" id="strokeColor5" value="#3dac8a" />
+      <input type="color" id="strokeColor6" value="#3dac8a" />
+      <input type="color" id="strokeColor7" value="#3dac8a" />
+      <input type="color" id="strokeColor8" value="#3dac8a" />
+    </div>
+
+    <button id="openCanvasSizeBtn" class="menu-btn">Canvas Size</button>
+    <button id="openPatternBtn" class="menu-btn">Patterns</button>
+    <button id="openFavoritesBtn" class="menu-btn">Colors</button>
+    <button id="resetBtn" class="menu-btn">Reset</button>
+    <button id="clearAllBtn" class="menu-btn">Clear All Points</button>
+    <button id="undoBtn" class="menu-btn">Undo</button>
+  </div>
+</body>
+
+</html>

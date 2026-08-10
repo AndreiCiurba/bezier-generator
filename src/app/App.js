@@ -15,6 +15,7 @@ import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
+import { touchesMenus } from '../ui/menuHitTest.js';
 
 const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
@@ -166,7 +167,7 @@ export class App {
   };
 
   mousePressed = () => {
-    if (this.#touchesMenus()) return;
+    if (touchesMenus(mouseX, mouseY)) return;
 
     if (mouseButton === CENTER) {
       this.isDragging = true;
@@ -224,18 +225,5 @@ export class App {
     const worldPos = this.viewport.toWorld(screenX, screenY);
     const nearest = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
     if (nearest) this.selection.add(nearest.copy());
-  }
-
-  #touchesMenus() {
-    const el = document.elementFromPoint(mouseX, mouseY);
-    return Boolean(
-      el &&
-        (el.closest('button') ||
-          el.closest('input') ||
-          el.closest('#patternSubmenu') ||
-          el.closest('#colorFavoritesSubmenu') ||
-          el.closest('#ui') ||
-          el.closest('#burger'))
-    );
   }
 }

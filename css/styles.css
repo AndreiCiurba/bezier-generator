@@ -1,10 +1,11 @@
 /**
- * Menu chrome: burger icon, the main panel it opens, its two submenus
- * (Colors/Patterns), shared button styling, and the color-picker inputs.
- * Tokens (colors/shadows/spacing) live in tokens.css.
+ * Menu chrome: burger icon, the main panel it opens, its submenus (Colors,
+ * Patterns, and - freestyle page only - Canvas Size), shared button styling,
+ * and the color-picker inputs. Tokens (colors/shadows/spacing) live in
+ * tokens.css. Shared by both index.html and freestyle/index.html.
  */
 
-/* ---- Panels: main menu + the two submenus share their shape ---- */
+/* ---- Panels: main menu + its submenus share their shape ---- */
 
 .panel {
   padding: 10px;
@@ -31,7 +32,8 @@
 }
 
 #colorFavoritesSubmenu,
-#patternSubmenu {
+#patternSubmenu,
+#canvasSizeSubmenu {
   position: absolute;
   top: 0;
   left: calc(100% + 10px); /* anchored just to the right of #ui */
@@ -40,7 +42,7 @@
   box-shadow: var(--panel-shadow-submenu);
 }
 
-/* ---- Close ("X") buttons: main panel + both submenus ---- */
+/* ---- Close ("X") buttons: main panel + every submenu ---- */
 
 .panel-close-btn {
   position: absolute;
@@ -59,6 +61,27 @@
 
 .panel-close-btn:hover {
   color: var(--close-btn-color-hover);
+}
+
+/* ---- Cross-page nav link (top-right corner, both pages) ---- */
+
+.page-nav-link {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: var(--z-burger);
+  font-family: var(--ui-font-family);
+  font-size: 13px;
+  background: var(--burger-bg);
+  color: var(--burger-text);
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: var(--burger-shadow);
+  text-decoration: none;
+}
+
+.page-nav-link:hover {
+  color: #ffffff;
 }
 
 /* ---- Burger icon ---- */

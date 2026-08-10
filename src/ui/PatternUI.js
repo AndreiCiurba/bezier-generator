@@ -21,6 +21,10 @@ export class PatternUI {
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    * @param {import('./PatternStamper.js').PatternStamper} stamper
    * @param {import('./PanelGroup.js').PanelGroup} submenuGroup keeps this and the Colors submenu mutually exclusive
+   *
+   * `elements.toggleModeBtn` is optional - omit it where there's no grid to
+   * auto-stamp across (the freestyle page), and Manual/Auto placement simply
+   * doesn't apply.
    */
   constructor(elements, patternStore, selection, palette, stamper, submenuGroup) {
     this.el = elements;
@@ -59,10 +63,12 @@ export class PatternUI {
       }
     });
 
-    toggleModeBtn.addEventListener('click', () => {
-      const mode = this.patternStore.togglePlacementMode();
-      toggleModeBtn.textContent = mode === 'manual' ? 'Manual' : 'Auto';
-    });
+    if (toggleModeBtn) {
+      toggleModeBtn.addEventListener('click', () => {
+        const mode = this.patternStore.togglePlacementMode();
+        toggleModeBtn.textContent = mode === 'manual' ? 'Manual' : 'Auto';
+      });
+    }
 
     saveBtn.addEventListener('click', () => this.#saveCurrentSelection());
 

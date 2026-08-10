@@ -13,6 +13,11 @@ web of straight lines between them (an approximation of string art / Bezier curv
 each line colored from a user-defined palette. Finished curves persist on the canvas ("stored
 curves") and can be turned into reusable, stamped "patterns."
 
+**As of 2026-08-10 there's a second page, `/freestyle/`** — the same curve/pattern/color
+mechanics on a blank, gridless, fixed-size canvas (click anywhere, no snapping), aimed at
+designing a nail layout for a real physical board rather than a screen-only pattern. See
+[epic-freestyle.md](epic-freestyle.md) for the in-progress feature set and design decisions.
+
 ## History / original intent
 
 The code itself only shows a generic drawing tool, but the full commit history (not just the

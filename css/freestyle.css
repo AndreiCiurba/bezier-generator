@@ -1,0 +1,19 @@
+/**
+ * Freestyle-only layout. Unlike the grid tool, this page's canvas is a
+ * fixed, user-chosen size (see CanvasSizeUI) rather than filling the whole
+ * window, so it needs to be explicitly centered and the space around it
+ * needs a background.
+ */
+
+body {
+  margin: 0;
+  background: #0c0c0c; /* matches the canvas's own background(12) fill */
+}
+
+.centered-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
+}
