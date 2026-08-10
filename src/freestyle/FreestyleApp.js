@@ -17,6 +17,7 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
+import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
 // Default board: 20x20cm at the default DPI.
@@ -135,6 +136,8 @@ export class FreestyleApp {
   draw = () => {
     background(12);
     this.viewport.applyTransform();
+
+    GraphPaperRenderer.draw(this.canvasWidth, this.canvasHeight);
 
     for (const curve of this.curves.curves) {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {

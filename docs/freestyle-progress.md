@@ -7,9 +7,12 @@ behind each one.
 ## Backlog
 
 - [x] **1. New page with a blank canvas** — `/freestyle/`, empty canvas, no grid.
-- [~] **2. "Foaie de calcul" capability** — done for the canvas-size input (accepts "20cm",
-      "600px", a bare number defaults to px; DPI is a user-configurable field). Not yet extended
-      anywhere else in the UI (e.g. point coordinates aren't shown/editable in real-world units).
+- [x] **2. "Foaie de calcul" capability** — unit-aware canvas-size input (accepts "20cm", "600px",
+      a bare number defaults to px; DPI is a user-configurable field) **plus** a graph-paper
+      backdrop on the canvas itself: divided into square cells (100 along the longer side,
+      proportionally fewer on the shorter side, so a 2:1 canvas gets 100×50 - cells never stretch),
+      a bold lighter-grey line every 10 cells, darker-grey minor lines between (`GraphPaperRenderer`
+      + pure `graphPaperMath.js`). Drawn in world space, so it pans/zooms with the design.
 - [x] **3. Canvas size pre-selection** — preset dropdown (20×20, 30×30, 30×40, 40×40, 50×50 cm)
       + custom width/height fields, centered on screen. **Default: 20×20cm @ 90 DPI** (709×709px).
 - [ ] **4. Number of colors pre-selection** — not started. Freestyle still uses the fixed 8-slot

@@ -110,11 +110,27 @@ lot more here than it did for the grid tool.
   (`winMouseX`/`winMouseY` in both apps) plus a second line of defense: `FreestyleApp` now
   rejects any point outside the canvas bounds regardless of cause (`src/core/bounds.js`).
 
+### Step 2 — graph-paper canvas backdrop (✅ implemented, completes backlog item 2)
+
+- **Division count:** the canvas divides into square cells - 100 along its *longer* side, and
+  proportionally fewer along the shorter side so cells never stretch into rectangles (e.g. a 2:1
+  canvas gets 100×50, not 100×100). Computed by `computeDivisions(width, height)` in the new
+  `src/freestyle/graphPaperMath.js` (pure, unit-tested).
+- **Line shading:** every 10th line (from the edge) is a bold, lighter grey (`stroke(100)` -
+  matches the grid tool's own nail-dot color, for visual consistency across the app); the lines
+  between are a darker, subtler grey (`stroke(35)`). Minor lines are drawn first, major lines on
+  top last, so a major line always reads as one clean, uninterrupted line through its
+  intersections with minor ones (`GraphPaperRenderer.draw`).
+- **Coordinate space:** drawn in world space, inside the same `viewport.applyTransform()` block as
+  the curves/nails - so it pans and zooms together with the design, staying spatially "attached"
+  to the board rather than fixed to the screen. That's the point: squares represent real
+  proportional positions on the physical board, useful for eyeballing/counting distances.
+- **Scope:** freestyle only. The grid tool has its own nail lattice as a reference grid already.
+
 ### Still to be scoped (later steps, in backlog order)
 
-Items 2 (unit conversion beyond the canvas-size input), 4 (color count), 6 (hover/grey-out
-display), 7 (keyboard-driven pattern placement), 8 (drag-and-drop point editing), 9 (export) —
-each gets its own clarifying round when we get to it.
+Item 4 (color count), 6 (hover/grey-out display), 7 (keyboard-driven pattern placement),
+8 (drag-and-drop point editing), 9 (export) — each gets its own clarifying round when we get to it.
 
 ## Working agreement for this epic
 
