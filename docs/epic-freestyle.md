@@ -2,7 +2,9 @@
 
 **Status:** Step 1 (backlog items 1, 3, 5 in cut-down form, plus the canvas-size half of item 2)
 is implemented and verified. Delivered incrementally, one item at a time, each scoped with its
-own round of questions before code is written.
+own round of questions before code is written. **See [freestyle-progress.md](freestyle-progress.md)
+for the running done/not-done checklist** — this doc holds the backlog wording and the *why*
+behind each decision; that one is the at-a-glance *what's done*.
 
 ## Goal
 
@@ -49,13 +51,16 @@ lot more here than it did for the grid tool.
   `CanvasView`, `JsonFile`, `Panel`, `PanelGroup`, `MenuUI`, `ColorPickerUI`, `FavoritesUI`. `Grid`
   is **not** used - points land exactly where clicked, no snapping. The grid tool itself only
   changed in two small, backward-compatible ways (see "Shared-code changes" below).
-- **Default canvas size:** 600×400px, centered via CSS (`position:absolute` + `transform:
-  translate(-50%,-50%)` on the canvas element, in the new `css/freestyle.css`).
+- **Default canvas size: 20×20cm @ 90 DPI** (709×709px - `DEFAULT_DPI` in `src/freestyle/units.js`,
+  size computed from it rather than hardcoded, so the two can't drift apart). Originally shipped
+  as a placeholder 600×400px @ 96 DPI, corrected once the real default was known. Centered via CSS
+  (`position:absolute` + `transform: translate(-50%,-50%)` on the canvas element, in the shared
+  `css/canvas-frame.css` - see "Grid tool gets the same treatment" below).
 - **Canvas size picker:** a "Canvas Size" submenu (`CanvasSizeUI`, mutually exclusive with
   Colors/Patterns via the same `PanelGroup`) - preset dropdown (20×20, 30×30, 30×40, 40×40,
   50×50 cm, applies immediately on selection) + custom width/height text fields (accept "20cm",
   "600px", or a bare number defaulting to px; applied via an explicit Apply button) + a DPI
-  number field controlling the unit→pixel ratio (default 96, i.e. ~37.8px/cm).
+  number field controlling the unit→pixel ratio (starts at the 90 DPI default, editable).
 - **Changing canvas size:** clears curves, the in-progress selection, and the active pattern
   selection, then calls p5's `resizeCanvas` - a clean slate at the new size, as decided.
 - **Patterns on freestyle:** no Manual/Auto toggle (there's no grid to auto-stamp across) -
@@ -65,25 +70,42 @@ lot more here than it did for the grid tool.
 #### New files
 
 `src/freestyle/`: `units.js` (+test - pure cm/mm/in↔px conversion), `CanvasSizeUI.js`,
-`FreestylePatternStamper.js` (+test), `FreestyleApp.js`, `bootstrap.js`. Plus `freestyle/index.html`
-and `css/freestyle.css`.
+`FreestylePatternStamper.js` (+test), `FreestyleApp.js`, `bootstrap.js`. Plus `freestyle/index.html`.
 
 #### Shared-code changes (both backward-compatible, grid tool unaffected)
 
 - `PatternUI`'s `toggleModeBtn` element is now optional - omitted on freestyle, still present and
   wired on the grid tool.
-- The `touchesMenus` hit-test (mousePressed/touchEnded, "did this click land on a menu instead of
-  the canvas") was pulled out of `App.js` into `src/ui/menuHitTest.js` so `FreestyleApp` doesn't
+- The `touchesMenus` hit-test (mousePressed, "did this click land on a menu instead of the
+  canvas") was pulled out of `App.js` into `src/ui/menuHitTest.js` so `FreestyleApp` doesn't
   duplicate it. It generically checks `.closest('.panel')`, so it needed no per-submenu ID list
   and required no change when the Canvas Size submenu was added.
+- Dark-themed submenu form fields (`.panel select`/`input[type=text]`/`input[type=number]` in
+  `css/styles.css`) - the Canvas Size fields were plain default-browser white boxes; this fixed
+  that and, being a shared rule, also themed the Patterns submenu's "name..." field on both pages.
+- **Grid tool gets the same centered/framed treatment.** What was `css/freestyle.css`
+  (freestyle-only: center the canvas, grey page background) turned out to apply equally well to
+  the grid tool once asked for it too, so it's now `css/canvas-frame.css`, loaded by both pages.
+  The grid tool's canvas is inset by a fixed `CANVAS_MARGIN` (30px, both at startup and in
+  `windowResized`) rather than given a fixed size like freestyle - it has no "one physical board"
+  concept, it's meant to pan/zoom over a large lattice, so shrinking-to-fit isn't the goal, just
+  a visible frame instead of bleeding to the window edges.
 
-#### A bug caught during verification
+#### Bugs caught during verification
 
-`#canvasSizeSubmenu` was initially missing from the CSS selector that positions submenus beside
-the main panel (`#colorFavoritesSubmenu, #patternSubmenu { position: absolute; ... }`) - it fell
-back to rendering as a normal in-flow child inside `#ui`, stacking on top of and blocking
-`#closeUiBtn`. Caught by the Playwright verification pass (a real click timeout, not a visual
-guess) and fixed by adding `#canvasSizeSubmenu` to that selector.
+- `#canvasSizeSubmenu` was initially missing from the CSS selector that positions submenus beside
+  the main panel (`#colorFavoritesSubmenu, #patternSubmenu { position: absolute; ... }`) - it fell
+  back to rendering as a normal in-flow child inside `#ui`, stacking on top of and blocking
+  `#closeUiBtn`. Caught by the Playwright verification pass (a real click timeout, not a visual
+  guess) and fixed by adding `#canvasSizeSubmenu` to that selector.
+- `touchesMenus()` checked `document.elementFromPoint()` against p5's `mouseX`/`mouseY`
+  (canvas-relative) instead of `winMouseX`/`winMouseY` (viewport-relative, what
+  `elementFromPoint` actually needs). Harmless on the grid tool, where the canvas sits almost
+  flush with the page origin, but freestyle's canvas is centered and can be hundreds of pixels
+  away - a click on the burger icon was checked against the wrong point on the page, missed every
+  menu element, and fell through as a stray canvas point placement. Fixed at the root
+  (`winMouseX`/`winMouseY` in both apps) plus a second line of defense: `FreestyleApp` now
+  rejects any point outside the canvas bounds regardless of cause (`src/core/bounds.js`).
 
 ### Still to be scoped (later steps, in backlog order)
 

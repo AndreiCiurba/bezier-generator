@@ -45,8 +45,8 @@
   --input-border: 1px solid rgba(255, 255, 255, 0.15);
   --input-border-focus: 1px solid var(--btn-bg);
 
-  /* Freestyle page background (surrounds the fixed-size canvas) */
-  --freestyle-page-bg: #3a3a3a;
+  /* Page background surrounding the framed, centered canvas (both pages) */
+  --canvas-page-bg: #3a3a3a;
 
   /* Shared */
   --ui-font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;

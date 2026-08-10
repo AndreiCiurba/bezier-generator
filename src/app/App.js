@@ -23,6 +23,10 @@ GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
 const NEAREST_NAIL_RADIUS = 10;
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
+// Inset from the window edges so the canvas reads as a centered, framed
+// board on the grey page background (see css/canvas-frame.css) instead of
+// bleeding edge-to-edge.
+const CANVAS_MARGIN = 30;
 
 /**
  * The whole app, wired together. Replaces main.js as the p5 sketch entry
@@ -105,7 +109,7 @@ export class App {
       document.getElementById('closeUiBtn')
     ).init();
 
-    createCanvas(windowWidth, windowHeight);
+    this.#createCanvas();
 
     document.getElementById('resetBtn').addEventListener('click', this.handleReset);
     document.getElementById('clearAllBtn').addEventListener('click', this.handleClearAll);
@@ -213,7 +217,7 @@ export class App {
   };
 
   windowResized = () => {
-    resizeCanvas(windowWidth, windowHeight);
+    resizeCanvas(windowWidth - CANVAS_MARGIN * 2, windowHeight - CANVAS_MARGIN * 2);
   };
 
   /** Places a point at a screen-space position: stamps a pattern if one is active, otherwise extends the manual selection. */
@@ -225,5 +229,10 @@ export class App {
     const worldPos = this.viewport.toWorld(screenX, screenY);
     const nearest = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
     if (nearest) this.selection.add(nearest.copy());
+  }
+
+  #createCanvas() {
+    const renderer = createCanvas(windowWidth - CANVAS_MARGIN * 2, windowHeight - CANVAS_MARGIN * 2);
+    renderer.canvas.classList.add('centered-canvas');
   }
 }

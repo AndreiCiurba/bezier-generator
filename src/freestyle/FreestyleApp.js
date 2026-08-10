@@ -17,10 +17,12 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
-import { DEFAULT_DPI } from './units.js';
+import { DEFAULT_DPI, toPixels } from './units.js';
 
-const DEFAULT_WIDTH = 600;
-const DEFAULT_HEIGHT = 400;
+// Default board: 20x20cm at the default DPI.
+const DEFAULT_SIZE_CM = 20;
+const DEFAULT_WIDTH = Math.round(toPixels(DEFAULT_SIZE_CM, 'cm', DEFAULT_DPI));
+const DEFAULT_HEIGHT = DEFAULT_WIDTH;
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
 

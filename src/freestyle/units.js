@@ -9,7 +9,7 @@
 // from it.
 const UNITS_PER_INCH = { in: 1, cm: 2.54, mm: 25.4 };
 
-export const DEFAULT_DPI = 96; // ~37.8 px/cm - standard CSS-pixel reference
+export const DEFAULT_DPI = 90; // the freestyle page's starting DPI/scale setting
 
 /**
  * @param {number} value

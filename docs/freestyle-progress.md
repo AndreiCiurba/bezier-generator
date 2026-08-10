@@ -1,0 +1,42 @@
+# Freestyle epic — progress tracker
+
+One backlog item at a time, as agreed. This file is the running checklist; see
+[epic-freestyle.md](epic-freestyle.md) for the backlog's full wording, decisions, and rationale
+behind each one.
+
+## Backlog
+
+- [x] **1. New page with a blank canvas** — `/freestyle/`, empty canvas, no grid.
+- [~] **2. "Foaie de calcul" capability** — done for the canvas-size input (accepts "20cm",
+      "600px", a bare number defaults to px; DPI is a user-configurable field). Not yet extended
+      anywhere else in the UI (e.g. point coordinates aren't shown/editable in real-world units).
+- [x] **3. Canvas size pre-selection** — preset dropdown (20×20, 30×30, 30×40, 40×40, 50×50 cm)
+      + custom width/height fields, centered on screen. **Default: 20×20cm @ 90 DPI** (709×709px).
+- [ ] **4. Number of colors pre-selection** — not started. Freestyle still uses the fixed 8-slot
+      palette, same as the grid tool.
+- [x] **5. Freestyle pattern creation** — click anywhere (no snapping) to place control points;
+      Reset/Clear All/Undo, colors, favorites, and patterns (save/select/stamp) all work the same
+      as the grid tool, minus the Manual/Auto toggle (nothing to auto-stamp across without a grid).
+- [ ] **6. Display with hover — greyed out or not** — not started.
+- [ ] **7. V / H / arrow keys for pattern apply** — not started.
+- [ ] **8. Drag & drop a pattern point (all copies vs. just one)** — not started.
+- [ ] **9. Export image (nails-only, and nails+lines)** — not started.
+
+## Supporting work done alongside the backlog
+
+Not backlog items themselves, but built in service of them or as follow-up polish:
+
+- [x] Cross-page nav link (`/` ↔ `/freestyle/`).
+- [x] Dark-themed submenu form fields (select/text/number inputs) — was default browser white,
+      now matches the rest of the UI (applies to both pages).
+- [x] Fixed a real bug: clicking the menu while placing points on freestyle added a stray
+      out-of-canvas point and drew a line toward it (`touchesMenus()` was checking the wrong page
+      coordinates). Also added a canvas-bounds guard as a second line of defense.
+- [x] Grid tool's canvas is now also centered and framed on the grey page background (previously
+      only freestyle was) — same `css/canvas-frame.css` treatment, inset by a fixed margin instead
+      of a fixed size (the grid tool has no "canvas size" concept — it's meant to pan/zoom over a
+      large lattice, not represent one physical board size).
+
+## Status legend
+
+`[x]` done and verified · `[~]` partially done, scope noted · `[ ]` not started

@@ -57,7 +57,7 @@ describe('parseToPixels', () => {
 });
 
 describe('DEFAULT_DPI', () => {
-  it('is 96 (standard CSS-pixel reference)', () => {
-    expect(DEFAULT_DPI).toBe(96);
+  it('is 90 (the freestyle page default starting DPI)', () => {
+    expect(DEFAULT_DPI).toBe(90);
   });
 });

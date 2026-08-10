@@ -1,0 +1,19 @@
+/**
+ * Shared by both pages: centers the p5 canvas on the page (rather than
+ * letting it sit flush at the top-left/fill the window) and gives the
+ * surrounding page a grey background distinct from the canvas's own
+ * near-black background(12) fill, so the canvas edge reads clearly.
+ */
+
+body {
+  margin: 0;
+  background: var(--canvas-page-bg);
+}
+
+.centered-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.6);
+}
