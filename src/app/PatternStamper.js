@@ -1,0 +1,62 @@
+import { Curve } from '../models/Curve.js';
+
+/**
+ * Places copies of the currently-selected pattern onto the grid.
+ *
+ * Fixes a real bug from the original `renderPattern`: it converted the click
+ * from screen space to world space internally, but its caller in main.js had
+ * *already* done that conversion before calling it - so a pattern stamp's
+ * position was double-corrected for pan/zoom, landing in the wrong place
+ * anytime the canvas wasn't at its default pan/zoom. `stampAtScreenPoint` now
+ * does the one, single, canonical conversion.
+ *
+ * Also fixes `renderPattern`'s nearest-nail lookup, which took the *first*
+ * grid point found within 10px rather than the truly nearest one, and threw
+ * if none qualified - see Grid#findNearestPoint.
+ */
+export class PatternStamper {
+  /**
+   * @param {import('../core/Grid.js').Grid} grid
+   * @param {import('../core/Viewport.js').Viewport} viewport
+   * @param {import('../state/CurveStore.js').CurveStore} curveStore
+   * @param {import('../state/PatternStore.js').PatternStore} patternStore
+   */
+  constructor(grid, viewport, curveStore, patternStore) {
+    this.grid = grid;
+    this.viewport = viewport;
+    this.curveStore = curveStore;
+    this.patternStore = patternStore;
+  }
+
+  /**
+   * Stamps one copy of the selected pattern anchored at the nail nearest the
+   * given screen-space point. No-op if no pattern is selected or no nail is
+   * close enough to anchor on.
+   * @param {{x:number,y:number}} screenPos
+   */
+  stampAtScreenPoint(screenPos) {
+    const pattern = this.patternStore.selectedPattern;
+    if (!pattern) return;
+
+    const worldPos = this.viewport.toWorld(screenPos.x, screenPos.y);
+    const anchor = this.grid.findNearestPoint(worldPos);
+    if (!anchor) return;
+
+    this.curveStore.add(new Curve(pattern.translatedTo(anchor), pattern.colors.slice(), pattern.id));
+  }
+
+  /**
+   * Stamps a copy of the selected pattern anchored at every grid nail at
+   * once ("Auto" placement mode). No-op if this pattern has already been
+   * stamped throughout the grid.
+   */
+  stampThroughoutGrid() {
+    const pattern = this.patternStore.selectedPattern;
+    if (!pattern) return;
+    if (this.curveStore.hasCurveForPattern(pattern.id)) return;
+
+    for (const anchor of this.grid.points) {
+      this.curveStore.add(new Curve(pattern.translatedTo(anchor), pattern.colors, pattern.id));
+    }
+  }
+}

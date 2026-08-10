@@ -1,0 +1,12 @@
+{
+  "name": "bezier-generator",
+  "private": true,
+  "type": "module",
+  "description": "String-art grid planning tool. No build step for the app itself (plain ES modules loaded directly by index.html, deployed as-is to GitHub Pages) - Vitest here is dev-only, for unit tests of the pure logic under src/.",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.4"
+  }
+}
