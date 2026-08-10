@@ -18,6 +18,7 @@ import { touchesMenus } from '../ui/menuHitTest.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
+import { LivePreviewLine } from './LivePreviewLine.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
 // Default board: 20x20cm at the default DPI.
@@ -151,6 +152,7 @@ export class FreestyleApp {
       StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll());
     }
     CanvasView.drawGuidePath(this.selection.points);
+    this.#drawLivePreviewLine();
 
     const preview = this.patterns.preview;
     if (preview) {
@@ -258,6 +260,25 @@ export class FreestyleApp {
       return;
     }
     this.selection.add(worldPos);
+  }
+
+  /**
+   * The "next segment" rubber-band line from the last placed point to the
+   * cursor - only while actively building a manual selection (not while a
+   * pattern is armed for stamping), and only once at least one point exists.
+   * Skipped when the cursor isn't over the canvas (e.g. hovering a menu),
+   * same bounds check as placing a point.
+   */
+  #drawLivePreviewLine() {
+    if (this.patterns.isInUse) return;
+
+    const from = this.selection.lastPoint;
+    if (!from) return;
+
+    const cursorWorld = this.viewport.toWorld(mouseX, mouseY);
+    if (!isWithinBounds(cursorWorld, this.canvasWidth, this.canvasHeight)) return;
+
+    LivePreviewLine.draw(this.viewport, from, cursorWorld, mouseX, mouseY);
   }
 
   #createCanvas() {

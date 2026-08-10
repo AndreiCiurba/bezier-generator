@@ -12,6 +12,11 @@ export class SelectionStore {
     return this.#points.length;
   }
 
+  /** The most recently added point, or null if nothing's been placed yet. */
+  get lastPoint() {
+    return this.#points.length > 0 ? this.#points[this.#points.length - 1] : null;
+  }
+
   add(point) {
     this.#points.push(point);
   }

@@ -116,16 +116,35 @@ lot more here than it did for the grid tool.
   proportionally fewer along the shorter side so cells never stretch into rectangles (e.g. a 2:1
   canvas gets 100×50, not 100×100). Computed by `computeDivisions(width, height)` in the new
   `src/freestyle/graphPaperMath.js` (pure, unit-tested).
-- **Line shading:** every 10th line (from the edge) is a bold, lighter grey (`stroke(100)` -
-  matches the grid tool's own nail-dot color, for visual consistency across the app); the lines
-  between are a darker, subtler grey (`stroke(35)`). Minor lines are drawn first, major lines on
-  top last, so a major line always reads as one clean, uninterrupted line through its
-  intersections with minor ones (`GraphPaperRenderer.draw`).
+- **Line shading:** every 10th line (from the edge) is a bold grey (`stroke(70)` - started at 100,
+  matching the grid tool's nail-dot color, but that read as too bright/white once built, so toned
+  down); the lines between are a darker, subtler grey (`stroke(35)`). Minor lines are drawn first,
+  major lines on top last, so a major line always reads as one clean, uninterrupted line through
+  its intersections with minor ones (`GraphPaperRenderer.draw`).
 - **Coordinate space:** drawn in world space, inside the same `viewport.applyTransform()` block as
   the curves/nails - so it pans and zooms together with the design, staying spatially "attached"
   to the board rather than fixed to the screen. That's the point: squares represent real
   proportional positions on the physical board, useful for eyeballing/counting distances.
 - **Scope:** freestyle only. The grid tool has its own nail lattice as a reference grid already.
+
+### Step 2b — live alignment-highlighted preview line (✅ implemented, completes backlog item 2)
+
+- **What:** after the first point is placed, a "rubber band" line follows the cursor - a preview
+  of the next segment before you click to commit it. Turns the app's gold button-accent color
+  (`rgb(255, 204, 0)`, same as `--btn-bg`) when it's perfectly horizontal or vertical (within a
+  tolerance), signaling "this segment is straight" - otherwise it's the same grey as the
+  already-committed guide-line segments (`stroke(100)`).
+- **Alignment check:** `isAxisAligned(from, to, tolerance)` in the new, pure, unit-tested
+  `src/freestyle/lineAlignment.js` - true if the two points share (within tolerance) an x or a y.
+  Checked in **screen space** (not world space) so the tolerance reads the same regardless of
+  zoom level - "within a few screen pixels" (4px) feels consistent whether zoomed in or out, unlike
+  a fixed world-space tolerance which would feel stricter/looser as you zoom.
+- **Scope:** only the live, not-yet-placed segment. Once you click, that segment is committed and
+  keeps its normal grey forever - `LivePreviewLine` is only ever drawn for `selection.lastPoint`
+  (a new getter added to `SelectionStore`) → cursor, nothing retroactive.
+- **Suppressed** while a pattern is armed for stamping (`patterns.isInUse`) and while the cursor is
+  outside the canvas bounds (reuses `isWithinBounds` from the earlier bugfix) - same reasoning as
+  not placing points off-canvas.
 
 ### Still to be scoped (later steps, in backlog order)
 

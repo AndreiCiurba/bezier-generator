@@ -1,10 +1,11 @@
 import { computeDivisions, computeGridLines } from './graphPaperMath.js';
 
-// Lighter grey for the bold "every 10th" lines, darker grey for the rest -
-// both subtle against the canvas's own near-black background(12) fill.
-// MAJOR matches the grid tool's own nail-dot stroke(100) for visual
-// consistency across the app.
-const MAJOR_LINE_SHADE = 100;
+// A moderate grey for the bold "every 10th" lines, a darker grey for the
+// rest - both subtle against the canvas's own near-black background(12)
+// fill. Major started at 100 (matching the grid tool's nail-dot stroke) but
+// read as too bright/white; toned down while keeping it clearly lighter
+// than the minor lines.
+const MAJOR_LINE_SHADE = 70;
 const MINOR_LINE_SHADE = 35;
 const LINE_WEIGHT = 1;
 
