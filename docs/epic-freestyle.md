@@ -171,6 +171,21 @@ lot more here than it did for the grid tool.
 - **UI:** a small "Colors" number field + Apply button in the main panel, right above the swatches
   it controls (`ColorCountUI`) - not a dedicated submenu, since it's a single field rather than
   the multi-field cluster Canvas Size has.
+- **Line weight also scales with color count** (follow-up ask, same step): exactly today's weight
+  (0.6) at 8 colors - changing the count is a no-op for anyone who leaves it at the default -
+  doubling by 2 colors, quadrupling by 1, and gradually thinner up to 25. Inverse-square-root
+  falloff (`strokeWeightForColorCount` in the new, pure, unit-tested `src/freestyle/strokeWeight.js`)
+  rather than straight inverse, so the *thin* end tapers gently instead of collapsing toward a
+  hairline - "slightly decrease" at 25, not "barely visible". `StringArtRenderer.drawCurve` grew a
+  4th `weight` param (default 0.6, so the grid tool - which never passes it - is untouched); each
+  curve/pattern's weight is derived from its own `colors.length`, same "keeps its own fineness"
+  reasoning as the segments coupling above.
+- **E2e-verified** (asked for explicitly - see the `no-e2e` skill): picker count and the
+  `colorCountInput` default both confirmed at 8; a 3-point curve arranged so `colorCount=1`
+  degenerates the weave to one single isolated line (segments=1 only ever draws p1→p3 directly)
+  gave a clean line to pixel-measure, confirming the formula is actually wired into rendering, not
+  just computed and discarded; screenshots across 1/2/8/25 colors show the expected
+  thick-line/sparse-fan → thin-line/dense-fan progression.
 
 #### Shared-code changes (backward-compatible, grid tool unaffected)
 

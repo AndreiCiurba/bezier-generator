@@ -27,6 +27,12 @@ behind each one.
       each curve/pattern uses its *own* `colors.length`, not the live palette size, so changing
       the count doesn't alter how already-drawn curves render. Changing the count clears the
       current design (same as a canvas-size change). Grid tool untouched (still fixed at 8).
+      **Plus** line thickness now scales with color count too: exactly today's weight (0.6) at 8
+      colors, thicker for fewer (doubles at 2), gradually thinner up to 25 - an inverse-square-root
+      falloff (`strokeWeightForColorCount`) so the high end tapers gently. E2e-verified: picker
+      count/default confirmed, a clean isolated-line pixel measurement at 1 color confirmed the
+      formula is genuinely wired into rendering (not just computed and discarded), and screenshots
+      across 1/2/8/25 colors show the expected thick→thin progression.
 - [x] **5. Freestyle pattern creation** — click anywhere (no snapping) to place control points;
       Reset/Clear All/Undo, colors, favorites, and patterns (save/select/stamp) all work the same
       as the grid tool, minus the Manual/Auto toggle (nothing to auto-stamp across without a grid).

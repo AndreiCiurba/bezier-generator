@@ -20,6 +20,7 @@ import { CanvasSizeUI } from './CanvasSizeUI.js';
 import { ColorCountUI } from './ColorCountUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
+import { strokeWeightForColorCount } from './strokeWeight.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
 // Default board: 20x20cm at the default DPI.
@@ -154,15 +155,26 @@ export class FreestyleApp {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      // Subdivision fineness always matches this curve's own color count -
-      // not necessarily the *current* palette size, so curves/patterns from
-      // before a color-count change keep rendering exactly as drawn.
-      StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length);
+      // Subdivision fineness and line weight always match this curve's own
+      // color count - not necessarily the *current* palette size, so
+      // curves/patterns from before a color-count change keep rendering
+      // exactly as drawn.
+      StringArtRenderer.drawCurve(
+        curve.points,
+        curve.colors,
+        curve.colors.length,
+        strokeWeightForColorCount(curve.colors.length)
+      );
       curve.previouslyDrawn = true;
     }
 
     if (this.selection.isReadyForCurve()) {
-      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll(), this.palette.size);
+      StringArtRenderer.drawCurve(
+        this.selection.points,
+        this.palette.getAll(),
+        this.palette.size,
+        strokeWeightForColorCount(this.palette.size)
+      );
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawLivePreviewLine();
