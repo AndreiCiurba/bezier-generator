@@ -20,21 +20,23 @@ export class PatternUI {
    * @param {import('../state/SelectionStore.js').SelectionStore} selection
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    * @param {import('./PatternStamper.js').PatternStamper} stamper
+   * @param {import('./PanelGroup.js').PanelGroup} submenuGroup keeps this and the Colors submenu mutually exclusive
    */
-  constructor(elements, patternStore, selection, palette, stamper) {
+  constructor(elements, patternStore, selection, palette, stamper, submenuGroup) {
     this.el = elements;
-    this.panel = new Panel(elements.panelEl);
+    this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.patternStore = patternStore;
     this.selection = selection;
     this.palette = palette;
     this.stamper = stamper;
+    this.submenuGroup = submenuGroup;
     this.listItems = new Map(); // pattern id -> <li>
   }
 
   init() {
     const { openBtn, closeBtn, exportBtn, importBtn, importInput, saveBtn, toggleModeBtn } = this.el;
 
-    openBtn.addEventListener('click', () => this.panel.open());
+    openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     exportBtn.addEventListener('click', () => {

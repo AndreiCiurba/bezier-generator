@@ -22,19 +22,27 @@ export class FavoritesUI {
    * @param {import('../state/FavoritesStore.js').FavoritesStore} favorites
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    * @param {import('./ColorPickerUI.js').ColorPickerUI} colorPickerUI
+   * @param {import('./PanelGroup.js').PanelGroup} submenuGroup keeps this and the Patterns submenu mutually exclusive
    */
-  constructor(elements, favorites, palette, colorPickerUI) {
+  constructor(elements, favorites, palette, colorPickerUI, submenuGroup) {
     this.el = elements;
-    this.panel = new Panel(elements.panelEl);
+    this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.favorites = favorites;
     this.palette = palette;
     this.colorPickerUI = colorPickerUI;
+    this.submenuGroup = submenuGroup;
   }
 
   init() {
     const { openBtn, closeBtn, saveBtn, exportBtn, importBtn, importInput } = this.el;
 
-    openBtn.addEventListener('click', () => this.panel.toggle());
+    openBtn.addEventListener('click', () => {
+      if (this.panel.isOpen) {
+        this.panel.close();
+      } else {
+        this.submenuGroup.openOnly(this.panel);
+      }
+    });
     closeBtn.addEventListener('click', () => this.panel.close());
 
     saveBtn.addEventListener('click', () => {

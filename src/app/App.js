@@ -14,6 +14,7 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
+import { PanelGroup } from '../ui/PanelGroup.js';
 
 const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
@@ -55,6 +56,10 @@ export class App {
     this.colorPickerUI = new ColorPickerUI(colorPickerContainer, this.palette);
     this.colorPickerUI.init();
 
+    // Colors and Patterns submenus render in the same spot next to the main
+    // menu, so keep them mutually exclusive - opening one closes the other.
+    const submenuGroup = new PanelGroup();
+
     new FavoritesUI(
       {
         panelEl: document.getElementById('colorFavoritesSubmenu'),
@@ -68,7 +73,8 @@ export class App {
       },
       this.favorites,
       this.palette,
-      this.colorPickerUI
+      this.colorPickerUI,
+      submenuGroup
     ).init();
 
     this.patternUI = new PatternUI(
@@ -87,7 +93,8 @@ export class App {
       this.patterns,
       this.selection,
       this.palette,
-      this.stamper
+      this.stamper,
+      submenuGroup
     );
     this.patternUI.init();
 

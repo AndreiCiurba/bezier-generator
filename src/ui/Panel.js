@@ -7,6 +7,10 @@ export class Panel {
     this.element = element;
   }
 
+  get isOpen() {
+    return !this.element.classList.contains('hidden');
+  }
+
   open() {
     this.element.classList.remove('hidden');
   }
