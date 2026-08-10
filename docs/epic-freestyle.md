@@ -130,18 +130,22 @@ lot more here than it did for the grid tool.
 ### Step 2b — live alignment-highlighted preview line (✅ implemented, completes backlog item 2)
 
 - **What:** after the first point is placed, a "rubber band" line follows the cursor - a preview
-  of the next segment before you click to commit it. Its color is a continuous grey→red gradient
-  (`rgb(100,100,100)` → `rgb(220,40,40)`) based on how close it is to perfectly horizontal or
-  vertical - full red exactly on axis, grey at/beyond a 50-screen-px falloff range, smoothly
-  interpolated in between. Signals "getting closer to straight" as a gradient rather than a sudden
-  snap. (First cut was a hard on/off color swap to gold at a 4px tolerance; that read as an abrupt
-  jump right at the threshold, so it became a continuous fade instead.)
+  of the next segment before you click to commit it. Its color is a continuous three-stop gradient
+  - grey (`rgb(100,100,100)`, far off-axis) → yellow (`rgb(255,204,0)`, the app's own gold accent,
+  at the midpoint of the range) → red (`rgb(220,40,40)`, reached only exactly on axis) - based on
+  how close it is to perfectly horizontal or vertical, over a 50-screen-px falloff range. Signals
+  "getting closer to straight" as a gradient, with red reserved as a pixel-perfect-only signal
+  rather than the ordinary "close enough" color. (Went through two rounds: a hard on/off gold snap
+  at a 4px tolerance felt like an abrupt jump; a plain two-color grey→red fade fixed that but made
+  "just red enough" too easy to reach; the third stop keeps red meaningfully rare.)
 - **Alignment math:** `axisMisalignment(from, to)` (smaller of the x/y difference) and
   `alignmentCloseness(offset, maxDistance)` (0..1, linear falloff) in the pure, unit-tested
-  `src/freestyle/lineAlignment.js`; `lerpColor(colorA, colorB, t)` in the new, pure, unit-tested
-  `src/freestyle/colorGradient.js`. Checked in **screen space** (not world space) so the falloff
-  distance reads the same regardless of zoom level, unlike a fixed world-space distance which
-  would feel stricter/looser as you zoom.
+  `src/freestyle/lineAlignment.js`; `lerpColor`/`lerpColorStops` in the pure, unit-tested
+  `src/freestyle/colorGradient.js` - the latter walks an ordered list of color stops and only
+  ever reaches the final one at t=1, so red isn't blended in throughout the range the way a
+  two-color lerp would. Checked in **screen space** (not world space) so the falloff distance
+  reads the same regardless of zoom level, unlike a fixed world-space distance which would feel
+  stricter/looser as you zoom.
 - **Scope:** only the live, not-yet-placed segment. Once you click, that segment is committed and
   keeps its normal grey forever - `LivePreviewLine` is only ever drawn for `selection.lastPoint`
   (a new getter added to `SelectionStore`) → cursor, nothing retroactive.
