@@ -130,22 +130,23 @@ lot more here than it did for the grid tool.
 ### Step 2b — live alignment-highlighted preview line (✅ implemented, completes backlog item 2)
 
 - **What:** after the first point is placed, a "rubber band" line follows the cursor - a preview
-  of the next segment before you click to commit it. Its color is a continuous three-stop gradient
-  - grey (`rgb(100,100,100)`, far off-axis) → yellow (`rgb(255,204,0)`, the app's own gold accent,
-  at the midpoint of the range) → red (`rgb(220,40,40)`, reached only exactly on axis) - based on
-  how close it is to perfectly horizontal or vertical, over a 50-screen-px falloff range. Signals
-  "getting closer to straight" as a gradient, with red reserved as a pixel-perfect-only signal
-  rather than the ordinary "close enough" color. (Went through two rounds: a hard on/off gold snap
-  at a 4px tolerance felt like an abrupt jump; a plain two-color grey→red fade fixed that but made
-  "just red enough" too easy to reach; the third stop keeps red meaningfully rare.)
+  of the next segment before you click to commit it. Grey (`rgb(100,100,100)`, far off-axis) fades
+  continuously to yellow (`rgb(255,204,0)`, the app's own gold accent) across a 50-screen-px range
+  as it approaches perfectly horizontal or vertical - but red (`rgb(220,40,40)`) is **not** part of
+  that fade. It's a separate, discrete signal that only appears within 1 screen px of exactly
+  on-axis - a deliberate jump, not the reddest end of a gradient, so pixel-perfect alignment is
+  unmistakable rather than just "the closest end of the fade so far". (Went through three rounds:
+  a hard on/off gold snap at a 4px tolerance felt like an abrupt jump; a two-color grey→red fade
+  fixed that but made "close enough" read as red anywhere near the aligned end; a three-stop
+  grey→yellow→red gradient still faded gradually into red through orange near the end, undermining
+  the "notice the discrepancy right away" goal - only reserving red for a true discrete snap
+  achieves that.)
 - **Alignment math:** `axisMisalignment(from, to)` (smaller of the x/y difference) and
   `alignmentCloseness(offset, maxDistance)` (0..1, linear falloff) in the pure, unit-tested
-  `src/freestyle/lineAlignment.js`; `lerpColor`/`lerpColorStops` in the pure, unit-tested
-  `src/freestyle/colorGradient.js` - the latter walks an ordered list of color stops and only
-  ever reaches the final one at t=1, so red isn't blended in throughout the range the way a
-  two-color lerp would. Checked in **screen space** (not world space) so the falloff distance
-  reads the same regardless of zoom level, unlike a fixed world-space distance which would feel
-  stricter/looser as you zoom.
+  `src/freestyle/lineAlignment.js`; `lerpColor` in the pure, unit-tested `src/freestyle/colorGradient.js`
+  for the grey→yellow fade, with the red pixel-perfect check applied *before* that lerp, as a
+  separate branch, not a further gradient stop. Checked in **screen space** (not world space) so
+  both the fade range and the pixel-perfect threshold read the same regardless of zoom level.
 - **Scope:** only the live, not-yet-placed segment. Once you click, that segment is committed and
   keeps its normal grey forever - `LivePreviewLine` is only ever drawn for `selection.lastPoint`
   (a new getter added to `SelectionStore`) → cursor, nothing retroactive.

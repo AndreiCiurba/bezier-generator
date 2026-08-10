@@ -14,9 +14,9 @@ behind each one.
       a bold moderate-grey line every 10 cells, darker-grey minor lines between (`GraphPaperRenderer`
       + pure `graphPaperMath.js`). Drawn in world space, so it pans/zooms with the design. **Plus** a
       live "rubber band" line from the last placed point to the cursor while building a curve,
-      fading through a grey→yellow→red gradient as it gets closer to perfectly horizontal or
-      vertical (red reserved for pixel-perfect on-axis, yellow at the gradient's midpoint, grey
-      beyond a 50px screen falloff, any zoom) - "this segment is straight"
+      fading grey→yellow across a 50px screen falloff as it gets closer to perfectly horizontal or
+      vertical, any zoom - with red as a separate, discrete snap only within 1px of exactly
+      on-axis, not part of the fade, so a genuine pixel-perfect line jumps out unmistakably
       (`LivePreviewLine` + pure `lineAlignment.js` + `colorGradient.js`).
       Only the in-progress segment; committed segments keep their normal color.
 - [x] **3. Canvas size pre-selection** — preset dropdown (20×20, 30×30, 30×40, 40×40, 50×50 cm)
