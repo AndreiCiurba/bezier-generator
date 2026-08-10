@@ -7,7 +7,9 @@
 
 body {
   margin: 0;
-  background: #0c0c0c; /* matches the canvas's own background(12) fill */
+  /* Deliberately lighter than the canvas's own near-black background(12)
+     fill, so the canvas edge reads clearly against the page around it. */
+  background: var(--freestyle-page-bg);
 }
 
 .centered-canvas {
