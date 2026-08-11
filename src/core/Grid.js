@@ -1,4 +1,5 @@
 import { Point } from './Point.js';
+import { findNearestPoint } from './nearestPoint.js';
 
 /**
  * The lattice of "nails" the whole app is built around.
@@ -97,15 +98,6 @@ export class Grid {
    * @returns {Point | null}
    */
   findNearestPoint(worldPos, maxDistance = 10) {
-    let nearest = null;
-    let nearestDist = Infinity;
-    for (const p of this.#points) {
-      const d = p.distanceTo(worldPos);
-      if (d < nearestDist) {
-        nearestDist = d;
-        nearest = p;
-      }
-    }
-    return nearestDist <= maxDistance ? nearest : null;
+    return findNearestPoint(this.#points, worldPos, maxDistance);
   }
 }

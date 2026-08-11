@@ -21,6 +21,16 @@ const CONTROL_POINT_ACTIVE_COLOR = '#ffcc00';
 const CONTROL_POINT_DIAMETER = 7;
 const CONTROL_POINT_ACTIVE_DIAMETER = 11;
 
+// A bright red/pink, unmistakable against both the grey nail dots and any
+// string color - deformation pins are drag handles, not part of the artwork.
+const PIN_COLOR = '#ff3b6b';
+const PIN_DIAMETER = 12;
+const PIN_SELECTED_RING_DIAMETER = 20;
+// A very faint outline of the pin's influence radius - helps make the
+// falloff concept ("nails farther away move less, out to this edge")
+// visible while dragging, not just felt.
+const PIN_RADIUS_OUTLINE_COLOR = '#ff3b6b40';
+
 /**
  * Small drawing helpers for canvas "furniture" that isn't itself string art:
  * the grid dots, the in-progress selection guide line, and pattern-shape
@@ -97,6 +107,37 @@ export class CanvasView {
         const d = isActive ? CONTROL_POINT_ACTIVE_DIAMETER : CONTROL_POINT_DIAMETER;
         ellipse(curve.points[i].x, curve.points[i].y, d, d);
       }
+    }
+  }
+
+  /**
+   * Deformation pins (see DeformableGrid/Pin) - drawn on top of the grid's
+   * (possibly already-deformed) nail dots while Deformation Mode is active,
+   * visually unmistakable from a regular nail (AC3). The selected pin (see
+   * DeformationUI - whichever was last created/dragged/plain-clicked) gets a
+   * ring around it and its influence radius outlined faintly, so the falloff
+   * region it's about to affect is visible while you work with it.
+   * @param {import('../models/Pin.js').Pin[]} pins
+   * @param {import('../models/Pin.js').Pin|null} [selectedPin]
+   */
+  static drawDeformationPins(pins, selectedPin = null) {
+    for (const pin of pins) {
+      const isSelected = pin === selectedPin;
+
+      if (isSelected) {
+        noFill();
+        stroke(PIN_RADIUS_OUTLINE_COLOR);
+        strokeWeight(1);
+        ellipse(pin.position.x, pin.position.y, pin.radius * 2, pin.radius * 2);
+
+        stroke(PIN_COLOR);
+        strokeWeight(2);
+        ellipse(pin.position.x, pin.position.y, PIN_SELECTED_RING_DIAMETER, PIN_SELECTED_RING_DIAMETER);
+      }
+
+      noStroke();
+      fill(PIN_COLOR);
+      ellipse(pin.position.x, pin.position.y, PIN_DIAMETER, PIN_DIAMETER);
     }
   }
 }

@@ -33,7 +33,8 @@
 
 #colorFavoritesSubmenu,
 #patternSubmenu,
-#canvasSizeSubmenu {
+#canvasSizeSubmenu,
+#deformationSubmenu {
   position: absolute;
   top: 0;
   left: calc(100% + 10px); /* anchored just to the right of #ui */

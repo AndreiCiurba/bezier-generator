@@ -3,6 +3,7 @@ import { Viewport } from '../core/Viewport.js';
 import { CanvasView } from '../core/CanvasView.js';
 import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
+import { DeformableGrid, DEFAULT_PIN_RADIUS, DEFAULT_PIN_FALLOFF } from '../core/DeformableGrid.js';
 import { Curve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
@@ -15,6 +16,7 @@ import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
+import { DeformationUI } from '../ui/DeformationUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
@@ -24,6 +26,13 @@ const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
 
 const NEAREST_NAIL_RADIUS = 10;
+// World-space pick radius for grabbing/removing an existing deformation pin -
+// a touch larger than a nail's own snap radius since pins are bigger,
+// deliberately-grabbable markers. Not zoom-adjusted, matching how
+// NEAREST_NAIL_RADIUS already works in this file (a raw world-space
+// tolerance, not a screen-space one - see freestyle's point editor for the
+// zoom-adjusted alternative, used there instead for a different reason).
+const PIN_PICK_RADIUS = 15;
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
 // Empty margin around the grid's own bounding box, on every side, when
@@ -52,16 +61,27 @@ export class App {
     this.canvasWidth = bbox.width + GRID_PADDING * 2;
     this.canvasHeight = bbox.height + GRID_PADDING * 2;
 
+    // Wraps `this.grid` with an (initially empty, so behaviorally identical)
+    // Puppet Warp deformation layer - see DeformableGrid.js. Everything that
+    // used to read `this.grid.points`/`findNearestPoint` for rendering or
+    // click-handling in the *drawing* stage now reads `this.deformation`
+    // instead, so curves snap to and render from *current* (possibly
+    // deformed) nail positions, while `this.grid` itself stays the untouched
+    // base lattice throughout.
+    this.deformation = new DeformableGrid(this.grid);
+
     this.palette = new StrokePalette();
     this.favorites = new FavoritesStore();
     this.curves = new CurveStore();
     this.selection = new SelectionStore();
     this.patterns = new PatternStore();
-    this.stamper = new PatternStamper(this.grid, this.viewport, this.curves, this.patterns);
+    this.stamper = new PatternStamper(this.deformation, this.viewport, this.curves, this.patterns);
 
     // Pan-drag state.
     this.isDragging = false;
     this.dragStart = null;
+    // { pin } while a Ctrl-grabbed deformation pin is actively being dragged.
+    this.pinDrag = null;
     // Tap-vs-swipe detection for touch (previously implicit/undeclared globals
     // in main.js - which, being plain assignments inside an ES module, would
     // actually throw a ReferenceError under strict mode instead of creating
@@ -123,6 +143,29 @@ export class App {
     );
     this.patternUI.init();
 
+    this.deformationUI = new DeformationUI(
+      {
+        panelEl: document.getElementById('deformationSubmenu'),
+        openBtn: document.getElementById('openDeformationBtn'),
+        closeBtn: document.getElementById('closeDeformationSubmenuBtn'),
+        defaultRadiusInput: document.getElementById('deformationDefaultRadiusInput'),
+        defaultFalloffInput: document.getElementById('deformationDefaultFalloffInput'),
+        applyDefaultsBtn: document.getElementById('applyDeformationDefaultsBtn'),
+        selectedRadiusInput: document.getElementById('deformationSelectedRadiusInput'),
+        selectedFalloffInput: document.getElementById('deformationSelectedFalloffInput'),
+        applySelectedBtn: document.getElementById('applyDeformationSelectedBtn'),
+        removePinBtn: document.getElementById('removeDeformationPinBtn'),
+        resetBtn: document.getElementById('resetDeformationBtn'),
+        pinCountEl: document.getElementById('deformationPinCount'),
+      },
+      submenuGroup,
+      { radius: DEFAULT_PIN_RADIUS, falloff: DEFAULT_PIN_FALLOFF },
+      this.handleRemoveDeformationPin,
+      this.handleResetDeformation,
+      this.handleSelectedPinChanged
+    );
+    this.deformationUI.init();
+
     this.colorCountUI = new ColorCountUI(
       {
         input: document.getElementById('colorCountInput'),
@@ -172,7 +215,7 @@ export class App {
     background(12);
     this.viewport.applyTransform();
 
-    CanvasView.drawGridDots(this.grid.points);
+    CanvasView.drawGridDots(this.deformation.points);
 
     for (const curve of this.curves.curves) {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
@@ -201,6 +244,10 @@ export class App {
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawArmedPatternPreview();
+
+    if (this.deformationUI.isActive) {
+      CanvasView.drawDeformationPins(this.deformation.pins, this.deformationUI.selectedPin);
+    }
 
     const preview = this.patterns.preview;
     if (preview) {
@@ -251,12 +298,32 @@ export class App {
     this.colorPickerUI.rebuild();
   };
 
-  mousePressed = () => {
+  handleRemoveDeformationPin = (pin) => {
+    this.deformation.removePin(pin);
+    this.deformationUI.refreshPinCount(this.deformation.pins.length);
+  };
+
+  handleResetDeformation = () => {
+    this.deformation.reset();
+    this.deformationUI.refreshPinCount(0);
+  };
+
+  /** The selected pin's radius/falloff were edited directly in the panel, bypassing DeformableGrid's own mutators - force a recompute. */
+  handleSelectedPinChanged = () => {
+    this.deformation.invalidate();
+  };
+
+  mousePressed = (event) => {
     if (touchesMenus(winMouseX, winMouseY)) return;
 
     if (mouseButton === CENTER) {
       this.isDragging = true;
       this.dragStart = new Point(mouseX, mouseY);
+      return;
+    }
+
+    if (this.deformationUI.isActive) {
+      this.#handleDeformationClick(event);
       return;
     }
 
@@ -270,6 +337,12 @@ export class App {
   };
 
   touchEnded = () => {
+    // Deformation Mode's pin interactions are Ctrl/Alt+Click, a keyboard+
+    // mouse-only gesture with no touch equivalent - a plain tap is a no-op
+    // here too, same as an unmodified click, rather than falling through to
+    // placing a curve point (AC2: not a drawing action in this mode).
+    if (this.deformationUI.isActive) return false;
+
     const tapDuration = millis() - this.touchStartTime;
     const movedDistance = this.touchStart ? new Point(mouseX, mouseY).distanceTo(this.touchStart) : Infinity;
 
@@ -280,6 +353,11 @@ export class App {
   };
 
   mouseDragged = () => {
+    if (touches.length === 0 && this.pinDrag) {
+      const worldPos = this.viewport.toWorld(mouseX, mouseY);
+      this.deformation.movePin(this.pinDrag.pin, worldPos);
+      return;
+    }
     if (touches.length === 0 && this.isDragging) {
       const dx = mouseX - this.dragStart.x;
       const dy = mouseY - this.dragStart.y;
@@ -290,6 +368,7 @@ export class App {
 
   mouseReleased = () => {
     this.isDragging = false;
+    this.pinDrag = null;
   };
 
   mouseWheel = (event) => {
@@ -307,8 +386,56 @@ export class App {
       return;
     }
     const worldPos = this.viewport.toWorld(screenX, screenY);
-    const nearest = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
+    // Current (possibly deformed) nail positions, not the base grid's own -
+    // so curve points snap to and render from wherever the nails actually
+    // are right now (epic AC10).
+    const nearest = this.deformation.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
     if (nearest) this.selection.add(nearest.copy());
+  }
+
+  /**
+   * Handles a click while Deformation Mode is active (see DeformationUI) -
+   * Ctrl+Click a pin drags it (or creates one, anchored on the nearest
+   * *base* nail, if none was hit), Alt+Click a pin removes it, and a plain
+   * click on a pin just selects it (populates the panel's radius/falloff
+   * fields) without moving or creating anything - not a drawing action
+   * either way (AC2).
+   * @param {MouseEvent} [event] the native DOM event p5 passes through -
+   *   read directly for `ctrlKey`/`altKey` rather than tracking our own
+   *   continuous keydown/keyup state, since (unlike freestyle's hold-V/H/
+   *   Ctrl highlighting) nothing here needs to react to a key being held
+   *   *without* a click.
+   */
+  #handleDeformationClick(event) {
+    const worldPos = this.viewport.toWorld(mouseX, mouseY);
+
+    if (event?.altKey) {
+      const pin = this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS);
+      if (!pin) return;
+      this.deformation.removePin(pin);
+      this.deformationUI.refreshPinCount(this.deformation.pins.length);
+      if (this.deformationUI.selectedPin === pin) this.deformationUI.setSelectedPin(null);
+      return;
+    }
+
+    if (event?.ctrlKey) {
+      let pin = this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS);
+      if (!pin) {
+        const nail = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
+        if (!nail) return;
+        pin = this.deformation.addPin({
+          referencePosition: nail,
+          radius: this.deformationUI.defaultRadius,
+          falloff: this.deformationUI.defaultFalloff,
+        });
+        this.deformationUI.refreshPinCount(this.deformation.pins.length);
+      }
+      this.pinDrag = { pin };
+      this.deformationUI.setSelectedPin(pin);
+      return;
+    }
+
+    this.deformationUI.setSelectedPin(this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS));
   }
 
   /**

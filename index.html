@@ -56,6 +56,41 @@
     </div>
 
 
+    <!-- Deformation Submenu (Puppet Warp) - Ctrl+Click a nail to place a pin, Ctrl+Drag to move it, Alt+Click to remove it -->
+    <div id="deformationSubmenu" class="panel hidden">
+      <button id="closeDeformationSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Grid Deformation</div>
+      <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+        Ctrl+Click a nail: add pin &middot; Ctrl+Drag: move it &middot; Alt+Click: remove it
+      </div>
+
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">New pin defaults</div>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Radius
+        <input id="deformationDefaultRadiusInput" type="number" min="1" step="1" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Falloff
+        <input id="deformationDefaultFalloffInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+      </label>
+      <button id="applyDeformationDefaultsBtn" class="menu-btn">Apply</button>
+
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Selected pin</div>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Radius
+        <input id="deformationSelectedRadiusInput" type="number" min="1" step="1" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Falloff
+        <input id="deformationSelectedFalloffInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+      </label>
+      <button id="applyDeformationSelectedBtn" class="menu-btn">Apply</button>
+      <button id="removeDeformationPinBtn" class="menu-btn">Remove Pin</button>
+
+      <div id="deformationPinCount" style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">0 pins</div>
+      <button id="resetDeformationBtn" class="menu-btn">Reset Deformation</button>
+    </div>
+
     <!-- Number of colors: also sets the weave's subdivision fineness and line weight 1:1 -->
     <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
       <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
@@ -66,6 +101,7 @@
     <!-- Populated by ColorPickerUI from the palette (size set above) -->
     <div id="colorPickerContainer"></div>
 
+    <button id="openDeformationBtn" class="menu-btn">Deform Grid</button>
     <button id="openPatternBtn" class="menu-btn">Patterns</button>
     <button id="openFavoritesBtn" class="menu-btn">Colors</button>
     <button id="resetBtn" class="menu-btn">Reset</button>
