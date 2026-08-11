@@ -1,14 +1,12 @@
 import { weaveSegmentsForCurve } from '../core/weaveMath.js';
 import { nailPositionsForCurve } from '../core/nailPositions.js';
-import { strokeWeightForColorCount } from '../core/strokeWeight.js';
+import { controlPointDiameterForColorCount, innerPointDiameterForColorCount } from '../core/nailDotSize.js';
 
 // Print-friendly white, unlike the editor's own dark background(12) - the
 // point is a clean template to transfer onto a physical board, not to match
 // the on-screen theme.
 const BACKGROUND_COLOR = 255;
 const DOT_COLOR = 0; // solid black - reads clearly on plain paper
-const CONTROL_POINT_DIAMETER = 10;
-const INNER_POINT_DIAMETER = 4;
 
 /**
  * Renders the freestyle canvas's curves onto an offscreen `p5.Graphics`
@@ -46,13 +44,11 @@ export class ExportRenderer {
   static renderNailsAndStrings(pg, curves) {
     pg.background(BACKGROUND_COLOR);
     for (const curve of curves) {
-      ExportRenderer.#drawWeave(
-        pg,
-        curve.points,
-        curve.colors,
-        curve.colors.length,
-        strokeWeightForColorCount(curve.colors.length)
-      );
+      // Its own weight - explicit override if it has one (freestyle's
+      // manual Stroke Weight setting), else derived from its own color
+      // count - never the *current* setting, so this always matches what
+      // the curve actually renders as on screen.
+      ExportRenderer.#drawWeave(pg, curve.points, curve.colors, curve.colors.length, curve.renderWeight);
     }
     ExportRenderer.#drawNails(pg, curves);
   }
@@ -66,6 +62,13 @@ export class ExportRenderer {
     }
   }
 
+  /**
+   * Dot sizes scale with each curve's *own* color count (`nailDotSize.js`) -
+   * more colors means more, closer-together subdivision points per edge, so
+   * a fixed dot size would start overlapping into what reads as a solid
+   * line rather than individual nails. Bigger, easier-to-see dots for a
+   * sparse, few-color weave; smaller ones for a dense, many-color weave.
+   */
   static #drawNails(pg, curves) {
     pg.noStroke();
     pg.fill(DOT_COLOR);
@@ -74,11 +77,13 @@ export class ExportRenderer {
     // where a curve's own edges meet - not that they'd usually overlap, but
     // it keeps "control points read as the prominent ones" true regardless.
     for (const curve of curves) {
+      const diameter = innerPointDiameterForColorCount(curve.colors.length);
       const { innerPoints } = nailPositionsForCurve(curve);
-      for (const p of innerPoints) pg.ellipse(p.x, p.y, INNER_POINT_DIAMETER, INNER_POINT_DIAMETER);
+      for (const p of innerPoints) pg.ellipse(p.x, p.y, diameter, diameter);
     }
     for (const curve of curves) {
-      for (const p of curve.points) pg.ellipse(p.x, p.y, CONTROL_POINT_DIAMETER, CONTROL_POINT_DIAMETER);
+      const diameter = controlPointDiameterForColorCount(curve.colors.length);
+      for (const p of curve.points) pg.ellipse(p.x, p.y, diameter, diameter);
     }
   }
 }

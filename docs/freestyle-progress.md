@@ -97,6 +97,43 @@ behind each one.
       **Plus** a small, unrelated toggle for step 2's graph-paper backdrop
       (`toggleGraphPaperInput` → `showGraphPaper`) - on-screen only, never affects either export.
 
+#### Follow-up: manual stroke weight, and export dots that scale with color count
+
+Two related asks in the same round: an artist matching a physical thread's real thickness needs to
+*set* the line weight directly, not just get whatever `strokeWeightForColorCount` derives from the
+color count; and the export's nail dots were a fixed size regardless of how many colors/subdivision
+points a curve had, so a fine (high-color-count) weave's closely-packed inner points visually
+merged into what read as a solid line instead of individual, markable nail positions.
+
+- **Stroke Weight field** (`strokeWeightInput` + Apply, right below Colors - `StrokeWeightUI`,
+  mirroring `ColorCountUI`'s exact field-plus-Apply shape) - freestyle only. Decoupled from color
+  count entirely: Colors still controls subdivision fineness (`segments`), Stroke Weight
+  independently controls line thickness. Defaults to today's baseline (0.6, exactly
+  `strokeWeightForColorCount(8)`) so anyone who never touches it sees no change.
+- **Per-curve, not global**: `Curve` grew an optional `weight` field (4th constructor arg,
+  `null` by default) and a `renderWeight` getter (`weight ?? strokeWeightForColorCount(colors.length)`)
+  - the grid tool never passes a 4th arg, so it's completely unaffected, byte-identical behavior.
+  Freestyle passes its current `strokeWeight` setting whenever a curve is actually created (Reset,
+  pattern stamping via `FreestylePatternStamper#stampAtScreenPoint`'s new 3rd param) - so, same
+  "keeps its own value forever" treatment as colors/segments, changing the setting **does not**
+  clear the canvas (unlike Colors/Canvas Size) since it's purely cosmetic going forward, nothing
+  structural to invalidate. The live in-progress selection preview and the armed-pattern ghost
+  preview (`CanvasView.drawArmedPatternPreview`'s new optional `weight` param) both read the
+  current setting too, so what you see while working always matches what gets locked in.
+- **Export dots now scale with each curve's own color count** (`src/core/nailDotSize.js`, new,
+  mirrors `strokeWeight.js`'s own inverse-proportionality reasoning and baseline-8-is-a-no-op
+  convention) - bigger control/inner dots for a sparse, few-color weave, smaller ones for a dense,
+  many-color weave, clamped at both ends (plain inverse proportionality alone would reach an
+  absurd ~80px control dot at 1 color). `ExportRenderer` computes both diameters per curve instead
+  of using its old fixed constants. Export line weight also switched to `curve.renderWeight`
+  (was a direct `strokeWeightForColorCount` call), so an exported PNG's strings match whatever
+  weight that curve actually renders with on screen.
+
+#### New files
+
+`src/freestyle/strokeWeightSetting.js` (+test), `src/freestyle/StrokeWeightUI.js`,
+`src/core/nailDotSize.js` (+test).
+
 ## Supporting work done alongside the backlog
 
 Not backlog items themselves, but built in service of them or as follow-up polish:

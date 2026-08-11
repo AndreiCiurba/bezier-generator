@@ -18,9 +18,10 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
-import { strokeWeightForColorCount } from '../core/strokeWeight.js';
+import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
+import { StrokeWeightUI } from './StrokeWeightUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
 import { ExportRenderer } from './ExportRenderer.js';
@@ -89,6 +90,13 @@ export class FreestyleApp {
     // another point gets added before the commit, since the shape would no
     // longer match what was actually saved.
     this.pendingOriginPatternId = null;
+
+    // The pixel thickness new curves get woven with, set directly (not
+    // derived from color count - see StrokeWeightUI) so the artist can match
+    // the actual thread they're using. Applies to curves created *from now
+    // on* only - see Curve#renderWeight, same "keeps its own value forever"
+    // treatment as colors/segments.
+    this.strokeWeight = BASELINE_STROKE_WEIGHT;
   }
 
   setup = () => {
@@ -169,6 +177,18 @@ export class FreestyleApp {
     );
     this.colorCountUI.init();
 
+    this.strokeWeightUI = new StrokeWeightUI(
+      {
+        input: document.getElementById('strokeWeightInput'),
+        applyBtn: document.getElementById('applyStrokeWeightBtn'),
+      },
+      this.strokeWeight,
+      (weight) => {
+        this.strokeWeight = weight;
+      }
+    );
+    this.strokeWeightUI.init();
+
     new MenuUI(
       document.getElementById('burger'),
       document.getElementById('ui'),
@@ -232,26 +252,17 @@ export class FreestyleApp {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      // Subdivision fineness and line weight always match this curve's own
-      // color count - not necessarily the *current* palette size, so
-      // curves/patterns from before a color-count change keep rendering
-      // exactly as drawn.
-      StringArtRenderer.drawCurve(
-        curve.points,
-        curve.colors,
-        curve.colors.length,
-        strokeWeightForColorCount(curve.colors.length)
-      );
+      // Subdivision fineness always matches this curve's own color count;
+      // weight is its own explicit setting if it has one (the "Stroke
+      // Weight" field, see StrokeWeightUI) or the same color-count-derived
+      // fallback as before - either way, never the *current* setting, so
+      // curves/patterns from before a change keep rendering exactly as drawn.
+      StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
       curve.previouslyDrawn = true;
     }
 
     if (this.selection.isReadyForCurve()) {
-      StringArtRenderer.drawCurve(
-        this.selection.points,
-        this.palette.getAll(),
-        this.palette.size,
-        strokeWeightForColorCount(this.palette.size)
-      );
+      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll(), this.palette.size, this.strokeWeight);
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawLivePreviewLine();
@@ -273,7 +284,8 @@ export class FreestyleApp {
         new Curve(
           this.selection.points.map((p) => p.copy()),
           this.palette.snapshot(),
-          this.pendingOriginPatternId
+          this.pendingOriginPatternId,
+          this.strokeWeight
         )
       );
     }
@@ -332,7 +344,7 @@ export class FreestyleApp {
   #curvesForExport() {
     const curves = this.curves.curves.slice();
     if (this.selection.isReadyForCurve()) {
-      curves.push(new Curve(this.selection.points, this.palette.getAll()));
+      curves.push(new Curve(this.selection.points, this.palette.getAll(), null, this.strokeWeight));
     }
     return curves;
   }
@@ -437,7 +449,8 @@ export class FreestyleApp {
     if (this.patterns.isInUse) {
       this.stamper.stampAtScreenPoint(
         { x: screenX, y: screenY },
-        { horizontal: this.flipHorizontal, vertical: this.flipVertical }
+        { horizontal: this.flipHorizontal, vertical: this.flipVertical },
+        this.strokeWeight
       );
       return;
     }
@@ -528,10 +541,12 @@ export class FreestyleApp {
     if (!isWithinBounds(cursorWorld, this.canvasWidth, this.canvasHeight)) return;
     if (touchesMenus(winMouseX, winMouseY)) return;
 
-    CanvasView.drawArmedPatternPreview(pattern, cursorWorld, {
-      horizontal: this.flipHorizontal,
-      vertical: this.flipVertical,
-    });
+    CanvasView.drawArmedPatternPreview(
+      pattern,
+      cursorWorld,
+      { horizontal: this.flipHorizontal, vertical: this.flipVertical },
+      this.strokeWeight
+    );
   }
 
   /**

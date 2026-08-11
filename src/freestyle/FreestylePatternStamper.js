@@ -26,13 +26,16 @@ export class FreestylePatternStamper {
    * was being previewed at the moment of the click is what gets placed.
    * @param {{x:number,y:number}} screenPos
    * @param {{horizontal?: boolean, vertical?: boolean}} [flip]
+   * @param {number|null} [weight] the current "Stroke Weight" setting (see
+   *   StrokeWeightUI) to lock this stamp to - `null` falls back to the
+   *   color-count-derived default (`Curve#renderWeight`).
    */
-  stampAtScreenPoint(screenPos, flip) {
+  stampAtScreenPoint(screenPos, flip, weight = null) {
     const pattern = this.patternStore.selectedPattern;
     if (!pattern) return;
 
     const worldPos = this.viewport.toWorld(screenPos.x, screenPos.y);
     const points = translatePointsTo(flipPoints(pattern.points, flip), worldPos);
-    this.curveStore.add(new Curve(points, pattern.colors.slice(), pattern.id));
+    this.curveStore.add(new Curve(points, pattern.colors.slice(), pattern.id, weight));
   }
 }

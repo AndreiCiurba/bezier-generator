@@ -77,8 +77,13 @@ export class CanvasView {
    * @param {import('../models/Pattern.js').Pattern} pattern
    * @param {{x:number,y:number}} anchorWorldPos where pattern.points[0] would land
    * @param {{horizontal?: boolean, vertical?: boolean}} [flip]
+   * @param {number|null} [weight] the current "Stroke Weight" setting, if
+   *   the caller has one (freestyle) - so the ghost preview's thickness
+   *   matches what the real stamp will actually use. `null` (the grid
+   *   tool's only case) falls back to the color-count-derived default, same
+   *   as before this param existed.
    */
-  static drawArmedPatternPreview(pattern, anchorWorldPos, flip) {
+  static drawArmedPatternPreview(pattern, anchorWorldPos, flip, weight = null) {
     const flipped = flipPoints(pattern.points, flip);
     const translated = translatePointsTo(flipped, anchorWorldPos);
     const previewStrokes = pattern.colors.map(() => ({ color: ARMED_PREVIEW_COLOR, enabled: true }));
@@ -86,7 +91,7 @@ export class CanvasView {
       translated,
       previewStrokes,
       pattern.colors.length,
-      strokeWeightForColorCount(pattern.colors.length)
+      weight ?? strokeWeightForColorCount(pattern.colors.length)
     );
   }
 

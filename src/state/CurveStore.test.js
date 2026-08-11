@@ -1,6 +1,26 @@
 import { describe, it, expect } from 'vitest';
 import { CurveStore } from './CurveStore.js';
 import { Curve } from '../models/Curve.js';
+import { strokeWeightForColorCount } from '../core/strokeWeight.js';
+
+describe('Curve#renderWeight', () => {
+  it('falls back to strokeWeightForColorCount(colors.length) when no explicit weight was given', () => {
+    const colors = [{ color: '#fff', enabled: true }, { color: '#000', enabled: true }];
+    const curve = new Curve([], colors);
+    expect(curve.renderWeight).toBe(strokeWeightForColorCount(2));
+  });
+
+  it('uses the explicit weight when one was given, ignoring color count entirely', () => {
+    const colors = [{ color: '#fff', enabled: true }];
+    const curve = new Curve([], colors, null, 5);
+    expect(curve.renderWeight).toBe(5);
+  });
+
+  it('an explicit weight of 0 is honored, not treated as "unset" (nullish coalescing, not ||)', () => {
+    const curve = new Curve([], [{ color: '#fff', enabled: true }], null, 0);
+    expect(curve.renderWeight).toBe(0);
+  });
+});
 
 describe('Curve#belongsToPattern', () => {
   it('is false for manual curves (patternId null) regardless of what is compared against', () => {
