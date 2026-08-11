@@ -17,6 +17,7 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
+import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { strokeWeightForColorCount } from '../core/strokeWeight.js';
 
 const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
@@ -67,6 +68,11 @@ export class App {
     // globals; touch support looks to have never really worked).
     this.touchStartTime = 0;
     this.touchStart = null;
+
+    // Momentary pattern-flip state: true only while V/H is physically held
+    // down (see setup's keydown/keyup wiring), not a toggle.
+    this.flipVertical = false;
+    this.flipHorizontal = false;
   }
 
   setup = () => {
@@ -140,7 +146,25 @@ export class App {
     document.getElementById('undoBtn').addEventListener('click', this.handleUndo);
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.handleReset();
+      if (e.key === 'Escape') {
+        this.handleReset();
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'v') this.flipVertical = true;
+      if (key === 'h') this.flipHorizontal = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'v') this.flipVertical = false;
+      if (key === 'h') this.flipHorizontal = false;
+    });
+    // Guards against a stuck-flipped state if focus leaves the page (e.g.
+    // alt-tab) while a flip key is held, since keyup wouldn't otherwise fire.
+    window.addEventListener('blur', () => {
+      this.flipVertical = false;
+      this.flipHorizontal = false;
     });
   };
 
@@ -176,6 +200,7 @@ export class App {
       );
     }
     CanvasView.drawGuidePath(this.selection.points);
+    this.#drawArmedPatternPreview();
 
     const preview = this.patterns.preview;
     if (preview) {
@@ -275,12 +300,36 @@ export class App {
   /** Places a point at a screen-space position: stamps a pattern if one is active, otherwise extends the manual selection. */
   #placeAtScreenPoint(screenX, screenY) {
     if (this.patterns.isInUse) {
-      this.stamper.stampAtScreenPoint({ x: screenX, y: screenY });
+      this.stamper.stampAtScreenPoint(
+        { x: screenX, y: screenY },
+        { horizontal: this.flipHorizontal, vertical: this.flipVertical }
+      );
       return;
     }
     const worldPos = this.viewport.toWorld(screenX, screenY);
     const nearest = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
     if (nearest) this.selection.add(nearest.copy());
+  }
+
+  /**
+   * The ghost preview for the armed pattern (selected, Manual mode) - follows
+   * the cursor on the canvas, greyed out, flip-aware. Separate from
+   * `patterns.preview` (the list-row hover preview, kept as-is above) - both
+   * can show at once, e.g. if a pattern's armed and you're also browsing the
+   * list, though that's a rare edge case in practice.
+   */
+  #drawArmedPatternPreview() {
+    if (!this.patterns.isInUse || this.patterns.placementMode !== 'manual') return;
+    if (touchesMenus(winMouseX, winMouseY)) return;
+
+    const pattern = this.patterns.selectedPattern;
+    if (!pattern) return;
+
+    const cursorWorld = this.viewport.toWorld(mouseX, mouseY);
+    CanvasView.drawArmedPatternPreview(pattern, cursorWorld, {
+      horizontal: this.flipHorizontal,
+      vertical: this.flipVertical,
+    });
   }
 
   #createCanvas() {

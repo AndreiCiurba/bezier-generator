@@ -1,4 +1,5 @@
 import { Curve } from '../models/Curve.js';
+import { flipPoints, translatePointsTo } from '../core/pointTransforms.js';
 
 /**
  * Places copies of the currently-selected pattern onto the grid.
@@ -31,10 +32,13 @@ export class PatternStamper {
   /**
    * Stamps one copy of the selected pattern anchored at the nail nearest the
    * given screen-space point. No-op if no pattern is selected or no nail is
-   * close enough to anchor on.
+   * close enough to anchor on. `flip` mirrors the pattern the same way the
+   * hold-V/hold-H shortcuts preview it - whatever was being previewed at the
+   * moment of the click is what gets placed.
    * @param {{x:number,y:number}} screenPos
+   * @param {{horizontal?: boolean, vertical?: boolean}} [flip]
    */
-  stampAtScreenPoint(screenPos) {
+  stampAtScreenPoint(screenPos, flip) {
     const pattern = this.patternStore.selectedPattern;
     if (!pattern) return;
 
@@ -42,7 +46,8 @@ export class PatternStamper {
     const anchor = this.grid.findNearestPoint(worldPos);
     if (!anchor) return;
 
-    this.curveStore.add(new Curve(pattern.translatedTo(anchor), pattern.colors.slice(), pattern.id));
+    const points = translatePointsTo(flipPoints(pattern.points, flip), anchor);
+    this.curveStore.add(new Curve(points, pattern.colors.slice(), pattern.id));
   }
 
   /**

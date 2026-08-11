@@ -57,6 +57,30 @@ describe('PatternStamper#stampAtScreenPoint', () => {
     expect(curves.count).toBe(1);
     expect(curves.curves[0].points[0]).toEqual({ x: target.x, y: target.y });
   });
+
+  it('applies a flip when given, keeping the anchor point fixed', () => {
+    const { stamper, curves, patterns, grid } = setUp();
+    const target = grid.points[3];
+
+    patterns.add(
+      new Pattern({
+        id: 'p1',
+        name: 'p1',
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 0 },
+        ],
+        colors: [],
+      })
+    );
+    patterns.select('p1');
+
+    stamper.stampAtScreenPoint(target, { horizontal: true });
+
+    expect(curves.curves[0].points[0]).toEqual({ x: target.x, y: target.y });
+    // Unflipped this would land at target.x + 10; flipped it mirrors to target.x - 10.
+    expect(curves.curves[0].points[1].x).toBeCloseTo(target.x - 10, 5);
+  });
 });
 
 describe('PatternStamper#stampThroughoutGrid', () => {

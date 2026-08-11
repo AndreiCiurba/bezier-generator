@@ -21,12 +21,19 @@ export class PatternUI {
    * @param {import('../state/StrokePalette.js').StrokePalette} palette
    * @param {import('./PatternStamper.js').PatternStamper} stamper
    * @param {import('./PanelGroup.js').PanelGroup} submenuGroup keeps this and the Colors submenu mutually exclusive
+   * @param {(patternId: string) => void} [onPatternSaved] called with the new
+   *   pattern's id right after saving - lets the caller tag the still-
+   *   uncommitted selection as this pattern's origin, so if/when it's
+   *   committed to a curve, it can share the pattern's id too (see
+   *   FreestyleApp's ctrl-shift point editor: this is what makes the
+   *   original hand-drawn shape move along with the pattern's stamped
+   *   copies, not just the copies). Optional - the grid tool doesn't wire it.
    *
    * `elements.toggleModeBtn` is optional - omit it where there's no grid to
    * auto-stamp across (the freestyle page), and Manual/Auto placement simply
    * doesn't apply.
    */
-  constructor(elements, patternStore, selection, palette, stamper, submenuGroup) {
+  constructor(elements, patternStore, selection, palette, stamper, submenuGroup, onPatternSaved) {
     this.el = elements;
     this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.patternStore = patternStore;
@@ -34,6 +41,7 @@ export class PatternUI {
     this.palette = palette;
     this.stamper = stamper;
     this.submenuGroup = submenuGroup;
+    this.onPatternSaved = onPatternSaved;
     this.listItems = new Map(); // pattern id -> <li>
   }
 
@@ -93,6 +101,7 @@ export class PatternUI {
       colors: this.palette.snapshot(),
     });
     this.patternStore.add(pattern);
+    this.onPatternSaved?.(pattern.id);
     this.render();
     this.el.nameInput.value = '';
   }

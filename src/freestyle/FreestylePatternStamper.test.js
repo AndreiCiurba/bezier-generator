@@ -47,6 +47,28 @@ describe('FreestylePatternStamper#stampAtScreenPoint', () => {
     expect(curves.curves[0].points[0].y).toBeCloseTo(anchor.y, 5);
   });
 
+  it('applies a flip when given, keeping the anchor point fixed', () => {
+    const { stamper, curves, patterns } = setUp();
+    patterns.add(
+      new Pattern({
+        id: 'p1',
+        name: 'p1',
+        points: [
+          { x: 0, y: 0 },
+          { x: 0, y: 10 },
+        ],
+        colors: [],
+      })
+    );
+    patterns.select('p1');
+
+    stamper.stampAtScreenPoint({ x: 50, y: 50 }, { vertical: true });
+
+    expect(curves.curves[0].points[0]).toEqual({ x: 50, y: 50 });
+    // Unflipped this would land at y=60; flipped it mirrors to y=40.
+    expect(curves.curves[0].points[1].y).toBeCloseTo(40, 5);
+  });
+
   it('each stamp gets its own color array, not a shared reference', () => {
     const { stamper, curves, patterns } = setUp();
     patterns.add(new Pattern({ id: 'p1', name: 'p1', points: [{ x: 0, y: 0 }], colors: [{ color: '#fff', enabled: true }] }));

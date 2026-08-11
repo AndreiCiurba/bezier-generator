@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Point } from './Point.js';
-import { subdivide, computeWeaveSegments } from './weaveMath.js';
+import { subdivide, computeWeaveSegments, weaveSegmentsForCurve } from './weaveMath.js';
 
 describe('subdivide', () => {
   it('returns segments+1 points including both endpoints', () => {
@@ -42,3 +42,31 @@ describe('computeWeaveSegments', () => {
 function subdivideAt(a, b, segments, index) {
   return subdivide(a, b, segments)[index];
 }
+
+describe('weaveSegmentsForCurve', () => {
+  const points = [new Point(0, 0), new Point(10, 0), new Point(10, 10), new Point(0, 10)];
+
+  it('skips disabled layers entirely', () => {
+    const strokes = [
+      { color: '#fff', enabled: true },
+      { color: '#000', enabled: false },
+    ];
+    const segments = weaveSegmentsForCurve(points, strokes, 2);
+    expect(segments.every((s) => s.color === '#fff')).toBe(true);
+  });
+
+  it('matches computeWeaveSegments summed across every triplet and layer', () => {
+    const strokes = [{ color: '#abc', enabled: true }];
+    const segments = weaveSegmentsForCurve(points, strokes, 3);
+
+    let expectedCount = 0;
+    for (let i = 0; i < points.length - 2; i++) {
+      expectedCount += computeWeaveSegments(points[i], points[i + 1], points[i + 2], 0, 3).length;
+    }
+    expect(segments).toHaveLength(expectedCount);
+  });
+
+  it('returns no segments for fewer than 3 points', () => {
+    expect(weaveSegmentsForCurve([points[0], points[1]], [{ color: '#fff', enabled: true }], 4)).toEqual([]);
+  });
+});

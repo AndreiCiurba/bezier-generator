@@ -1,4 +1,4 @@
-import { computeWeaveSegments } from './weaveMath.js';
+import { weaveSegmentsForCurve } from './weaveMath.js';
 
 const DEFAULT_STROKE_WEIGHT = 0.6; // the app's original, fixed line thickness
 
@@ -22,16 +22,9 @@ export class StringArtRenderer {
     strokeWeight(weight);
     noFill();
 
-    for (let i = 0; i < points.length - 2; i++) {
-      const [p1, p2, p3] = [points[i], points[i + 1], points[i + 2]];
-
-      strokes.forEach((layer, layerIndex) => {
-        if (!layer.enabled) return;
-        stroke(layer.color);
-        for (const { from, to } of computeWeaveSegments(p1, p2, p3, layerIndex, segments)) {
-          line(from.x, from.y, to.x, to.y);
-        }
-      });
+    for (const { from, to, color } of weaveSegmentsForCurve(points, strokes, segments)) {
+      stroke(color);
+      line(from.x, from.y, to.x, to.y);
     }
   }
 }

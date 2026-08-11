@@ -237,10 +237,182 @@ jumped back to 11.
   shared homes (`src/state/`, `src/ui/`, `src/core/` respectively) once the grid tool needed them
   too.
 
+### Step 6/7 — armed-pattern hover preview, hold-V/H flip (✅ implemented, item 7 partial)
+
+Both items scoped and built together since the flip is really an extension of the hover preview
+(what gets mirrored while you decide where to click).
+
+- **What changed about hover:** the existing list-row hover preview (`patterns.preview`,
+  `CanvasView.drawPatternPreview`) only showed while your mouse was physically over a saved
+  pattern's row in the submenu - not while actually aiming a click on the canvas. Confirmed with
+  the user: **keep that mechanism as-is**, and *add* a second, independent one - whenever a
+  pattern is armed (selected, Manual placement mode) the ghost now follows the cursor anywhere on
+  the canvas, greyed out (`#c8c8c880`), continuously, derived fresh each frame straight from
+  `patterns.isInUse`/`selectedPattern` rather than event-driven state - no hover-in/hover-out
+  listeners needed for this half. New `CanvasView.drawArmedPatternPreview(pattern, anchorWorldPos,
+  flip)`, called from a new `#drawArmedPatternPreview()` in both `App` and `FreestyleApp`, gated on
+  `placementMode === 'manual'` (freestyle's is always `'manual'` - never toggled there - so the
+  same check works unmodified on both pages) and suppressed over menus
+  (`touchesMenus`)/off-canvas (freestyle's `isWithinBounds`).
+  Also fixed while rewriting this path: the preview's density (segments/line weight) now matches
+  the pattern's own `colors.length`, same coupling used everywhere else, instead of a fixed
+  7-white-layer placeholder that didn't reflect what the real stamp would look like.
+- **What V/H actually does:** clarified through a wrong first guess - not a toggle ("press V once
+  to flip, again to un-flip"), a **momentary hold**: the preview mirrors only while the key is
+  physically down, and returns to normal the instant it's released. Confirmed: the *actual stamp*
+  also comes out mirrored if you click while holding - preview and placement always agree, since
+  both read the same live `flipVertical`/`flipHorizontal` booleans at the moment they run.
+- **Flip math:** `flipPoints(points, {horizontal, vertical})` in the new, pure, unit-tested
+  `src/core/pointTransforms.js` - mirrors every point around `points[0]`, which is what gets
+  anchored to the cursor/click, so the anchor itself never moves, only the rest of the shape
+  flips around it. `Pattern#translatedTo` was refactored to share the same file's
+  `translatePointsTo` helper (behavior-preserving DRY cleanup, not a new feature) rather than
+  duplicating the offset math a third time.
+- **Where flip is applied:** `PatternStamper#stampAtScreenPoint` and
+  `FreestylePatternStamper#stampAtScreenPoint` both grew a `flip` parameter, applied via
+  `flipPoints` + `translatePointsTo` before building the `Curve`. `stampThroughoutGrid` (Auto mode)
+  intentionally does **not** take flip - there's no click/hold gesture involved, it fires
+  immediately on selecting the pattern from the list.
+- **Keyboard wiring:** `keydown` sets the flag (guarded by the new `isTypingTarget` so typing 'v'
+  or 'h' into e.g. the pattern name field doesn't trigger a flip), `keyup` always clears it
+  regardless of focus (so a focus change mid-hold can't leave it stuck on), and a `window` `blur`
+  listener clears both flags too, in case focus leaves the page entirely (alt-tab) while a key's
+  held, which would never deliver a `keyup` otherwise.
+- **Scope:** both pages, matching how the underlying pattern/stamper infrastructure is already
+  shared.
+- **Still open (rest of backlog item 7):** arrow-key nudging of the armed pattern's position isn't
+  built yet - a separate future round.
+
+#### E2e-verified (asked for explicitly - see the `no-e2e` skill)
+
+Built a 3-point "L" pattern on freestyle, confirmed the ghost preview follows the cursor while
+*not* hovering the list (the actual complaint); confirmed typing "vhTest"/"hTest" as pattern names
+saved correctly (the typing-guard didn't block normal input, and normal typing didn't leak into
+flip state); an unguarded first attempt at the H-flip case used an out-of-bounds click target and
+correctly produced *no* preview/stamp (the bounds guard working as designed, not a bug - caught by
+comparing against the canvas's actual measured size and redone with an in-bounds target); the
+corrected H-flip screenshot shows an unambiguous left-right mirror against two identically-oriented
+unflipped shapes; the V-flip case showed an equally clear up-down mirror. Repeated a lighter version
+on the grid tool (nail-snapped placement) with the same result. Zero console/page errors throughout
+both passes.
+
+### Step 8 — ctrl-drag control-point editor (✅ implemented, freestyle only)
+
+Scoped with a round of clarifying questions before any code: freestyle-only (not the grid tool,
+where a dragged point would need nail-snapping logic this round didn't cover); works on **all**
+committed curves, not just pattern-stamped ones (a plain hand-drawn curve's points highlight and
+drag too - Shift just has nothing extra to do for one, since there's no sibling copy to sync);
+dragging edits only the curve instance(s) already on the canvas, **not** the saved pattern
+template in the library (stamping that pattern again later still gives you the original shape);
+and the Shift "move all copies together" sync is live, every frame, not only applied on release.
+
+- **Ctrl held + nothing else claims the canvas** (`#canEditPoints` - `!patterns.isInUse &&
+  selection.count === 0`, i.e. no pattern armed for stamping and no in-progress manual curve) -
+  every curve's control points highlight, gold-accent dots (`CanvasView.drawControlPointHighlights`,
+  reusing the app's own `#ffcc00` on-axis accent color from the step-2b live preview line).
+- **Ctrl-click on a highlighted point** starts a drag (`#tryStartPointEdit`, hit-tested via the
+  new pure `findNearestCurvePoint` in `src/core/pointEditing.js` - screen-space pick radius,
+  10px, divided by zoom, so the tolerance feels the same at any zoom level, same radius the grid
+  tool already uses for nail snapping). Dragging moves that point to the cursor's world position
+  every frame (`#dragActivePoint`) - the curve reshapes live, same render path as any other curve.
+- **Shift also held while dragging** moves the same point index on every other curve stamped from
+  the same pattern (`patternId`), by the same per-frame delta - the pure `shiftSiblingPoints` in
+  the same file. No-op for a manually-drawn curve (`patternId === null`) - nothing else to sync.
+  This is the "all copies vs. just one" toggle from the backlog wording, expressed as a held
+  modifier rather than a separate UI toggle.
+- **Doesn't hit a point:** a ctrl-click that misses (nothing within the pick radius) falls through
+  to the normal click handling (`#placeAtScreenPoint`) - Ctrl only special-cases a hit, it doesn't
+  block placing a new point elsewhere.
+- **Guarded against a stuck drag/held-key state** the same way as the V/H flip flags: `keyup`
+  clears `ctrlHeld`/`shiftHeld` unconditionally, and a `window` `blur` listener clears both plus
+  drops any in-progress `pointEdit`, in case focus leaves the page mid-drag (alt-tab) and no
+  `keyup`/`mouseup` ever fires.
+- **Active point emphasis:** the point actually being dragged renders larger/fully opaque
+  (`CONTROL_POINT_ACTIVE_*` in `CanvasView`) versus the semi-transparent dots for the rest -
+  affordance for which one you've grabbed, not asked for explicitly but a natural extension of
+  the same draw call.
+
+#### New files
+
+`src/core/pointEditing.js` (+test) - pure, unit-tested `findNearestCurvePoint` and
+`shiftSiblingPoints`, no p5/DOM dependency, matching the `pointTransforms.js` pattern from step 6/7.
+
+#### Follow-up: the original hand-drawn shape now moves with its pattern's copies too
+
+Raised after the first pass shipped: draw a shape, save it as a pattern, arm the pattern and stamp
+some copies, then ctrl-shift-drag a point - the original drawing didn't move, only the stamped
+copies did, since it was never actually tagged as belonging to the pattern (`patternId` stayed
+`null` - saving a pattern only *copies* the selection's points into a new `Pattern`, it doesn't
+link back to the curve that selection eventually becomes). Fixed rather than left as expected
+behavior, since it was small: `PatternUI` now takes an optional `onPatternSaved(patternId)`
+callback (only wired on freestyle - the grid tool's `PatternUI` call site is unaffected, the new
+param is simply unused there), fired right after a save. `FreestyleApp` remembers that id as
+`pendingOriginPatternId`; if the *same, unmodified* selection then gets committed to a curve
+(Reset/Escape), that curve is tagged with it instead of `null` - so it's a real, if belated,
+"stamped instance" of the pattern as far as `Curve#belongsToPattern`/`shiftSiblingPoints` are
+concerned, and ctrl-shift-drag picks it up like any other copy. Invalidated (falls back to
+`null`) if another point gets added to the selection after saving but before the commit, or if
+the selection/curves get cleared by any of the existing reset paths (Clear All, color-count
+change, canvas resize) - all of which already reset `pendingOriginPatternId` alongside what they
+already reset.
+
+### Step 9 — nails/nails+strings PNG export, graph-paper toggle (✅ implemented, freestyle only)
+
+Scoped with a round of clarifying questions: PNG only (not the originally-brainstormed PDF/JPEG -
+superseded by the user's own spec this round), white background with solid black nail dots for
+both exports (the editor's own near-black `background(12)` doesn't print well onto a physical
+board template) - the second export layers the real per-curve palette colors for the strings, not
+plain black, on top of that same white background; control points drawn **wider** than the
+in-between "inner" points, per the ask. Bundled in the same round: a small, unrelated toggle for
+the existing graph-paper backdrop (step 2's "foaie de calcul" feature) - on-screen visibility only,
+confirmed **not** to affect either export (a clean nails-only/nails+strings template either way,
+regardless of whether the grid happens to be showing while editing).
+
+- **"Control points" vs. "inner points":** control points are `curve.points` - what you actually
+  clicked (or a pattern's own points, translated when stamped). Inner points are the physical nail
+  positions the weave math itself subdivides *between* each consecutive pair of them (`segments`
+  = that curve's own `colors.length`, same coupling used everywhere else) - real nails on the
+  physical board, just not ones you placed directly, hence styled smaller/less prominent. The pure
+  `nailPositionsForCurve` in the new `src/core/nailPositions.js` computes both sets for one curve;
+  every `{from, to}` pair the weave ever draws starts/ends on one of these points, so this is
+  exactly the full physical nail set, no more, no less.
+- **Two buttons, freestyle only:** "Export Nails (PNG)" (`handleExportNails` →
+  `ExportRenderer.renderNails`) and "Export Nails + Strings (PNG)" (`handleExportNailsAndStrings` →
+  `ExportRenderer.renderNailsAndStrings`) - not added to the grid tool's menu.
+- **What gets exported:** every committed curve, plus the in-progress selection if it's far enough
+  along to render as a curve (`#curvesForExport`) - matches exactly what the draw loop itself
+  shows, a faithful "what you see" snapshot, not just what's been formally committed via Reset.
+- **Export resolution:** the canvas's own pixel size, unscaled - no separate "print DPI" needed,
+  since the canvas's pixel dimensions are already calibrated to the real-world size via the
+  existing DPI setting (`units.js`) - exporting 1:1 *is* exporting at that DPI.
+- **Rendering approach:** a `p5.Graphics` offscreen buffer (`createGraphics`), not the visible
+  canvas - `StringArtRenderer`/`CanvasView`/`GraphPaperRenderer` all draw via *bare* global p5
+  calls (`stroke()`, `line()`, ...), which in p5's global mode always target the visible canvas;
+  there's no way to redirect one at an offscreen buffer. `ExportRenderer` calls the buffer's own
+  instance methods (`pg.stroke()`, `pg.line()`, ...) instead - but still shares the real geometry
+  (`weaveSegmentsForCurve`, `nailPositionsForCurve`) with the live renderer, so only the "which
+  drawing calls" part is duplicated, not any math. Downloaded via the new, small
+  `src/io/PngFile.js#downloadCanvasPng` (`canvas.toBlob` + object URL + a clicked `<a>`, mirroring
+  `JsonFile.js#downloadJson`'s existing pattern).
+- **Refactor along the way:** `weaveMath.js` grew `weaveSegmentsForCurve(points, strokes,
+  segments)` - the pure `{from, to, color}` flattening `StringArtRenderer.drawCurve` already did
+  inline, pulled out so `ExportRenderer` doesn't duplicate the nested triplet/layer loop, only the
+  final draw call. `StringArtRenderer.drawCurve` itself is now a thin wrapper over it - same output,
+  confirmed via the existing/expanded `weaveMath.test.js`.
+- **Foaie de calcul toggle:** a checkbox in the main menu (`toggleGraphPaperInput` →
+  `FreestyleApp#showGraphPaper`, defaults on - today's only behavior) shows/hides
+  `GraphPaperRenderer` while editing. Both PNG exports call `ExportRenderer` directly and never
+  touch `GraphPaperRenderer` at all, so the grid never appears in an export regardless of the
+  toggle's state.
+
+#### New files
+
+`src/core/nailPositions.js` (+test), `src/freestyle/ExportRenderer.js`, `src/io/PngFile.js`.
+
 ### Still to be scoped (later steps, in backlog order)
 
-Items 6 (hover/grey-out display), 7 (keyboard-driven pattern placement), 8 (drag-and-drop point
-editing), 9 (export) — each gets its own clarifying round when we get to it.
+Item 7's arrow-key nudging is still open; item 9's PDF format (superseded by PNG this round, per
+the user's own spec) was never pursued. No further backlog items remain unscoped as of this step.
 
 ## Working agreement for this epic
 

@@ -1,4 +1,5 @@
 import { Point } from '../core/Point.js';
+import { translatePointsTo } from '../core/pointTransforms.js';
 
 /**
  * A named, reusable curve shape that can be stamped onto the grid at any nail.
@@ -26,8 +27,7 @@ export class Pattern {
    * @returns {Point[]}
    */
   translatedTo(anchor) {
-    const offset = this.points[0].sub(anchor);
-    return this.points.map((p) => p.sub(offset));
+    return translatePointsTo(this.points, anchor);
   }
 
   toJSON() {

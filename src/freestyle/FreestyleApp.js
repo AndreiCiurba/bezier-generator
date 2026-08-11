@@ -3,6 +3,7 @@ import { CanvasView } from '../core/CanvasView.js';
 import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
 import { isWithinBounds } from '../core/bounds.js';
+import { findNearestCurvePoint, shiftSiblingPoints } from '../core/pointEditing.js';
 import { Curve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
@@ -16,11 +17,14 @@ import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
+import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { strokeWeightForColorCount } from '../core/strokeWeight.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
+import { ExportRenderer } from './ExportRenderer.js';
+import { downloadCanvasPng } from '../io/PngFile.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
 // Default board: 20x20cm at the default DPI.
@@ -29,6 +33,9 @@ const DEFAULT_WIDTH = Math.round(toPixels(DEFAULT_SIZE_CM, 'cm', DEFAULT_DPI));
 const DEFAULT_HEIGHT = DEFAULT_WIDTH;
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
+// Screen-space pick radius for grabbing a control point with ctrl-click -
+// same tolerance the grid tool uses for nail snapping (NEAREST_NAIL_RADIUS).
+const CONTROL_POINT_PICK_RADIUS_PX = 10;
 
 /**
  * The freestyle page, wired together - same idea as App.js (the grid tool)
@@ -53,6 +60,35 @@ export class FreestyleApp {
     this.dragStart = null;
     this.touchStartTime = 0;
     this.touchStart = null;
+
+    // Momentary pattern-flip state: true only while V/H is physically held
+    // down (see setup's keydown/keyup wiring), not a toggle.
+    this.flipVertical = false;
+    this.flipHorizontal = false;
+
+    // Control-point editor (backlog item 8): Ctrl held (and nothing else
+    // armed/in-progress) highlights every curve's points; ctrl-clicking one
+    // and dragging reshapes that curve live; holding Shift too moves the
+    // same point on every other curve stamped from the same pattern along
+    // with it. `pointEdit` is set only while a drag is actually in progress.
+    this.ctrlHeld = false;
+    this.shiftHeld = false;
+    this.pointEdit = null;
+
+    // "Foaie de calcul" graph-paper backdrop visibility - on by default
+    // (today's only behavior); a small menu toggle can now hide it. Editing-
+    // only - the PNG exports never draw it, regardless of this setting.
+    this.showGraphPaper = true;
+
+    // Set when "Save current pattern" is clicked, to the new pattern's id -
+    // so that *if* the selection it was saved from goes on to be committed
+    // unchanged (Reset/Escape), the resulting curve is tagged with that same
+    // patternId instead of null. That's what lets the original hand-drawn
+    // shape move along with the pattern's stamped copies under ctrl-shift
+    // dragging, not just the copies. Invalidated (see #placeAtScreenPoint) if
+    // another point gets added before the commit, since the shape would no
+    // longer match what was actually saved.
+    this.pendingOriginPatternId = null;
   }
 
   setup = () => {
@@ -100,7 +136,10 @@ export class FreestyleApp {
       this.selection,
       this.palette,
       this.stamper,
-      submenuGroup
+      submenuGroup,
+      (patternId) => {
+        this.pendingOriginPatternId = patternId;
+      }
     );
     this.patternUI.init();
 
@@ -141,9 +180,45 @@ export class FreestyleApp {
     document.getElementById('resetBtn').addEventListener('click', this.handleReset);
     document.getElementById('clearAllBtn').addEventListener('click', this.handleClearAll);
     document.getElementById('undoBtn').addEventListener('click', this.handleUndo);
+    document.getElementById('exportNailsBtn').addEventListener('click', this.handleExportNails);
+    document
+      .getElementById('exportNailsStringsBtn')
+      .addEventListener('click', this.handleExportNailsAndStrings);
+
+    const graphPaperToggle = document.getElementById('toggleGraphPaperInput');
+    graphPaperToggle.checked = this.showGraphPaper;
+    graphPaperToggle.addEventListener('change', () => {
+      this.showGraphPaper = graphPaperToggle.checked;
+    });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') this.handleReset();
+      if (e.key === 'Escape') {
+        this.handleReset();
+        return;
+      }
+      if (isTypingTarget(e.target)) return;
+      const key = e.key.toLowerCase();
+      if (key === 'v') this.flipVertical = true;
+      if (key === 'h') this.flipHorizontal = true;
+      if (key === 'control') this.ctrlHeld = true;
+      if (key === 'shift') this.shiftHeld = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (key === 'v') this.flipVertical = false;
+      if (key === 'h') this.flipHorizontal = false;
+      if (key === 'control') this.ctrlHeld = false;
+      if (key === 'shift') this.shiftHeld = false;
+    });
+    // Guards against a stuck-flipped/stuck-editing state if focus leaves the
+    // page (e.g. alt-tab) while a key's held, since keyup wouldn't otherwise
+    // fire - also drops any in-progress point drag, same reasoning.
+    window.addEventListener('blur', () => {
+      this.flipVertical = false;
+      this.flipHorizontal = false;
+      this.ctrlHeld = false;
+      this.shiftHeld = false;
+      this.pointEdit = null;
     });
   };
 
@@ -151,7 +226,7 @@ export class FreestyleApp {
     background(12);
     this.viewport.applyTransform();
 
-    GraphPaperRenderer.draw(this.canvasWidth, this.canvasHeight);
+    if (this.showGraphPaper) GraphPaperRenderer.draw(this.canvasWidth, this.canvasHeight);
 
     for (const curve of this.curves.curves) {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
@@ -180,6 +255,8 @@ export class FreestyleApp {
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawLivePreviewLine();
+    this.#drawArmedPatternPreview();
+    this.#drawControlPointHighlights();
 
     const preview = this.patterns.preview;
     if (preview) {
@@ -195,22 +272,70 @@ export class FreestyleApp {
       this.curves.add(
         new Curve(
           this.selection.points.map((p) => p.copy()),
-          this.palette.snapshot()
+          this.palette.snapshot(),
+          this.pendingOriginPatternId
         )
       );
     }
     this.selection.reset();
+    this.pendingOriginPatternId = null;
   };
 
   handleClearAll = () => {
     this.selection.reset();
     this.curves.clear();
+    this.pendingOriginPatternId = null;
   };
 
   handleUndo = () => {
     if (this.curves.count > 0) this.curves.undo();
     this.selection.reset();
   };
+
+  /** Nails only (control + inner points), no strings - see ExportRenderer. */
+  handleExportNails = () => {
+    this.#exportPng('freestyle-nails.png', ExportRenderer.renderNails);
+  };
+
+  /** Nails plus the actual woven strings, in their real colors. */
+  handleExportNailsAndStrings = () => {
+    this.#exportPng('freestyle-nails-strings.png', ExportRenderer.renderNailsAndStrings);
+  };
+
+  /**
+   * Shared PNG-export plumbing for both buttons: renders onto a throwaway
+   * offscreen buffer at the canvas's own pixel size (already calibrated to
+   * the real-world size via the DPI setting - see units.js - so no extra
+   * scaling is needed for print accuracy) and triggers a download.
+   * @param {string} filename
+   * @param {(pg: import('p5'), curves: import('../models/Curve.js').Curve[]) => void} render
+   */
+  #exportPng(filename, render) {
+    const curves = this.#curvesForExport();
+    if (curves.length === 0) {
+      alert('Nothing to export yet - place some points first.');
+      return;
+    }
+
+    const pg = createGraphics(this.canvasWidth, this.canvasHeight);
+    render(pg, curves);
+    downloadCanvasPng(pg.canvas, filename);
+    pg.remove();
+  }
+
+  /**
+   * Every curve that's actually visible right now - the committed ones plus
+   * the in-progress selection, if it's far enough along to render as a curve
+   * (matches exactly what the draw loop itself renders, so the export is a
+   * faithful "what you see" snapshot).
+   */
+  #curvesForExport() {
+    const curves = this.curves.curves.slice();
+    if (this.selection.isReadyForCurve()) {
+      curves.push(new Curve(this.selection.points, this.palette.getAll()));
+    }
+    return curves;
+  }
 
   /**
    * Resizes the palette to a new number of color slots (also the weave's
@@ -225,6 +350,7 @@ export class FreestyleApp {
     this.patternUI.resetSelectionVisual();
     this.selection.reset();
     this.curves.clear();
+    this.pendingOriginPatternId = null;
 
     this.palette.resize(count);
     this.colorPickerUI.rebuild();
@@ -236,6 +362,7 @@ export class FreestyleApp {
     this.patternUI.resetSelectionVisual();
     this.selection.reset();
     this.curves.clear();
+    this.pendingOriginPatternId = null;
 
     this.canvasWidth = widthPx;
     this.canvasHeight = heightPx;
@@ -251,6 +378,8 @@ export class FreestyleApp {
       this.dragStart = new Point(mouseX, mouseY);
       return;
     }
+
+    if (this.#tryStartPointEdit()) return;
 
     this.#placeAtScreenPoint(mouseX, mouseY);
   };
@@ -272,6 +401,10 @@ export class FreestyleApp {
   };
 
   mouseDragged = () => {
+    if (touches.length === 0 && this.pointEdit) {
+      this.#dragActivePoint();
+      return;
+    }
     if (touches.length === 0 && this.isDragging) {
       const dx = mouseX - this.dragStart.x;
       const dy = mouseY - this.dragStart.y;
@@ -282,6 +415,7 @@ export class FreestyleApp {
 
   mouseReleased = () => {
     this.isDragging = false;
+    this.pointEdit = null;
   };
 
   mouseWheel = (event) => {
@@ -301,10 +435,103 @@ export class FreestyleApp {
     if (!isWithinBounds(worldPos, this.canvasWidth, this.canvasHeight)) return;
 
     if (this.patterns.isInUse) {
-      this.stamper.stampAtScreenPoint({ x: screenX, y: screenY });
+      this.stamper.stampAtScreenPoint(
+        { x: screenX, y: screenY },
+        { horizontal: this.flipHorizontal, vertical: this.flipVertical }
+      );
       return;
     }
     this.selection.add(worldPos);
+    // A saved pattern's origin tag only applies if the shape it was saved
+    // from is committed unchanged - another point added after saving means
+    // it no longer matches, so the eventual commit should go back to a plain
+    // (patternId: null) curve.
+    this.pendingOriginPatternId = null;
+  }
+
+  /**
+   * True when nothing else claims the canvas - no pattern armed for
+   * stamping, no in-progress manual curve - so ctrl-drag point editing is
+   * allowed. Same "nothing else going on" gate for both starting a drag and
+   * drawing the highlight overlay.
+   */
+  #canEditPoints() {
+    return !this.patterns.isInUse && this.selection.count === 0;
+  }
+
+  /**
+   * Ctrl-click a control point to start dragging it: hit-tests every curve's
+   * points against the click, in screen space (so the pick radius stays a
+   * constant number of pixels regardless of zoom). Returns whether a drag
+   * was actually started, so the caller can skip the normal
+   * place-a-point/stamp-a-pattern click handling when it was.
+   */
+  #tryStartPointEdit() {
+    if (!this.ctrlHeld || !this.#canEditPoints()) return false;
+
+    const worldPos = this.viewport.toWorld(mouseX, mouseY);
+    const hit = findNearestCurvePoint(
+      this.curves.curves,
+      worldPos,
+      CONTROL_POINT_PICK_RADIUS_PX / this.viewport.zoom
+    );
+    if (!hit) return false;
+
+    this.pointEdit = { curve: hit.curve, pointIndex: hit.pointIndex };
+    return true;
+  }
+
+  /**
+   * Drags the actively-grabbed control point to the cursor's current world
+   * position - the curve it belongs to reshapes live. With Shift held, the
+   * same point on every other curve stamped from the same pattern moves by
+   * the same per-frame delta, so all copies stay in sync as you drag
+   * (backlog item 8's "all copies vs. just one" toggle).
+   */
+  #dragActivePoint() {
+    const { curve, pointIndex } = this.pointEdit;
+    const point = curve.points[pointIndex];
+    const worldPos = this.viewport.toWorld(mouseX, mouseY);
+    const dx = worldPos.x - point.x;
+    const dy = worldPos.y - point.y;
+
+    point.set(worldPos.x, worldPos.y);
+    if (this.shiftHeld) {
+      shiftSiblingPoints(this.curves.curves, curve, pointIndex, dx, dy);
+    }
+  }
+
+  /**
+   * Highlights every curve's control points while Ctrl is held and nothing
+   * else is armed/in-progress - the "see all the points" half of backlog
+   * item 8, independent of whether a drag is actually happening.
+   */
+  #drawControlPointHighlights() {
+    if (!this.ctrlHeld || !this.#canEditPoints()) return;
+    CanvasView.drawControlPointHighlights(this.curves.curves, this.pointEdit);
+  }
+
+  /**
+   * The ghost preview for the armed pattern (selected for stamping) -
+   * follows the cursor, greyed out, flip-aware. Separate from
+   * `patterns.preview` (the list-row hover preview, kept as-is below) - both
+   * can show at once, e.g. if a pattern's armed and you're also browsing the
+   * list, though that's a rare edge case in practice.
+   */
+  #drawArmedPatternPreview() {
+    if (!this.patterns.isInUse) return;
+
+    const pattern = this.patterns.selectedPattern;
+    if (!pattern) return;
+
+    const cursorWorld = this.viewport.toWorld(mouseX, mouseY);
+    if (!isWithinBounds(cursorWorld, this.canvasWidth, this.canvasHeight)) return;
+    if (touchesMenus(winMouseX, winMouseY)) return;
+
+    CanvasView.drawArmedPatternPreview(pattern, cursorWorld, {
+      horizontal: this.flipHorizontal,
+      vertical: this.flipVertical,
+    });
   }
 
   /**

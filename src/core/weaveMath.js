@@ -41,3 +41,31 @@ export function computeWeaveSegments(p1, p2, p3, layerIndex, segments = 8) {
   }
   return pairs;
 }
+
+/**
+ * Flattens an entire curve (points + stroke layers) into the full flat list
+ * of `{from, to, color}` weave line segments it draws - every enabled
+ * layer's `computeWeaveSegments` output across every consecutive triplet, in
+ * draw order. Pure data, no p5 calls - the shared source of truth for
+ * "what lines does this curve draw", consumed by both `StringArtRenderer`
+ * (draws them onto the live canvas via bare p5 calls) and `ExportRenderer`
+ * (draws them onto an offscreen `p5.Graphics` buffer for PNG export, which
+ * needs its own instance methods rather than the bare globals).
+ * @param {{x:number,y:number}[]} points
+ * @param {{color:string,enabled:boolean}[]} strokes
+ * @param {number} segments
+ * @returns {{from: Point, to: Point, color: string}[]}
+ */
+export function weaveSegmentsForCurve(points, strokes, segments = 8) {
+  const result = [];
+  for (let i = 0; i < points.length - 2; i++) {
+    const [p1, p2, p3] = [points[i], points[i + 1], points[i + 2]];
+    strokes.forEach((layer, layerIndex) => {
+      if (!layer.enabled) return;
+      for (const { from, to } of computeWeaveSegments(p1, p2, p3, layerIndex, segments)) {
+        result.push({ from, to, color: layer.color });
+      }
+    });
+  }
+  return result;
+}

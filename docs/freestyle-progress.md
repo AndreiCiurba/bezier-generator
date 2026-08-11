@@ -52,10 +52,50 @@ behind each one.
 - [x] **5. Freestyle pattern creation** — click anywhere (no snapping) to place control points;
       Reset/Clear All/Undo, colors, favorites, and patterns (save/select/stamp) all work the same
       as the grid tool, minus the Manual/Auto toggle (nothing to auto-stamp across without a grid).
-- [ ] **6. Display with hover — greyed out or not** — not started.
-- [ ] **7. V / H / arrow keys for pattern apply** — not started.
-- [ ] **8. Drag & drop a pattern point (all copies vs. just one)** — not started.
-- [ ] **9. Export image (nails-only, and nails+lines)** — not started.
+- [x] **6. Display with hover — greyed out or not** — an armed pattern (selected, Manual mode) now
+      shows a **greyed-out ghost preview that follows the cursor anywhere on the canvas**, not just
+      while hovering its row in the list (the original, narrower behavior - kept as-is, as decided,
+      alongside this new one). Shows exactly where the pattern would land if clicked right now, in
+      the pattern's own real density (segments/line-weight derived from its own color count, not a
+      fixed 7-white-layer placeholder). Works on both pages (`App#drawArmedPatternPreview` /
+      `FreestyleApp#drawArmedPatternPreview`, `CanvasView.drawArmedPatternPreview`).
+- [x] **7. V / H pattern flip (partial - arrow-key nudging still open)** — **hold** V or H (a
+      momentary key-hold, not a toggle, as clarified) shows the ghost preview mirrored vertically/
+      horizontally around the pattern's own anchor point; releasing the key returns to normal.
+      Clicking while held stamps the pattern in that mirrored orientation - preview and real stamp
+      always match (`pointTransforms.js#flipPoints`, applied in both stamper classes and the
+      preview renderer). Guarded against firing while typing in a form field
+      (`src/ui/keyboardFocus.js#isTypingTarget`) and against a stuck-flipped state if focus leaves
+      the page mid-hold (reset on `window blur`). Arrow-key nudging (the other half of backlog
+      item 7) not started.
+- [x] **8. Drag & drop a control point (all copies vs. just one)** — freestyle only. Holding
+      **Ctrl** with nothing armed/in-progress (no pattern selected, no in-progress manual curve)
+      highlights every curve's control points, gold-accent dots. Ctrl-clicking one and dragging
+      reshapes that curve live (`#tryStartPointEdit`/`#dragActivePoint` in `FreestyleApp`, hit-test
+      via the new pure `findNearestCurvePoint`). Holding **Shift** too moves the same point on
+      every other curve stamped from the same pattern, live, every frame (`shiftSiblingPoints`) -
+      the "all copies vs. just one" toggle, expressed as a held modifier. Applies to **all**
+      committed curves, not just pattern-stamped ones (Shift is just a no-op for a plain hand-drawn
+      curve, since there's no sibling to sync). Edits only the on-canvas curve instance(s) - the
+      saved pattern template in the library is untouched. New `src/core/pointEditing.js` (+test).
+      **Follow-up:** the shape you originally drew (before saving it as a pattern) now moves
+      along with that pattern's stamped copies too under Shift, not just the copies - saving a
+      pattern tags the selection so that if it's committed unchanged right after, the resulting
+      curve shares the pattern's id (`PatternUI#onPatternSaved` → `FreestyleApp#pendingOriginPatternId`).
+- [x] **9. Export image (nails-only, and nails+lines)** — freestyle only, PNG (superseded the
+      backlog's original PDF/JPEG mention). Two buttons: **Export Nails** (control + inner points,
+      control points wider - `ExportRenderer.renderNails`) and **Export Nails + Strings** (same
+      dots plus the actual woven strings in their real palette colors -
+      `ExportRenderer.renderNailsAndStrings`). White background, black dots (the editor's dark
+      theme doesn't print well); exports every currently-visible curve (committed + an in-progress
+      ready selection); rendered onto an offscreen `p5.Graphics` buffer at the canvas's own pixel
+      size (already DPI-calibrated, no extra scaling needed) and downloaded via new
+      `src/io/PngFile.js`. "Inner points" = the physical nail positions the weave math subdivides
+      between each pair of control points (`src/core/nailPositions.js`, new). Along the way,
+      `weaveMath.js` grew a shared pure `weaveSegmentsForCurve` so `ExportRenderer` doesn't
+      duplicate `StringArtRenderer`'s weave loop, only the final p5-vs-p5.Graphics draw calls.
+      **Plus** a small, unrelated toggle for step 2's graph-paper backdrop
+      (`toggleGraphPaperInput` → `showGraphPaper`) - on-screen only, never affects either export.
 
 ## Supporting work done alongside the backlog
 

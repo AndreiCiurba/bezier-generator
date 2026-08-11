@@ -76,12 +76,20 @@
     <!-- Populated by ColorPickerUI from the palette (size set above) -->
     <div id="colorPickerContainer"></div>
 
+    <!-- "Foaie de calcul" graph-paper backdrop - editing aid only, never exported -->
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <input id="toggleGraphPaperInput" type="checkbox" />
+      Graph paper
+    </label>
+
     <button id="openCanvasSizeBtn" class="menu-btn">Canvas Size</button>
     <button id="openPatternBtn" class="menu-btn">Patterns</button>
     <button id="openFavoritesBtn" class="menu-btn">Colors</button>
     <button id="resetBtn" class="menu-btn">Reset</button>
     <button id="clearAllBtn" class="menu-btn">Clear All Points</button>
     <button id="undoBtn" class="menu-btn">Undo</button>
+    <button id="exportNailsBtn" class="menu-btn">Export Nails (PNG)</button>
+    <button id="exportNailsStringsBtn" class="menu-btn">Export Nails + Strings (PNG)</button>
   </div>
 </body>
 
