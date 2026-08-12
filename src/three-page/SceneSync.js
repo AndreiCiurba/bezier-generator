@@ -43,6 +43,18 @@ const CURVE_LINE_WIDTH = 2;
 // not a committed string.
 const SELECTION_GUIDE_COLOR = '#ffcc00';
 
+// Deformation pin markers - same palette as the 2D page's own
+// CanvasView.drawDeformationPins (PIN_COLOR/PIN_DIAMETER/etc.), so a pin
+// reads as "the same kind of thing" on both renderers.
+const PIN_COLOR = 0xff3b6b;
+const PIN_DOT_RADIUS = 6; // world units - matches the 2D page's PIN_DIAMETER (12) as a radius
+const PIN_RADIUS_RING_COLOR = 0xff3b6b;
+const PIN_RADIUS_RING_OPACITY = 0.18;
+// Markers sit just above the board surface - visible from directly above
+// (Drawing Mode) without z-fighting the board mesh, and well below the nail
+// heads so they never look like they're floating at nail height.
+const PIN_MARKER_HEIGHT = 1;
+
 const _matrix = new THREE.Matrix4();
 const _position = new THREE.Vector3();
 const _quaternion = new THREE.Quaternion();
@@ -91,7 +103,7 @@ export class SceneSync {
   /**
    * @param {import('three').Scene} scene
    * @param {import('../core/Grid.js').Grid} grid the base (undeformed) grid - its bounding box sizes/centers the board
-   * @param {import('../core/DeformableGrid.js').DeformableGrid} deformation wraps `grid`; nails are read from its *current* (possibly deformed) positions, index-aligned with `grid.points` - reading through this now (even before any deformation UI exists - that's Slice 7) means deformation sync needs no further changes here later
+   * @param {import('../core/DeformableGrid.js').DeformableGrid} deformation wraps `grid`; nails are read from its *current* (possibly deformed) positions, index-aligned with `grid.points` - reading through this from the start (before `ThreeApp` grew Puppet Warp editing in Slice 7) meant deformation sync needed no further changes here once it did
    * @param {import('../core/DesignModel.js').DesignModel} design assembles ordered/visible curves from the same `CurveStore` this page owns
    */
   constructor(scene, grid, deformation, design) {
@@ -107,6 +119,7 @@ export class SceneSync {
     this.lineResolution = new THREE.Vector2(1, 1);
     this.selectionGuide = null; // Drawing Mode's in-progress polyline, built lazily
     this.livePreview = null; // Drawing Mode's live woven-curve preview (>= 3 points), built lazily
+    this.pinGroup = null; // Deformation pin markers, rebuilt wholesale on every change (see setDeformationPins)
     this._lastSelectionPoints = null;
     this._lastPreview = null;
     this.#adopt(grid, deformation);
@@ -265,6 +278,60 @@ export class SceneSync {
   /** Clears the live weave preview (e.g. once a selection is committed/cleared). */
   clearLivePreview() {
     this.setLivePreview([], []);
+  }
+
+  /**
+   * Rebuilds the Deformation pin markers wholesale from the current pin set -
+   * a flat dot per pin (matches the 2D page's `CanvasView.drawDeformationPins`
+   * dot), plus a translucent ring at the selected pin's actual influence
+   * radius (matches that same function's selected-pin outline). Cheap enough
+   * to rebuild on every call (pin counts are small, a handful at most) that
+   * there's no need for the `curveLines`-style incremental diffing.
+   * @param {import('../models/Pin.js').Pin[]} pins
+   * @param {import('../models/Pin.js').Pin|null} selectedPin
+   */
+  setDeformationPins(pins, selectedPin) {
+    if (this.pinGroup) {
+      this.scene.remove(this.pinGroup);
+      this.pinGroup.traverse((object) => {
+        object.geometry?.dispose();
+        object.material?.dispose();
+      });
+      this.pinGroup = null;
+    }
+    if (pins.length === 0) return;
+
+    const group = new THREE.Group();
+    for (const pin of pins) {
+      const world = this.toWorldPosition(pin.position, PIN_MARKER_HEIGHT);
+
+      if (pin === selectedPin) {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(Math.max(pin.radius - 2, 0.1), pin.radius + 2, 48),
+          new THREE.MeshBasicMaterial({
+            color: PIN_RADIUS_RING_COLOR,
+            transparent: true,
+            opacity: PIN_RADIUS_RING_OPACITY,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+          })
+        );
+        ring.rotation.x = -Math.PI / 2; // lay flat on the board's XZ plane (RingGeometry defaults to facing +Z)
+        ring.position.set(world.x, world.y, world.z);
+        group.add(ring);
+      }
+
+      const dot = new THREE.Mesh(
+        new THREE.CircleGeometry(PIN_DOT_RADIUS, 24),
+        new THREE.MeshBasicMaterial({ color: PIN_COLOR, side: THREE.DoubleSide, depthWrite: false })
+      );
+      dot.rotation.x = -Math.PI / 2;
+      dot.position.set(world.x, world.y, world.z);
+      group.add(dot);
+    }
+
+    this.scene.add(group);
+    this.pinGroup = group;
   }
 
   #adopt(grid, deformation) {
@@ -468,6 +535,14 @@ export class SceneSync {
       this.livePreview.geometry.dispose();
       this.livePreview.material.dispose();
       this.livePreview = null;
+    }
+    if (this.pinGroup) {
+      this.scene.remove(this.pinGroup);
+      this.pinGroup.traverse((object) => {
+        object.geometry?.dispose();
+        object.material?.dispose();
+      });
+      this.pinGroup = null;
     }
   }
 }

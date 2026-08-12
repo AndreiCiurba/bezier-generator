@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Grid } from '../core/Grid.js';
-import { DeformableGrid } from '../core/DeformableGrid.js';
+import { DeformableGrid, DEFAULT_PIN_RADIUS, DEFAULT_PIN_FALLOFF } from '../core/DeformableGrid.js';
 import { DesignModel } from '../core/DesignModel.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
@@ -17,6 +17,7 @@ import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
+import { DeformationUI } from '../ui/DeformationUI.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { PatternStamper } from '../app/PatternStamper.js';
@@ -53,6 +54,9 @@ const ORBIT_TARGET = { x: 0, y: 0, z: 0 };
 // page's design-space pixels (axisMapping never rescales), so the same
 // constant applies unmodified.
 const NEAREST_NAIL_RADIUS = 10;
+// Same grab tolerance as App.js's own PIN_PICK_RADIUS - see that file for the
+// "bigger than a nail's own snap radius" rationale.
+const PIN_PICK_RADIUS = 15;
 
 /**
  * The 3D visualizer's top-level app class - structurally parallel to
@@ -65,11 +69,15 @@ const NEAREST_NAIL_RADIUS = 10;
  * Step 3 (the board), Step 4 (the nail grid, plus the user-selectable square
  * Grid Size control), Steps 5-6 (curve/string rendering + the shared
  * curve-visibility toggle), Step 7 (camera reset + the XYZ orientation
- * legend), and Steps 8-9 (Drawing Mode: locked top-down orthographic camera,
+ * legend), Steps 8-9 (Drawing Mode: locked top-down orthographic camera,
  * raycasted nail selection/curve creation, pattern stamping, camera-pose
- * save/restore) are all folded in here now - full parity with the 2D grid
- * page's manual + pattern drawing workflow, reusing its shared UI classes
- * (`PatternUI`, `FavoritesUI`, `PatternStamper`) verbatim, the same way
+ * save/restore), and Step 10 (Puppet Warp deformation - the exact same
+ * `DeformableGrid`/`DeformationUI` the 2D page uses; pin create/drag/remove
+ * piggybacks on Drawing Mode's pointer listeners, since raycasting onto the
+ * board plane only happens while the locked top-down camera is active) are
+ * all folded in here now - full parity with the 2D grid page's manual +
+ * pattern drawing workflow, reusing its shared UI classes (`PatternUI`,
+ * `FavoritesUI`, `PatternStamper`, `DeformationUI`) verbatim, the same way
  * `CurvesUI`/`ColorPickerUI`/`ColorCountUI`/`StrokeWeightUI` already are.
  *
  * Known gap, scoped out deliberately: the 2D page's continuous "armed
@@ -118,6 +126,9 @@ export class ThreeApp {
     this.patterns = new PatternStore();
     this.favorites = new FavoritesStore();
     this.strokeWeight = BASELINE_STROKE_WEIGHT;
+    // { pin } while a Ctrl-grabbed deformation pin is actively being dragged
+    // in Drawing Mode - same shape as App.js's own `this.pinDrag`.
+    this.pinDrag = null;
     // Momentary pattern-flip state: true only while V/H is physically held
     // down (see #initFlipKeys), not a toggle - same as App.js.
     this.flipVertical = false;
@@ -152,6 +163,7 @@ export class ThreeApp {
     this.#initGridSizeControls();
     this.#initBoardControls();
     this.#initNailHeightControls();
+    this.#initDeformationControls();
     this.#initCurvesUI();
     this.#initCameraReset();
     this.#initColorControls();
@@ -210,6 +222,67 @@ export class ThreeApp {
       DEFAULT_NAIL_HEIGHT,
       (height) => this.sceneSync.setNailHeight(height)
     ).init();
+  }
+
+  /**
+   * "Deform Grid" submenu (Puppet Warp) - the exact shared `DeformationUI`
+   * the 2D grid page uses, wired against this page's own `DeformableGrid`.
+   * Pin creation/drag/removal itself (Ctrl/Alt+Click) is handled in
+   * `#handleDeformationClick`, reached only through Drawing Mode's pointer
+   * listeners (see `#initDrawingMode`) - raycasting onto the board/nail plane
+   * is only meaningful while the locked top-down camera is active, so pin
+   * editing shares that same gate rather than growing a second, perspective-
+   * camera-aware raycast path.
+   */
+  #initDeformationControls() {
+    this.deformationUI = new DeformationUI(
+      {
+        panelEl: document.getElementById('deformationSubmenu'),
+        openBtn: document.getElementById('openDeformationBtn'),
+        closeBtn: document.getElementById('closeDeformationSubmenuBtn'),
+        defaultRadiusInput: document.getElementById('deformationDefaultRadiusInput'),
+        defaultFalloffInput: document.getElementById('deformationDefaultFalloffInput'),
+        applyDefaultsBtn: document.getElementById('applyDeformationDefaultsBtn'),
+        selectedRadiusInput: document.getElementById('deformationSelectedRadiusInput'),
+        selectedFalloffInput: document.getElementById('deformationSelectedFalloffInput'),
+        applySelectedBtn: document.getElementById('applyDeformationSelectedBtn'),
+        removePinBtn: document.getElementById('removeDeformationPinBtn'),
+        resetBtn: document.getElementById('resetDeformationBtn'),
+        pinCountEl: document.getElementById('deformationPinCount'),
+      },
+      this.submenuGroup,
+      { radius: DEFAULT_PIN_RADIUS, falloff: DEFAULT_PIN_FALLOFF },
+      this.#handleRemoveDeformationPin,
+      this.#handleResetDeformation,
+      this.#handleSelectedPinChanged
+    );
+    this.deformationUI.init();
+  }
+
+  #handleRemoveDeformationPin = (pin) => {
+    this.deformation.removePin(pin);
+    this.deformationUI.refreshPinCount(this.deformation.pins.length);
+    this.sceneSync.syncNailPositions();
+    this.#refreshDeformationPins();
+  };
+
+  #handleResetDeformation = () => {
+    this.deformation.reset();
+    this.deformationUI.refreshPinCount(0);
+    this.sceneSync.syncNailPositions();
+    this.#refreshDeformationPins();
+  };
+
+  /** The selected pin's radius/falloff were edited directly in the panel, bypassing `DeformableGrid`'s own mutators - force a recompute, same as App.js. */
+  #handleSelectedPinChanged = () => {
+    this.deformation.invalidate();
+    this.sceneSync.syncNailPositions();
+    this.#refreshDeformationPins();
+  };
+
+  /** Re-reads the current pin set into `SceneSync`'s pin markers - called after any create/move/remove/select. */
+  #refreshDeformationPins() {
+    this.sceneSync.setDeformationPins(this.deformation.pins, this.deformationUI.selectedPin);
   }
 
   /** "Curves" submenu - every committed curve, in store order, with a show/hide checkbox each (the same `CurvesUI` the 2D grid page uses, reading/writing this page's own `CurveStore`). */
@@ -407,7 +480,10 @@ export class ThreeApp {
    * Enters Drawing Mode (epic Steps 8-9): saves the current perspective
    * camera pose, disables `OrbitControls` entirely, switches the actively
    * rendered/raycasted camera to the locked top-down orthographic one, and
-   * starts listening for canvas clicks.
+   * starts listening for canvas pointer events (down/move/up, not just
+   * `click` - Deformation Mode's Ctrl+Drag needs to track motion between
+   * press and release, the same way App.js's `mouseDragged`/`mouseReleased`
+   * do on the 2D page).
    */
   #enterDrawingMode() {
     this.isDrawingMode = true;
@@ -416,13 +492,18 @@ export class ThreeApp {
     document.getElementById('resetCameraBtn').disabled = true;
     this.#updateDrawingCameraFrustum();
     this.activeCamera = this.drawingModeCamera.camera;
-    this.canvas.addEventListener('click', this.#handleDrawingClick);
+    this.canvas.addEventListener('pointerdown', this.#handleCanvasPointerDown);
+    this.canvas.addEventListener('pointermove', this.#handleCanvasPointerMove);
+    window.addEventListener('pointerup', this.#handleCanvasPointerUp);
   }
 
   /** Leaves Drawing Mode: restores the perspective camera to exactly where the user left it, and re-enables normal orbit/pan/zoom inspection. */
   #exitDrawingMode() {
     this.isDrawingMode = false;
-    this.canvas.removeEventListener('click', this.#handleDrawingClick);
+    this.canvas.removeEventListener('pointerdown', this.#handleCanvasPointerDown);
+    this.canvas.removeEventListener('pointermove', this.#handleCanvasPointerMove);
+    window.removeEventListener('pointerup', this.#handleCanvasPointerUp);
+    this.pinDrag = null;
     this.camera.position.copy(this.savedCameraState.position);
     this.controls.target.copy(this.savedCameraState.target);
     this.savedCameraState = null;
@@ -451,12 +532,88 @@ export class ThreeApp {
   }
 
   /**
-   * A Drawing Mode click: stamps the armed pattern if one is selected,
-   * otherwise extends the manual selection - the *exact* branch
+   * Drawing Mode's single pointer-down entry point - the *exact* branch
+   * `App.js#mousePressed` takes on the 2D page: Deformation Mode (if active)
+   * gets first refusal at the click (pin create/select/remove), otherwise it
+   * falls through to normal curve building/pattern stamping.
+   * @param {PointerEvent} event
+   */
+  #handleCanvasPointerDown = (event) => {
+    if (this.deformationUI.isActive) {
+      this.#handleDeformationClick(event);
+      return;
+    }
+    this.#handleDrawingClick(event);
+  };
+
+  /** While a pin is Ctrl-grabbed (see `#handleDeformationClick`), drags it live - mirrors `App.js#mouseDragged`'s pin-drag branch. A no-op the rest of the time (most pointer moves in Drawing Mode aren't dragging anything). */
+  #handleCanvasPointerMove = (event) => {
+    if (!this.pinDrag) return;
+    const worldPos = this.#raycastClientPointToDesignPosition(event.clientX, event.clientY);
+    if (!worldPos) return;
+    this.deformation.movePin(this.pinDrag.pin, worldPos);
+    this.sceneSync.syncNailPositions();
+    this.#refreshDeformationPins();
+  };
+
+  /** Releases whatever pin was being dragged, if any - mirrors `App.js#mouseReleased`. */
+  #handleCanvasPointerUp = () => {
+    this.pinDrag = null;
+  };
+
+  /**
+   * Handles a pointer-down while Deformation Mode is active - the *exact*
+   * branch `App.js#handleDeformationClick` takes on the 2D page: Ctrl+Click a
+   * pin drags it (or creates one, anchored on the nearest *base* nail, if
+   * none was hit), Alt+Click a pin removes it, and a plain click on a pin
+   * just selects it - not a drawing action either way.
+   * @param {PointerEvent} event
+   */
+  #handleDeformationClick(event) {
+    const worldPos = this.#raycastClientPointToDesignPosition(event.clientX, event.clientY);
+    if (!worldPos) return;
+
+    if (event.altKey) {
+      const pin = this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS);
+      if (!pin) return;
+      this.deformation.removePin(pin);
+      this.deformationUI.refreshPinCount(this.deformation.pins.length);
+      if (this.deformationUI.selectedPin === pin) this.deformationUI.setSelectedPin(null);
+      this.sceneSync.syncNailPositions();
+      this.#refreshDeformationPins();
+      return;
+    }
+
+    if (event.ctrlKey) {
+      let pin = this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS);
+      if (!pin) {
+        const nail = this.deformation.findNearestBaseNail(worldPos, NEAREST_NAIL_RADIUS);
+        if (!nail) return;
+        pin = this.deformation.addPin({
+          referencePosition: nail,
+          radius: this.deformationUI.defaultRadius,
+          falloff: this.deformationUI.defaultFalloff,
+        });
+        this.deformationUI.refreshPinCount(this.deformation.pins.length);
+        this.sceneSync.syncNailPositions();
+      }
+      this.pinDrag = { pin };
+      this.deformationUI.setSelectedPin(pin);
+      this.#refreshDeformationPins();
+      return;
+    }
+
+    this.deformationUI.setSelectedPin(this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS));
+    this.#refreshDeformationPins();
+  }
+
+  /**
+   * A Drawing Mode point placement: stamps the armed pattern if one is
+   * selected, otherwise extends the manual selection - the *exact* branch
    * `App.js#placeAtScreenPoint` takes on the 2D page, reusing
    * `PatternStamper`/`DeformableGrid#findNearestPoint`/`SelectionStore#add`
    * unmodified rather than duplicating any of that logic.
-   * @param {MouseEvent} event
+   * @param {PointerEvent} event
    */
   #handleDrawingClick = (event) => {
     if (this.patterns.isInUse) {
@@ -503,7 +660,20 @@ export class ThreeApp {
     this.grid = new Grid(buildGridConfig(size));
     this.deformation = new DeformableGrid(this.grid);
     this.sceneSync.setGrid(this.grid, this.deformation);
+    // `this.stamper` was constructed once against the *original* deformation
+    // instance - without repointing it here, Auto/manual pattern stamping
+    // would keep anchoring/snapping against the stale, now-replaced grid
+    // forever (the actual bug behind "Auto spreads across the original grid,
+    // not the current size").
+    this.stamper.setGrid(this.deformation);
     this.#updateDrawingCameraFrustum();
+    // The new DeformableGrid starts with zero pins - reflect that in the
+    // Deformation submenu/pin markers rather than leaving stale state from
+    // the old (now-replaced) grid around.
+    this.pinDrag = null;
+    this.deformationUI.setSelectedPin(null);
+    this.deformationUI.refreshPinCount(0);
+    this.#refreshDeformationPins();
   };
 
   #createScene() {

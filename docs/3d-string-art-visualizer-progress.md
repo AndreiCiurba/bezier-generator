@@ -218,10 +218,85 @@ concrete design/rationale behind each decision below.
       wanted. Full `vitest run`: 36 files / 238 tests passing. Manual/visual verification (real
       click-to-place, camera lock/restore, resize while in Drawing Mode) not yet run — per the
       `no-e2e` skill, only on explicit request.
-- [ ] **Slice 7 — Deformation integration verification** (Step 10)
-      Confirm Puppet Warp pin drags on the 3D page's own `DeformationUI` live-update nails/strings
-      through the `DesignModel.nails` read-through (expected to be mostly "free" if slices 3–4 read
-      live rather than snapshotting) — verification pass, not much new code.
+- [x] **Slice 7 — Deformation integration** (Step 10)
+      Turned out not to be free by itself: `SceneSync` already read nails live through
+      `deformation.points` (Slice 3's own setup, deliberately), but `ThreeApp` had no way to *create*
+      a Puppet Warp pin in the first place - `DeformationUI` (listed in the original plan's shared-UI
+      reuse list) had never actually been wired into this page. Added it for real, not just verified
+      it: new `#deformationSubmenu` in `3d/index.html` (identical fields to the 2D grid page's own,
+      comment updated to note pin interactions only work in Drawing Mode - see below), `ThreeApp`
+      now constructs `DeformationUI` the same way `App.js` does (`#initDeformationControls` +
+      `#handleRemoveDeformationPin`/`#handleResetDeformation`/`#handleSelectedPinChanged`, each
+      followed by `sceneSync.syncNailPositions()`).
+      **Scoping decision**: pin create/Ctrl-drag/Alt-remove is reachable only while Drawing Mode is
+      ON, piggybacking on its pointer listeners - unlike the 2D page, where Deformation Mode is a
+      totally independent, always-live canvas feature. This page has no such "always live" canvas;
+      raycasting a screen point onto the board/nail plane only exists via the locked top-down
+      Drawing Mode camera, so pin editing shares that same gate rather than building a second,
+      perspective-camera-aware raycast path the epic never asked for. Documented as a deliberate
+      divergence, not an oversight.
+      Drawing Mode's interaction was switched from a single `click` listener to `pointerdown`/
+      `pointermove`/`pointerup` (`#handleCanvasPointerDown` dispatches to
+      `#handleDeformationClick` when `deformationUI.isActive`, else the existing curve/pattern
+      `#handleDrawingClick`) - needed for Ctrl+Drag to track motion between press and release,
+      mirroring `App.js`'s `mouseDragged`/`mouseReleased` pin-drag handling exactly. As a side
+      effect this also fixed a latent mismatch: `click` fires on mouseup, but `App.js#mousePressed`
+      (and now this page too) place points on *press*, matching p5's real mousePressed semantics.
+      `#handleDeformationClick` is a line-for-line port of `App.js#handleDeformationClick`
+      (Ctrl+Click grab-or-create, Alt+Click remove, plain click select) against this page's own
+      `deformation`/`deformationUI`. New `SceneSync#setDeformationPins(pins, selectedPin)` - not
+      requested by the epic's own acceptance criteria, but necessary for usability: without a visual
+      marker there's no way to see where an existing pin is to Ctrl-click-grab it again on a locked
+      top-down view. Renders a flat dot per pin plus a translucent ring at the selected pin's actual
+      radius, same color/shape language as the 2D page's `CanvasView.drawDeformationPins`, rebuilt
+      wholesale on every call (pin counts are always small - no incremental diffing needed, unlike
+      `#syncCurves`). A Grid Size change now also resets the Deformation submenu's displayed pin
+      count/selection to match the fresh (zero-pin) `DeformableGrid` it creates. Full `vitest run`:
+      36 files / 238 tests passing (unchanged - this slice is DOM/Three wiring, no new pure logic).
+      Manual/visual verification (Ctrl+Click/drag/Alt+Click a pin in Drawing Mode, confirm nails +
+      pin markers move live, confirm curves placed before/after a drag look right) not yet run — per
+      the `no-e2e` skill, only on explicit request.
+
+      **Follow-up (user-reported bugs, same session): pattern stamping ignored grid resize/deformation.**
+      Two real bugs in shared `src/app/PatternStamper.js` (used by both `/` and `3d/`), caught via a
+      screenshot of Auto-stamping wildly overflowing a small resized board:
+      1. **Stale grid reference after a 3D "Grid Size" change.** `ThreeApp.stamper` is constructed
+         once, in the constructor, against the *original* `DeformableGrid` instance. `#handleGridSizeChange`
+         already swapped `this.deformation` to a brand-new instance on resize, but never told the
+         already-built `stamper` about it - so Auto/manual stamping kept anchoring against the
+         original grid's nails forever, no matter what size was picked afterwards. Fixed with a new
+         `PatternStamper#setGrid(grid)`, called from `#handleGridSizeChange` right after the new
+         `DeformableGrid` is built.
+      2. **Rigid translation, not nail-connection.** `stampAtScreenPoint`/`stampThroughoutGrid` used
+         to place a pattern's points via a pure rigid translate (`translatePointsTo`/`Pattern#translatedTo`)
+         with no check that the *result* actually landed on real nails. On an unchanged grid this is
+         invisible (a pattern's points were themselves real nails when captured, and translation
+         preserves the exact lattice-offset vectors between them, so they land back on real nails
+         automatically) - but it breaks down exactly where the user hit it: Auto-stamping near the
+         edge of a *resized* grid pushes some translated points past where any nail exists at all, and
+         stamping onto a *deformed* grid means the undeformed lattice math the raw translate assumes
+         no longer matches where nails actually are. Fixed with `PatternStamper#snapToNails` - every
+         translated point is re-resolved to `grid.findNearestPoint(point, NAIL_SNAP_RADIUS)` (10, the
+         same tolerance every other nail-snap in the app already uses) against the grid's *live*
+         (possibly deformed) positions, and copied (never aliasing the grid's own live `Point`s, so a
+         later deformation change can't retroactively reshape an already-placed curve). Returns `null`
+         - not a partial shape - the moment *any* single point has no nail within reach, so a stamp
+         that only partly fits is skipped entirely rather than drawn floating/disconnected - directly
+         implements the "if there is no corresponding nail to connect to, it should not be drawn" ask,
+         and "should not get out of it" falls out for free (an off-grid point has no nearby nail by
+         construction).
+      Both fixes live in the one shared class both pages already use, so the deformed-grid connection
+      fix benefits `/` too, not just `3d/` (Puppet Warp deformation has existed there since the
+      deformable-nail-grid epic; this was always a latent bug there, just harder to notice manually
+      since that page's grid never resizes). `PatternStamper.test.js` rewritten: the two existing
+      translate/flip tests now use *real* lattice-neighbor offsets (found by nearest-neighbor search
+      against the actual grid, not hand-picked arbitrary numbers) so they keep landing on real nails
+      under the new stricter behavior, plus four new tests - reject-a-non-lattice-offset,
+      reject-if-any-point-misses (both `stampAtScreenPoint` and `stampThroughoutGrid`),
+      snap-to-actual-deformed-position (builds a real `DeformableGrid` + pin), and
+      `setGrid` re-anchoring against a resized grid. Full `vitest run`: 36 files / 242 tests passing
+      (+4 net new). Manual/visual verification of the fix on the actual 3D page not yet run — per the
+      `no-e2e` skill, only on explicit request.
 - [ ] **Slice 8 — Performance, polish, regression** (Step 11)
       Perf check at the default 15×13 grid, geometry/material dispose audit, full `vitest run`,
       manual regression check on `/` and `/freestyle`.
