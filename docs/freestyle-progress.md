@@ -82,8 +82,22 @@ behind each one.
       along with that pattern's stamped copies too under Shift, not just the copies - saving a
       pattern tags the selection so that if it's committed unchanged right after, the resulting
       curve shares the pattern's id (`PatternUI#onPatternSaved` → `FreestyleApp#pendingOriginPatternId`).
-- [x] **9. Export image (nails-only, and nails+lines)** — freestyle only, PNG (superseded the
-      backlog's original PDF/JPEG mention). Two buttons: **Export Nails** (control + inner points,
+- [x] **9. Export image (nails-only, and nails+lines)** — PNG (superseded the backlog's original
+      PDF/JPEG mention). Shipped freestyle-only, **later ported to the grid tool too** (own request,
+      outside this epic) - `ExportRenderer` moved `src/freestyle/` → `src/core/` accordingly.
+      **Follow-up correction** once ported: on the grid tool, "control points" mean the *entire
+      predefined nail lattice* (deformed or not), not just the nails a curve happens to touch - the
+      whole board gets physically nailed during setup, unlike freestyle where only clicked points
+      are nails at all. `ExportRenderer.renderNails`/`renderNailsAndStrings` grew an optional
+      `lattice: {points, colorCount}` param (`null` on freestyle, unchanged behavior there) -
+      when given, it's drawn as the control points instead of `curve.points` (which would just be
+      redundant, same-position dots - every curve point is already a lattice nail). Curve-derived
+      inner/subdivision points are unaffected either way. `App.js` passes
+      `{points: this.deformation.points, colorCount: this.palette.size}` - always *current*
+      (post-deformation) positions. Now genuinely unit-tested (`ExportRenderer.test.js`, new) via a
+      hand-rolled mock `p5.Graphics` that just records calls - `ExportRenderer` only ever calls a
+      handful of dependency-injected methods on `pg`, never a global p5 call, so this was testable
+      all along and simply hadn't been done yet. Two buttons: **Export Nails** (control + inner points,
       control points wider - `ExportRenderer.renderNails`) and **Export Nails + Strings** (same
       dots plus the actual woven strings in their real palette colors -
       `ExportRenderer.renderNailsAndStrings`). White background, black dots (the editor's dark
@@ -106,15 +120,20 @@ points a curve had, so a fine (high-color-count) weave's closely-packed inner po
 merged into what read as a solid line instead of individual, markable nail positions.
 
 - **Stroke Weight field** (`strokeWeightInput` + Apply, right below Colors - `StrokeWeightUI`,
-  mirroring `ColorCountUI`'s exact field-plus-Apply shape) - freestyle only. Decoupled from color
-  count entirely: Colors still controls subdivision fineness (`segments`), Stroke Weight
-  independently controls line thickness. Defaults to today's baseline (0.6, exactly
-  `strokeWeightForColorCount(8)`) so anyone who never touches it sees no change.
+  mirroring `ColorCountUI`'s exact field-plus-Apply shape). Shipped freestyle-only, **later ported
+  to the grid tool too** (own request) - `StrokeWeightUI`/`strokeWeightSetting.js` moved to shared
+  `src/ui/`/`src/state/` homes accordingly, same "start freestyle-only, promote once the grid tool
+  wants it too" pattern as `ColorCountUI` before it. Decoupled from color count entirely: Colors
+  still controls subdivision fineness (`segments`), Stroke Weight independently controls line
+  thickness. Defaults to today's baseline (0.6, exactly `strokeWeightForColorCount(8)`) so anyone
+  who never touches it sees no change.
 - **Per-curve, not global**: `Curve` grew an optional `weight` field (4th constructor arg,
   `null` by default) and a `renderWeight` getter (`weight ?? strokeWeightForColorCount(colors.length)`)
-  - the grid tool never passes a 4th arg, so it's completely unaffected, byte-identical behavior.
-  Freestyle passes its current `strokeWeight` setting whenever a curve is actually created (Reset,
-  pattern stamping via `FreestylePatternStamper#stampAtScreenPoint`'s new 3rd param) - so, same
+  - a page that never passes a 4th arg is completely unaffected, byte-identical behavior. Both pages
+  pass their current `strokeWeight` setting whenever a curve is actually created (Reset, pattern
+  stamping via `stampAtScreenPoint`'s weight param on both `PatternStamper` and
+  `FreestylePatternStamper`, and Auto-mode's `stampThroughoutGrid` via `PatternUI`'s new
+  `getStrokeWeight` callback) - so, same
   "keeps its own value forever" treatment as colors/segments, changing the setting **does not**
   clear the canvas (unlike Colors/Canvas Size) since it's purely cosmetic going forward, nothing
   structural to invalidate. The live in-progress selection preview and the armed-pattern ghost
@@ -129,14 +148,25 @@ merged into what read as a solid line instead of individual, markable nail posit
   (was a direct `strokeWeightForColorCount` call), so an exported PNG's strings match whatever
   weight that curve actually renders with on screen.
 
-#### New files
+#### Files (now shared - see moves above)
 
-`src/freestyle/strokeWeightSetting.js` (+test), `src/freestyle/StrokeWeightUI.js`,
-`src/core/nailDotSize.js` (+test).
+`src/state/strokeWeightSetting.js` (+test, moved from `src/freestyle/`), `src/ui/StrokeWeightUI.js`
+(moved from `src/freestyle/`), `src/core/nailDotSize.js` (+test), `src/core/ExportRenderer.js`
+(+test files unchanged, moved from `src/freestyle/`).
 
 ## Supporting work done alongside the backlog
 
 Not backlog items themselves, but built in service of them or as follow-up polish:
+
+- [x] **Undo Line** — a second undo button, both pages. The existing "Undo" removes the whole
+      current figure at once (the last *committed* curve, however many points/lines it has, plus
+      whatever's still in progress) - "Undo Line" instead removes just the most recent point of the
+      figure *currently being built* (`SelectionStore#undoLast`, new - a no-op once nothing's in
+      progress, doesn't touch already-committed curves). Lets you back up one placement at a time
+      instead of losing the whole in-progress shape over a single misclick.
+- [x] **Deformation bug fix**: creating a *second* pin near an *already-deformed* area of the grid
+      used to silently fail - see `deformable-nail-grid-progress.md` for the root cause
+      (`DeformableGrid#findNearestBaseNail`) and fix.
 
 - [x] Cross-page nav link (`/` ↔ `/freestyle/`).
 - [x] Dark-themed submenu form fields (select/text/number inputs) — was default browser white,

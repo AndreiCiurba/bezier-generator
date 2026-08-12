@@ -21,6 +21,17 @@ export class SelectionStore {
     this.#points.push(point);
   }
 
+  /**
+   * Removes just the most recently added point ("undo line" - one step back
+   * in the figure currently being built), as opposed to `reset()` which
+   * discards the whole in-progress selection at once. A no-op on an empty
+   * selection.
+   * @returns {import('../core/Point.js').Point|undefined} the removed point, if any
+   */
+  undoLast() {
+    return this.#points.pop();
+  }
+
   /** A curve needs at least 3 points to render (see StringArtRenderer). */
   isReadyForCurve() {
     return this.#points.length >= 3;

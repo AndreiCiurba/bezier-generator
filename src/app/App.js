@@ -17,10 +17,13 @@ import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { DeformationUI } from '../ui/DeformationUI.js';
+import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
-import { strokeWeightForColorCount } from '../core/strokeWeight.js';
+import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
+import { ExportRenderer } from '../core/ExportRenderer.js';
+import { downloadCanvasPng } from '../io/PngFile.js';
 
 const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
@@ -93,6 +96,13 @@ export class App {
     // down (see setup's keydown/keyup wiring), not a toggle.
     this.flipVertical = false;
     this.flipHorizontal = false;
+
+    // The pixel thickness new curves get woven with, set directly (not
+    // derived from color count - see StrokeWeightUI) so the artist can match
+    // the actual thread they're using. Applies to curves created *from now
+    // on* only - see Curve#renderWeight, same "keeps its own value forever"
+    // treatment as colors/segments.
+    this.strokeWeight = BASELINE_STROKE_WEIGHT;
   }
 
   setup = () => {
@@ -139,7 +149,9 @@ export class App {
       this.selection,
       this.palette,
       this.stamper,
-      submenuGroup
+      submenuGroup,
+      undefined, // onPatternSaved - freestyle-only (the ctrl-shift point editor's origin tag)
+      () => this.strokeWeight
     );
     this.patternUI.init();
 
@@ -176,6 +188,18 @@ export class App {
     );
     this.colorCountUI.init();
 
+    this.strokeWeightUI = new StrokeWeightUI(
+      {
+        input: document.getElementById('strokeWeightInput'),
+        applyBtn: document.getElementById('applyStrokeWeightBtn'),
+      },
+      this.strokeWeight,
+      (weight) => {
+        this.strokeWeight = weight;
+      }
+    );
+    this.strokeWeightUI.init();
+
     new MenuUI(
       document.getElementById('burger'),
       document.getElementById('ui'),
@@ -187,6 +211,11 @@ export class App {
     document.getElementById('resetBtn').addEventListener('click', this.handleReset);
     document.getElementById('clearAllBtn').addEventListener('click', this.handleClearAll);
     document.getElementById('undoBtn').addEventListener('click', this.handleUndo);
+    document.getElementById('undoLineBtn').addEventListener('click', this.handleUndoLine);
+    document.getElementById('exportNailsBtn').addEventListener('click', this.handleExportNails);
+    document
+      .getElementById('exportNailsStringsBtn')
+      .addEventListener('click', this.handleExportNailsAndStrings);
 
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -221,26 +250,17 @@ export class App {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      // Subdivision fineness and line weight always match this curve's own
-      // color count - not necessarily the *current* palette size, so
-      // curves/patterns from before a color-count change keep rendering
-      // exactly as drawn.
-      StringArtRenderer.drawCurve(
-        curve.points,
-        curve.colors,
-        curve.colors.length,
-        strokeWeightForColorCount(curve.colors.length)
-      );
+      // Subdivision fineness always matches this curve's own color count;
+      // weight is its own explicit setting if it has one (the "Stroke
+      // Weight" field, see StrokeWeightUI) or the same color-count-derived
+      // fallback as before - either way, never the *current* setting, so
+      // curves/patterns from before a change keep rendering exactly as drawn.
+      StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
       curve.previouslyDrawn = true;
     }
 
     if (this.selection.isReadyForCurve()) {
-      StringArtRenderer.drawCurve(
-        this.selection.points,
-        this.palette.getAll(),
-        this.palette.size,
-        strokeWeightForColorCount(this.palette.size)
-      );
+      StringArtRenderer.drawCurve(this.selection.points, this.palette.getAll(), this.palette.size, this.strokeWeight);
     }
     CanvasView.drawGuidePath(this.selection.points);
     this.#drawArmedPatternPreview();
@@ -263,7 +283,9 @@ export class App {
       this.curves.add(
         new Curve(
           this.selection.points.map((p) => p.copy()),
-          this.palette.snapshot()
+          this.palette.snapshot(),
+          null,
+          this.strokeWeight
         )
       );
     }
@@ -275,10 +297,77 @@ export class App {
     this.curves.clear();
   };
 
+  /** Undoes the whole current figure - the last committed curve, however many lines/points it has, plus whatever's still in progress. */
   handleUndo = () => {
     if (this.curves.count > 0) this.curves.undo();
     this.selection.reset();
   };
+
+  /**
+   * Undoes just the most recent point of the figure currently being built -
+   * one step back, not the whole figure (see `handleUndo` for that). A no-op
+   * once nothing's in progress; doesn't touch already-committed curves.
+   */
+  handleUndoLine = () => {
+    this.selection.undoLast();
+  };
+
+  /**
+   * Every predefined nail (control points, big dots) plus every curve's own
+   * inner/subdivision points (small dots) - not just the nails a curve
+   * happens to touch. Unlike freestyle (no predefined lattice - only nails a
+   * curve actually uses are "control points"), the grid tool's whole board
+   * gets physically nailed during setup, so the full lattice always belongs
+   * in the export, regardless of what's been drawn on it yet. Reflects
+   * *current* (possibly deformed) positions - `this.deformation.points` -
+   * exactly as they'd need to be physically placed.
+   */
+  handleExportNails = () => {
+    this.#exportPng('grid-nails.png', ExportRenderer.renderNails);
+  };
+
+  /** Nails plus the actual woven strings, in their real colors - same "every predefined nail" control-point rule as `handleExportNails`. */
+  handleExportNailsAndStrings = () => {
+    this.#exportPng('grid-nails-strings.png', ExportRenderer.renderNailsAndStrings);
+  };
+
+  /**
+   * Shared PNG-export plumbing for both buttons: renders onto a throwaway
+   * offscreen buffer at the canvas's own pixel size and triggers a download.
+   * The full nail lattice is always exportable content on its own (the setup
+   * template), so "nothing to export" only applies when there's neither a
+   * curve nor a single lattice nail - never actually true here, but keeps
+   * the guard meaningful if that ever changes.
+   * @param {string} filename
+   * @param {(pg: import('p5'), curves: import('../models/Curve.js').Curve[], lattice: {points: import('../core/Point.js').Point[], colorCount: number}) => void} render
+   */
+  #exportPng(filename, render) {
+    const curves = this.#curvesForExport();
+    const lattice = { points: this.deformation.points, colorCount: this.palette.size };
+    if (curves.length === 0 && lattice.points.length === 0) {
+      alert('Nothing to export yet.');
+      return;
+    }
+
+    const pg = createGraphics(this.canvasWidth, this.canvasHeight);
+    render(pg, curves, lattice);
+    downloadCanvasPng(pg.canvas, filename);
+    pg.remove();
+  }
+
+  /**
+   * Every curve that's actually visible right now - the committed ones plus
+   * the in-progress selection, if it's far enough along to render as a curve
+   * (matches exactly what the draw loop itself renders, so the export is a
+   * faithful "what you see" snapshot).
+   */
+  #curvesForExport() {
+    const curves = this.curves.curves.slice();
+    if (this.selection.isReadyForCurve()) {
+      curves.push(new Curve(this.selection.points, this.palette.getAll(), null, this.strokeWeight));
+    }
+    return curves;
+  }
 
   /**
    * Resizes the palette to a new number of color slots (also the weave's
@@ -381,7 +470,8 @@ export class App {
     if (this.patterns.isInUse) {
       this.stamper.stampAtScreenPoint(
         { x: screenX, y: screenY },
-        { horizontal: this.flipHorizontal, vertical: this.flipVertical }
+        { horizontal: this.flipHorizontal, vertical: this.flipVertical },
+        this.strokeWeight
       );
       return;
     }
@@ -421,7 +511,11 @@ export class App {
     if (event?.ctrlKey) {
       let pin = this.deformation.findNearestPin(worldPos, PIN_PICK_RADIUS);
       if (!pin) {
-        const nail = this.grid.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
+        // Nearest nail by its *current* (deformed) position - what's
+        // actually on screen where the click landed - mapped back to its
+        // base position for the new pin's reference (see
+        // DeformableGrid#findNearestBaseNail for why this had to change).
+        const nail = this.deformation.findNearestBaseNail(worldPos, NEAREST_NAIL_RADIUS);
         if (!nail) return;
         pin = this.deformation.addPin({
           referencePosition: nail,
@@ -453,10 +547,12 @@ export class App {
     if (!pattern) return;
 
     const cursorWorld = this.viewport.toWorld(mouseX, mouseY);
-    CanvasView.drawArmedPatternPreview(pattern, cursorWorld, {
-      horizontal: this.flipHorizontal,
-      vertical: this.flipVertical,
-    });
+    CanvasView.drawArmedPatternPreview(
+      pattern,
+      cursorWorld,
+      { horizontal: this.flipHorizontal, vertical: this.flipVertical },
+      this.strokeWeight
+    );
   }
 
   #createCanvas() {

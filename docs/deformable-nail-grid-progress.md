@@ -78,6 +78,25 @@ acceptance criteria (AC1-AC14), and rationale.
       extend past the padded canvas edge. The epic doesn't ask for auto-resize; revisit if it turns
       out to matter in practice.
 
+#### Bug fixed post-ship: couldn't place a second pin near an already-deformed area
+
+Reported by the user after using the feature for real: Ctrl-clicking a nail to create a *new* pin
+silently did nothing once it was anywhere near an *existing* pin's influence radius.
+
+Root cause: pin creation looked up the clicked nail via `this.grid.findNearestPoint(...)` -
+**base**, undeformed positions - but the user is obviously clicking on what's actually *rendered*,
+which is `this.deformation.points` (**current**, deformed positions). Once even one pin existed,
+every nail within its influence radius had already visually moved away from its base position - so
+a Ctrl-click on the nail you could see would search for a base nail near the *click point*, find
+nothing within the small pick radius (the real base nail was now elsewhere), and silently no-op.
+The more you deformed, the larger the "dead zone" where no new pin could ever be placed.
+
+Fixed with `DeformableGrid#findNearestBaseNail(worldPos, maxDistance)`: searches **current**
+positions (matching what's on screen) but returns the corresponding **base** point (matching what a
+pin's `referencePosition` actually needs - a fixed base-grid anchor, not wherever the nail happened
+to be displayed at click time). `App.js`'s Ctrl-click handler now calls this instead of
+`Grid#findNearestPoint` directly. Regression-tested in `DeformableGrid.test.js`.
+
 #### New files
 
 `src/core/nearestPoint.js` (+test), `src/core/deformation/puppetWarp.js` (+test),

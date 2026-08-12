@@ -37,8 +37,11 @@ export class PatternStamper {
    * moment of the click is what gets placed.
    * @param {{x:number,y:number}} screenPos
    * @param {{horizontal?: boolean, vertical?: boolean}} [flip]
+   * @param {number|null} [weight] the current "Stroke Weight" setting (see
+   *   StrokeWeightUI) to lock this stamp to - `null` falls back to the
+   *   color-count-derived default (`Curve#renderWeight`).
    */
-  stampAtScreenPoint(screenPos, flip) {
+  stampAtScreenPoint(screenPos, flip, weight = null) {
     const pattern = this.patternStore.selectedPattern;
     if (!pattern) return;
 
@@ -47,21 +50,22 @@ export class PatternStamper {
     if (!anchor) return;
 
     const points = translatePointsTo(flipPoints(pattern.points, flip), anchor);
-    this.curveStore.add(new Curve(points, pattern.colors.slice(), pattern.id));
+    this.curveStore.add(new Curve(points, pattern.colors.slice(), pattern.id, weight));
   }
 
   /**
    * Stamps a copy of the selected pattern anchored at every grid nail at
    * once ("Auto" placement mode). No-op if this pattern has already been
    * stamped throughout the grid.
+   * @param {number|null} [weight] see `stampAtScreenPoint`
    */
-  stampThroughoutGrid() {
+  stampThroughoutGrid(weight = null) {
     const pattern = this.patternStore.selectedPattern;
     if (!pattern) return;
     if (this.curveStore.hasCurveForPattern(pattern.id)) return;
 
     for (const anchor of this.grid.points) {
-      this.curveStore.add(new Curve(pattern.translatedTo(anchor), pattern.colors, pattern.id));
+      this.curveStore.add(new Curve(pattern.translatedTo(anchor), pattern.colors, pattern.id, weight));
     }
   }
 }

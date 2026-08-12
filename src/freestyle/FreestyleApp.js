@@ -21,10 +21,10 @@ import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { FreestylePatternStamper } from './FreestylePatternStamper.js';
 import { CanvasSizeUI } from './CanvasSizeUI.js';
-import { StrokeWeightUI } from './StrokeWeightUI.js';
+import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { GraphPaperRenderer } from './GraphPaperRenderer.js';
 import { LivePreviewLine } from './LivePreviewLine.js';
-import { ExportRenderer } from './ExportRenderer.js';
+import { ExportRenderer } from '../core/ExportRenderer.js';
 import { downloadCanvasPng } from '../io/PngFile.js';
 import { DEFAULT_DPI, toPixels } from './units.js';
 
@@ -200,6 +200,7 @@ export class FreestyleApp {
     document.getElementById('resetBtn').addEventListener('click', this.handleReset);
     document.getElementById('clearAllBtn').addEventListener('click', this.handleClearAll);
     document.getElementById('undoBtn').addEventListener('click', this.handleUndo);
+    document.getElementById('undoLineBtn').addEventListener('click', this.handleUndoLine);
     document.getElementById('exportNailsBtn').addEventListener('click', this.handleExportNails);
     document
       .getElementById('exportNailsStringsBtn')
@@ -299,9 +300,19 @@ export class FreestyleApp {
     this.pendingOriginPatternId = null;
   };
 
+  /** Undoes the whole current figure - the last committed curve, however many lines/points it has, plus whatever's still in progress. */
   handleUndo = () => {
     if (this.curves.count > 0) this.curves.undo();
     this.selection.reset();
+  };
+
+  /**
+   * Undoes just the most recent point of the figure currently being built -
+   * one step back, not the whole figure (see `handleUndo` for that). A no-op
+   * once nothing's in progress; doesn't touch already-committed curves.
+   */
+  handleUndoLine = () => {
+    this.selection.undoLast();
   };
 
   /** Nails only (control + inner points), no strings - see ExportRenderer. */

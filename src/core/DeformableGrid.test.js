@@ -80,6 +80,44 @@ describe('DeformableGrid', () => {
     expect(deformable.findNearestPoint(anchor, 1)).toBeNull();
   });
 
+  describe('findNearestBaseNail (regression: creating a 2nd pin near a 1st used to be impossible)', () => {
+    it('finds a nail by its current (deformed) position and returns its base position', () => {
+      const grid = new Grid(config);
+      const deformable = new DeformableGrid(grid);
+      const anchor = grid.points[0];
+      const otherBase = grid.points[1];
+      const pin = deformable.addPin({ referencePosition: anchor, radius: 1000 });
+      deformable.movePin(pin, { x: anchor.x + 100, y: anchor.y + 100 });
+
+      // otherBase has also moved (radius 1000 covers the whole tiny test
+      // grid) - clicking where it's now *displayed* must still resolve to
+      // its base position, not fail because base-space search would miss.
+      const displayedPosition = deformable.points[1];
+      const found = deformable.findNearestBaseNail(displayedPosition, 1);
+      expect(found).toEqual(otherBase);
+    });
+
+    it('a plain base-space search would have missed this (the bug being fixed)', () => {
+      const grid = new Grid(config);
+      const deformable = new DeformableGrid(grid);
+      const anchor = grid.points[0];
+      const pin = deformable.addPin({ referencePosition: anchor, radius: 1000 });
+      deformable.movePin(pin, { x: anchor.x + 100, y: anchor.y + 100 });
+
+      const displayedPosition = deformable.points[1];
+      // Confirms the fix actually matters: the nail's base position is no
+      // longer near where it's displayed.
+      expect(grid.points[1].distanceTo(displayedPosition)).toBeGreaterThan(10);
+      expect(deformable.findNearestBaseNail(displayedPosition, 10)).not.toBeNull();
+    });
+
+    it('returns null when nothing is within range', () => {
+      const grid = new Grid(config);
+      const deformable = new DeformableGrid(grid);
+      expect(deformable.findNearestBaseNail({ x: 99999, y: 99999 }, 10)).toBeNull();
+    });
+  });
+
   describe('findNearestPin', () => {
     it('returns the truly nearest pin within range', () => {
       const grid = new Grid(config);

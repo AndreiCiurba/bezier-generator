@@ -33,4 +33,35 @@ describe('SelectionStore', () => {
     expect(s.count).toBe(0);
     expect(s.lastPoint).toBeNull();
   });
+
+  describe('undoLast', () => {
+    it('removes only the most recently added point', () => {
+      const s = new SelectionStore();
+      s.add({ x: 0, y: 0 });
+      s.add({ x: 1, y: 1 });
+      s.add({ x: 2, y: 2 });
+
+      const removed = s.undoLast();
+
+      expect(removed).toEqual({ x: 2, y: 2 });
+      expect(s.count).toBe(2);
+      expect(s.lastPoint).toEqual({ x: 1, y: 1 });
+    });
+
+    it('is a no-op on an empty selection', () => {
+      const s = new SelectionStore();
+      expect(s.undoLast()).toBeUndefined();
+      expect(s.count).toBe(0);
+    });
+
+    it('can be called repeatedly down to empty', () => {
+      const s = new SelectionStore();
+      s.add({ x: 0, y: 0 });
+      s.add({ x: 1, y: 1 });
+      s.undoLast();
+      s.undoLast();
+      expect(s.count).toBe(0);
+      expect(s.lastPoint).toBeNull();
+    });
+  });
 });

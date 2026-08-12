@@ -59,6 +59,38 @@ export class DeformableGrid {
     return findNearestPoint(this.points, worldPos, maxDistance);
   }
 
+  /**
+   * Nearest nail by its *current* (possibly deformed) position - i.e. what's
+   * actually rendered where the user is clicking - but returns the
+   * corresponding *base* point, since that's what a new pin's
+   * `referencePosition` should anchor to (a fixed base-grid location, not
+   * wherever that nail happened to be displayed at click time).
+   *
+   * Fixes a real bug: creating a pin used to search `Grid#findNearestPoint`
+   * directly (base positions) against a click made on the *deformed* canvas.
+   * Once even one pin existed, every nail within its influence radius had
+   * already moved away from its base position - so Ctrl-clicking the nail
+   * you could actually see would miss (nothing within range in base-space),
+   * and no second pin could ever be placed near the first one's influence.
+   * @param {{x:number,y:number}} worldPos
+   * @param {number} [maxDistance]
+   * @returns {import('./Point.js').Point | null}
+   */
+  findNearestBaseNail(worldPos, maxDistance = 10) {
+    const current = this.points;
+    let nearestIndex = -1;
+    let nearestDist = Infinity;
+    for (let i = 0; i < current.length; i++) {
+      const d = current[i].distanceTo(worldPos);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestIndex = i;
+      }
+    }
+    if (nearestIndex === -1 || nearestDist > maxDistance) return null;
+    return this.#grid.points[nearestIndex];
+  }
+
   /** Nearest pin (by its current, draggable position) to `worldPos`, or null. */
   findNearestPin(worldPos, maxDistance = 10) {
     let nearest = null;

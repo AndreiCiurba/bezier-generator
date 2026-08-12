@@ -28,12 +28,18 @@ export class PatternUI {
    *   FreestyleApp's ctrl-shift point editor: this is what makes the
    *   original hand-drawn shape move along with the pattern's stamped
    *   copies, not just the copies). Optional - the grid tool doesn't wire it.
+   * @param {() => number|null} [getStrokeWeight] returns the current "Stroke
+   *   Weight" setting (see StrokeWeightUI), read at the moment Auto mode
+   *   stamps a pattern throughout the grid, so those curves lock in the same
+   *   weight a Manual-mode stamp would. Optional - defaults to `null`
+   *   (the color-count-derived fallback, i.e. today's behavior) for any page
+   *   that doesn't wire manual weight control.
    *
    * `elements.toggleModeBtn` is optional - omit it where there's no grid to
    * auto-stamp across (the freestyle page), and Manual/Auto placement simply
    * doesn't apply.
    */
-  constructor(elements, patternStore, selection, palette, stamper, submenuGroup, onPatternSaved) {
+  constructor(elements, patternStore, selection, palette, stamper, submenuGroup, onPatternSaved, getStrokeWeight) {
     this.el = elements;
     this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.patternStore = patternStore;
@@ -42,6 +48,7 @@ export class PatternUI {
     this.stamper = stamper;
     this.submenuGroup = submenuGroup;
     this.onPatternSaved = onPatternSaved;
+    this.getStrokeWeight = getStrokeWeight ?? (() => null);
     this.listItems = new Map(); // pattern id -> <li>
   }
 
@@ -134,7 +141,7 @@ export class PatternUI {
 
     this.patternStore.select(pattern.id, true);
     if (this.patternStore.placementMode === 'auto') {
-      this.stamper.stampThroughoutGrid();
+      this.stamper.stampThroughoutGrid(this.getStrokeWeight());
     }
   }
 

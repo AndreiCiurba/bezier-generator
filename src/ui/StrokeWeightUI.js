@@ -1,12 +1,12 @@
-import { parseStrokeWeight, MIN_STROKE_WEIGHT, MAX_STROKE_WEIGHT } from './strokeWeightSetting.js';
+import { parseStrokeWeight, MIN_STROKE_WEIGHT, MAX_STROKE_WEIGHT } from '../state/strokeWeightSetting.js';
 
 /**
  * Wires the "Stroke Weight" field: the pixel thickness new curves get woven
  * with, set directly instead of only derived from color count - so the
  * artist can match the actual thread they're using. Mirrors
- * `ColorCountUI`'s "field + Apply" shape exactly. Freestyle-only for now
- * (like `CanvasSizeUI`/`FreestylePatternStamper` started out) - move to
- * `src/ui/` if the grid tool ever wants manual weight control too.
+ * `ColorCountUI`'s "field + Apply" shape exactly. Shared by both pages (like
+ * `ColorCountUI`/`colorCount.js`, this started freestyle-only and moved here
+ * once the grid tool needed it too).
  */
 export class StrokeWeightUI {
   /**
