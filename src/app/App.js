@@ -5,7 +5,7 @@ import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
 import { DeformableGrid, DEFAULT_PIN_RADIUS, DEFAULT_PIN_FALLOFF } from '../core/DeformableGrid.js';
 import { DesignModel } from '../core/DesignModel.js';
-import { Curve } from '../models/Curve.js';
+import { Curve, isLiveAutoPatternCurve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
 import { PatternStore } from '../state/PatternStore.js';
@@ -265,13 +265,20 @@ export class App {
     CanvasView.drawGridDots(this.deformation.points);
 
     for (const { curve } of this.design.visibleCurves) {
-      if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
+      if (isLiveAutoPatternCurve(curve, this.patterns)) {
+        // Auto-stamped and still the active selection - keep tracking the
+        // *current* palette/stroke weight for as long as that stays true,
+        // not just the moment it was placed (see Curve.js's own doc).
+        curve.recolor(this.palette.getAll());
+        curve.weight = this.strokeWeight;
+      } else if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
       // Subdivision fineness always matches this curve's own color count;
       // weight is its own explicit setting if it has one (the "Stroke
       // Weight" field, see StrokeWeightUI) or the same color-count-derived
-      // fallback as before - either way, never the *current* setting, so
+      // fallback as before - either way, never the *current* setting (unless
+      // it's still a live Auto-pattern curve, handled above), so
       // curves/patterns from before a change keep rendering exactly as drawn.
       StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
       curve.previouslyDrawn = true;

@@ -79,4 +79,38 @@ describe('StrokePalette', () => {
       expect(palette.getSlot(0).color).toBe('#a');
     });
   });
+
+  describe('onChange', () => {
+    it('notifies on setColor, toggleEnabled, and resize', () => {
+      const palette = new StrokePalette(['#a', '#b']);
+      let calls = 0;
+      palette.onChange(() => calls++);
+
+      palette.setColor(0, '#c');
+      expect(calls).toBe(1);
+
+      palette.toggleEnabled(0);
+      expect(calls).toBe(2);
+
+      palette.resize(3);
+      expect(calls).toBe(3);
+    });
+
+    it('does not notify a no-op resize (same size)', () => {
+      const palette = new StrokePalette(['#a', '#b']);
+      let calls = 0;
+      palette.onChange(() => calls++);
+      palette.resize(2);
+      expect(calls).toBe(0);
+    });
+
+    it('returns an unsubscribe function', () => {
+      const palette = new StrokePalette(['#a']);
+      let calls = 0;
+      const unsubscribe = palette.onChange(() => calls++);
+      unsubscribe();
+      palette.setColor(0, '#b');
+      expect(calls).toBe(0);
+    });
+  });
 });

@@ -4,7 +4,7 @@ import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
 import { isWithinBounds } from '../core/bounds.js';
 import { findNearestCurvePoint, shiftSiblingPoints } from '../core/pointEditing.js';
-import { Curve } from '../models/Curve.js';
+import { Curve, isLiveAutoPatternCurve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
 import { PatternStore } from '../state/PatternStore.js';
@@ -250,13 +250,22 @@ export class FreestyleApp {
     if (this.showGraphPaper) GraphPaperRenderer.draw(this.canvasWidth, this.canvasHeight);
 
     for (const curve of this.curves.curves) {
-      if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
+      if (isLiveAutoPatternCurve(curve, this.patterns)) {
+        // Auto-stamped and still the active selection - keep tracking the
+        // *current* palette/stroke weight for as long as that stays true
+        // (see Curve.js's own doc). Freestyle has no Auto placement UI, so
+        // this branch is unreachable here today - kept for consistency with
+        // the shared grid-tool/3D behavior, not dead weight to remove.
+        curve.recolor(this.palette.getAll());
+        curve.weight = this.strokeWeight;
+      } else if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
       // Subdivision fineness always matches this curve's own color count;
       // weight is its own explicit setting if it has one (the "Stroke
       // Weight" field, see StrokeWeightUI) or the same color-count-derived
-      // fallback as before - either way, never the *current* setting, so
+      // fallback as before - either way, never the *current* setting (unless
+      // it's still a live Auto-pattern curve, handled above), so
       // curves/patterns from before a change keep rendering exactly as drawn.
       StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
       curve.previouslyDrawn = true;

@@ -18,6 +18,7 @@ const DEFAULT_COLORS = [
  */
 export class StrokePalette {
   #slots;
+  #listeners = new Set();
 
   constructor(initialColors = DEFAULT_COLORS) {
     this.#slots = initialColors.map((color) => ({ color, enabled: true }));
@@ -42,10 +43,12 @@ export class StrokePalette {
 
   setColor(index, hex) {
     this.#slots[index].color = hex;
+    this.#notify();
   }
 
   toggleEnabled(index) {
     this.#slots[index].enabled = !this.#slots[index].enabled;
+    this.#notify();
     return this.#slots[index].enabled;
   }
 
@@ -60,15 +63,35 @@ export class StrokePalette {
     if (newSize === this.#slots.length) return;
     if (newSize < this.#slots.length) {
       this.#slots.length = newSize;
-      return;
+    } else {
+      for (let i = this.#slots.length; i < newSize; i++) {
+        this.#slots.push({ color: fillColorFn(), enabled: true });
+      }
     }
-    for (let i = this.#slots.length; i < newSize; i++) {
-      this.#slots.push({ color: fillColorFn(), enabled: true });
-    }
+    this.#notify();
   }
 
   /** Deep-cloned snapshot, safe to store on a Curve without aliasing live slot objects. */
   snapshot() {
     return this.#slots.map((s) => ({ color: s.color, enabled: s.enabled }));
+  }
+
+  /**
+   * Subscribes to any setColor/toggleEnabled/resize change. Returns an
+   * unsubscribe function - same shape as `CurveStore#onChange`. Needed by
+   * renderers with no continuous per-frame redraw of their own (the 3D page)
+   * to know when to re-sync anything reading live palette state, e.g. the
+   * Auto-mode "keep already-stamped pattern curves live" feature (see
+   * `models/Curve.js#isLiveAutoPatternCurve`).
+   * @param {() => void} listener
+   * @returns {() => void}
+   */
+  onChange(listener) {
+    this.#listeners.add(listener);
+    return () => this.#listeners.delete(listener);
+  }
+
+  #notify() {
+    for (const listener of this.#listeners) listener();
   }
 }

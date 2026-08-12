@@ -66,3 +66,26 @@ export class Curve {
     this.colors = strokes.map((c) => ({ color: c.color, enabled: c.enabled }));
   }
 }
+
+/**
+ * Whether `curve` should keep reflecting live palette/stroke-weight/layer-
+ * enable edits made *after* it was stamped, rather than freezing the moment
+ * it was placed - true only while the pattern it came from remains both
+ * selected/armed (`patterns.isInUse`) *and* in Auto placement mode. A plain
+ * per-click Manual-mode stamp (or a hand-drawn curve) always locks in its
+ * appearance immediately, same as before - this only applies to the "stamp
+ * everywhere at once" Auto workflow, and only for as long as that same
+ * pattern stays the active selection (deselecting, clearing, or switching
+ * back to Manual mode freezes every curve exactly as it last looked).
+ *
+ * A plain function taking `patterns` rather than a `Curve` method, so this
+ * file doesn't have to import `PatternStore` just for its shape - matches
+ * `belongsToPattern`'s own "take the id, not the whole store" convention,
+ * one level up.
+ * @param {Curve} curve
+ * @param {import('../state/PatternStore.js').PatternStore} patterns
+ * @returns {boolean}
+ */
+export function isLiveAutoPatternCurve(curve, patterns) {
+  return curve.belongsToPattern(patterns.selectedPatternId) && patterns.isInUse && patterns.placementMode === 'auto';
+}

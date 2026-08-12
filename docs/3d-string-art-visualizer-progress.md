@@ -404,6 +404,65 @@ message:
 Full `vitest run`: 36 files / 242 tests passing (unchanged). Manual/visual verification not yet run —
 per the `no-e2e` skill, only on explicit request.
 
+## Follow-up (post-epic, user-requested): stroke weight bug + Auto-mode live updates
+
+Two reports in one message, both fixed:
+
+**Bug: "Stroke Weight" had no effect on the 3D page.** Real bug, found by reading the source rather
+than assumed - `SceneSync#buildWeaveObject`'s `LineMaterial` used a module-level constant
+(`CURVE_LINE_WIDTH = 2`) for `linewidth`, completely ignoring every curve's own `renderWeight`
+(the field the "Stroke Weight" field actually sets). Fixed: `#buildWeaveObject` now takes a `weight`
+param, threaded through from `entry.curve.renderWeight` (`#syncCurves`) and the live "Stroke Weight"
+setting (`setLivePreview`, for the in-progress Drawing Mode preview - itself found to have the exact
+same gap). A curve's `renderWeight` (the 2D page's `strokeWeight()` unit, `BASELINE_STROKE_WEIGHT`
+0.6 at 8 colors) isn't itself a sensible `linewidth` - both are screen-space pixels, but the "fat line"
+addon was adopted specifically for *visibility* (Slice 4), and a raw sub-1px value would defeat that.
+New `STROKE_WEIGHT_TO_LINE_WIDTH_SCALE` (`= BASELINE_CURVE_LINE_WIDTH / BASELINE_STROKE_WEIGHT`)
+reproduces the previous fixed 2px look exactly at the baseline weight, while scaling proportionally as
+the user actually changes the setting - "keep the default readable" and "make the setting do
+something" both hold.
+
+**Feature: Auto-mode pattern curves should keep reflecting color/weight/layer-enable edits made
+*after* stamping, not just freeze at stamp time.** Asked for both pages (confirmed via a clarifying
+question, since the underlying model is shared) - previously, on `/`, a pattern-stamped curve only
+ever got *one* live recolor (the frame right after stamping, to swap the pattern's own stale saved
+colors for the live palette - see `Curve.js`'s original `previouslyDrawn` doc), then locked forever;
+on `3d/` there was no equivalent mechanism at all (no continuous per-frame redraw loop to piggyback
+on). New shared `models/Curve.js#isLiveAutoPatternCurve(curve, patterns)` (+ `Curve.test.js`, this
+class's first test file) - true only while a curve's own pattern remains *both* selected/armed
+(`patterns.isInUse`) *and* in Auto placement mode; Manual-mode stamps and hand-drawn curves are
+unaffected, matching the literal ask ("if a pattern is in auto mode").
+- **`/` and `/freestyle`** (`App.js`/`FreestyleApp.js`): the existing per-frame draw loop now branches
+  on `isLiveAutoPatternCurve` first - true means recolor **and** reweight (`curve.weight =
+  this.strokeWeight`) every single frame, not just once; false falls through to the pre-existing
+  one-shot `!previouslyDrawn` behavor unchanged. Freestyle has no Auto-mode UI (`PatternUI`'s
+  `toggleModeBtn` is only wired on the grid tool/3D pages), so this branch is unreachable there today -
+  included anyway for one shared, consistent model rather than diverging code paths.
+- **`3d/`** (`ThreeApp`/`SceneSync`): no per-frame loop to lean on, so this needed real plumbing.
+  New `StrokePalette#onChange`/`#notify()` (+ tests) - the exact `CurveStore#onChange` shape, called
+  from `setColor`/`toggleEnabled`/`resize`, so *every* palette mutation path notifies (a direct
+  `ColorPickerUI` edit, a right-click layer toggle, or `FavoritesUI` applying a whole bundle - the
+  bundle path doesn't go through `ColorPickerUI` at all, so a `ColorPickerUI`-only hook would have
+  missed it). `ThreeApp` subscribes once and reacts via new `#refreshLivePatternCurves` - scans
+  `design.visibleCurves` for anything `isLiveAutoPatternCurve` currently matches, recolors/reweights
+  those `Curve` objects directly, and hands their ids to new `SceneSync#rebuildCurves(ids)` (disposes
+  just those `LineSegments2` objects and reuses `#syncCurves`'s own "rebuild whatever's missing"
+  pass - not a full-scene rebuild). Also wired from the "Stroke Weight" Apply callback. A complete
+  no-op (one `visibleCurves` scan, nothing rebuilt) unless a pattern is actually both selected and in
+  Auto mode - most color/weight changes touch nothing here.
+- **Deliberately out of scope**: whether the *initial* Auto-stamp already matches the live palette
+  (on `3d/`, newly-stamped curves currently start from the *pattern's own saved* colors, like `/`
+  used to before its one-shot recolor corrects it next frame - 3D has no equivalent correction pass
+  for the very first stamp). Not what was reported (the report was specifically about *changes made
+  after* stamping), and wiring it in generally would double the cost of `stampThroughoutGrid`'s
+  already-uses-a-loop-of-individual-`curveStore.add()`-calls (a pre-existing, unbatched
+  O(curves²)-ish characteristic, not something introduced here) for every large Auto-stamp. Worth a
+  dedicated follow-up if it turns out to matter in practice.
+
+Full `vitest run`: 37 files / 252 tests passing (+10 net new - `StrokePalette.test.js`'s new
+`onChange` describe block, `Curve.test.js` new entirely). Manual/visual verification not yet run — per
+the `no-e2e` skill, only on explicit request.
+
 ## Status legend
 
 `[x]` done and verified · `[~]` partially done, scope noted · `[ ]` not started

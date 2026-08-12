@@ -8,6 +8,7 @@ import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { computeWeaveSegments } from '../core/weaveMath.js';
 import { nailPositionsForCurve } from '../core/nailPositions.js';
+import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 
 // Same margin-around-the-grid-bounding-box convention as App.js's own
 // GRID_PADDING - the board shouldn't hug the outermost nails flush against
@@ -56,7 +57,20 @@ const INNER_NAIL_RADIAL_SEGMENTS = 8; // fewer facets than the main nails' 10 - 
 // individual colored strands or show vertical layer separation from an
 // oblique angle (the epic's own stated goal), hence the "fat line" addon
 // (LineSegments2/LineMaterial) instead of plain THREE.LineSegments.
-const CURVE_LINE_WIDTH = 2;
+//
+// A curve's own `renderWeight` (the p5 2D page's `strokeWeight()` unit -
+// BASELINE_STROKE_WEIGHT is 0.6 at the default 8 colors) isn't itself a
+// sensible `LineMaterial.linewidth` - both are screen-space pixels, but a
+// sub-1px value reads as barely-there on most GPUs, and the "fat line" addon
+// was adopted specifically *for* visibility (see above). Scaling by this
+// factor reproduces today's previous fixed 2px look at the baseline weight
+// (found this bug: `linewidth` used to just be this hardcoded `2` outright,
+// completely ignoring the actual "Stroke Weight" setting - see
+// #buildWeaveObject), while still scaling proportionally as the user changes
+// it, satisfying both "keep the default readable" and "make the setting do
+// something."
+const BASELINE_CURVE_LINE_WIDTH = 2;
+const STROKE_WEIGHT_TO_LINE_WIDTH_SCALE = BASELINE_CURVE_LINE_WIDTH / BASELINE_STROKE_WEIGHT;
 
 // Drawing Mode's in-progress selection guide - the app's own gold accent
 // color (matches the 2D pages' on-axis live-preview-line/control-point
@@ -237,7 +251,7 @@ export class SceneSync {
     if (this.innerNailMesh) this.#writeInnerNailMatrices(this._innerNailPoints);
     this.#rebuildAllCurveObjects();
     if (this._lastSelectionPoints) this.setSelectionGuide(this._lastSelectionPoints);
-    if (this._lastPreview) this.setLivePreview(this._lastPreview.points, this._lastPreview.colors);
+    if (this._lastPreview) this.setLivePreview(this._lastPreview.points, this._lastPreview.colors, this._lastPreview.weight);
   }
 
   /**
@@ -311,16 +325,19 @@ export class SceneSync {
   /**
    * Drawing Mode's live weave preview - what the in-progress selection would
    * actually look like as a woven curve if committed right now, using the
-   * *current* live palette (mirrors the 2D page's
-   * `StringArtRenderer.drawCurve(selection.points, palette.getAll(), ...)`
-   * preview). Rebuilt on every call (points/colors, not a `Curve` instance -
-   * there's nothing committed yet). No-op visually (hidden) below 3 points,
-   * matching `SelectionStore#isReadyForCurve`.
+   * *current* live palette and stroke weight (mirrors the 2D page's
+   * `StringArtRenderer.drawCurve(selection.points, palette.getAll(), ...,
+   * strokeWeight)` preview). Rebuilt on every call (points/colors, not a
+   * `Curve` instance - there's nothing committed yet). No-op visually
+   * (hidden) below 3 points, matching `SelectionStore#isReadyForCurve`.
    * @param {{x:number,y:number}[]} points
    * @param {{color:string,enabled:boolean}[]} colors
+   * @param {number} [weight] defaults to `BASELINE_STROKE_WEIGHT` so existing
+   *   callers that haven't been updated to pass one still render at a
+   *   sensible width rather than `undefined * scale`
    */
-  setLivePreview(points, colors) {
-    this._lastPreview = { points, colors };
+  setLivePreview(points, colors, weight = BASELINE_STROKE_WEIGHT) {
+    this._lastPreview = { points, colors, weight };
     if (this.livePreview) {
       this.scene.remove(this.livePreview);
       this.livePreview.geometry.dispose();
@@ -329,7 +346,7 @@ export class SceneSync {
     }
     if (points.length < 3) return;
 
-    const object = this.#buildWeaveObject(points, colors);
+    const object = this.#buildWeaveObject(points, colors, weight);
     if (!object) return;
     this.scene.add(object);
     this.livePreview = object;
@@ -544,7 +561,7 @@ export class SceneSync {
 
     for (const entry of entries) {
       if (this.curveLines.has(entry.id)) continue;
-      const object = this.#buildWeaveObject(entry.curve.points, entry.curve.colors);
+      const object = this.#buildWeaveObject(entry.curve.points, entry.curve.colors, entry.curve.renderWeight);
       if (!object) continue; // a degenerate (<3-point) curve produces zero weave segments - nothing to show
       this.scene.add(object);
       this.curveLines.set(entry.id, object);
@@ -568,6 +585,30 @@ export class SceneSync {
   }
 
   /**
+   * Disposes and rebuilds just the given curve ids' `LineSegments2` objects
+   * against their *current* `curve.points`/`colors`/`renderWeight` - for
+   * when a curve's own fields were mutated directly rather than through
+   * `CurveStore`'s add/undo/clear/setVisible (which already trigger
+   * `#syncCurves` via `onChange`). Used by `ThreeApp`'s Auto-mode
+   * "keep already-stamped pattern curves live" feature: it recolors/
+   * reweights the matching `Curve` objects itself, then calls this so the
+   * rendered geometry catches up. Reuses `#syncCurves`'s own "build whatever
+   * id is missing from `curveLines`" pass rather than duplicating it.
+   * @param {string[]} ids
+   */
+  rebuildCurves(ids) {
+    for (const id of ids) {
+      const object = this.curveLines.get(id);
+      if (!object) continue;
+      this.scene.remove(object);
+      object.geometry.dispose();
+      object.material.dispose();
+      this.curveLines.delete(id);
+    }
+    this.#syncCurves();
+  }
+
+  /**
    * Builds one `LineSegments2` for a curve's (or the in-progress selection's)
    * full weave - every enabled color-layer's segments, via the shared, pure
    * `computeWeaveSegments` (no new weave math, identical per-triplet geometry
@@ -580,11 +621,16 @@ export class SceneSync {
    * native `THREE.LineSegments`, whose width is capped at ~1px on most
    * desktop GPU/driver combos - too thin to read as individual colored
    * strands or to show vertical layer separation from an oblique angle.
+   * `weight` (a curve's own `renderWeight`, or the live "Stroke Weight"
+   * setting for the in-progress preview) is scaled by
+   * `STROKE_WEIGHT_TO_LINE_WIDTH_SCALE` into `LineMaterial.linewidth` - see
+   * that constant's own doc for why a direct 1:1 pass-through doesn't work.
    * @param {{x:number,y:number}[]} points
    * @param {{color:string,enabled:boolean}[]} colors
+   * @param {number} weight
    * @returns {LineSegments2 | null} null if there are fewer than 3 points (no weave segments to draw)
    */
-  #buildWeaveObject(points, colors) {
+  #buildWeaveObject(points, colors, weight) {
     if (points.length < 3) return null;
     const colorCount = colors.length;
 
@@ -612,7 +658,7 @@ export class SceneSync {
 
     const material = new LineMaterial({
       vertexColors: true,
-      linewidth: CURVE_LINE_WIDTH,
+      linewidth: weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
       resolution: this.lineResolution,
     });
 

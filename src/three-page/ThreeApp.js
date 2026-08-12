@@ -8,7 +8,7 @@ import { SelectionStore } from '../state/SelectionStore.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { PatternStore } from '../state/PatternStore.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
-import { Curve } from '../models/Curve.js';
+import { Curve, isLiveAutoPatternCurve } from '../models/Curve.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { CurvesUI } from '../ui/CurvesUI.js';
@@ -318,6 +318,15 @@ export class ThreeApp {
       this.#handleColorCountChange
     );
     this.colorCountUI.init();
+
+    // No continuous per-frame redraw loop on this page to re-poll the
+    // palette every tick (unlike App.js/FreestyleApp.js) - a color edit or
+    // layer enable/disable (both go through `StrokePalette`, whether from
+    // `ColorPickerUI` directly or `FavoritesUI` applying a bundle) has to
+    // explicitly ask to re-sync anything that should track it live. Right
+    // now that's only the Auto-mode "keep already-stamped pattern curves
+    // live" feature.
+    this.palette.onChange(this.#refreshLivePatternCurves);
   }
 
   /**
@@ -345,9 +354,32 @@ export class ThreeApp {
       this.strokeWeight,
       (weight) => {
         this.strokeWeight = weight;
+        this.#refreshLivePatternCurves();
       }
     ).init();
   }
+
+  /**
+   * Re-syncs whichever curves currently belong to the *live* Auto-mode
+   * pattern (see `models/Curve.js#isLiveAutoPatternCurve`) with the current
+   * palette/stroke weight - called on every palette change (`ColorPickerUI`
+   * edits, layer enable/disable, `FavoritesUI` bundle applies, all funneled
+   * through `StrokePalette#onChange`) and every "Stroke Weight" apply. A
+   * complete no-op unless a pattern is actually both selected and in Auto
+   * mode right now - most color/weight changes touch nothing here.
+   */
+  #refreshLivePatternCurves = () => {
+    // visibleCurves, not the full store, matching the 2D draw loop's own
+    // scope (App.js only ever recolors curves it's actually about to render).
+    const ids = [];
+    for (const entry of this.design.visibleCurves) {
+      if (!isLiveAutoPatternCurve(entry.curve, this.patterns)) continue;
+      entry.curve.recolor(this.palette.getAll());
+      entry.curve.weight = this.strokeWeight;
+      ids.push(entry.id);
+    }
+    if (ids.length > 0) this.sceneSync.rebuildCurves(ids);
+  };
 
   /** "Colors" (favorite bundle save/export/import/apply) submenu - the exact shared `FavoritesUI` both p5 pages use. Must run after `#initColorControls` (needs `this.colorPickerUI`/`this.colorCountUI` already built). */
   #initFavoritesUI() {
@@ -481,7 +513,7 @@ export class ThreeApp {
   #handleUndoLine = () => {
     this.selection.undoLast();
     this.sceneSync.setSelectionGuide(this.selection.points);
-    this.sceneSync.setLivePreview(this.selection.points, this.palette.getAll());
+    this.sceneSync.setLivePreview(this.selection.points, this.palette.getAll(), this.strokeWeight);
   };
 
   /**
@@ -640,7 +672,7 @@ export class ThreeApp {
 
     this.selection.add(nearest.copy());
     this.sceneSync.setSelectionGuide(this.selection.points);
-    this.sceneSync.setLivePreview(this.selection.points, this.palette.getAll());
+    this.sceneSync.setLivePreview(this.selection.points, this.palette.getAll(), this.strokeWeight);
   };
 
   /** Fits the Drawing Mode camera's frustum to the board's *current* size/the *current* viewport - called on every resize and every Grid Size change, so it's always correct the instant Drawing Mode is entered. */
