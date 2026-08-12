@@ -463,6 +463,25 @@ Full `vitest run`: 37 files / 252 tests passing (+10 net new - `StrokePalette.te
 `onChange` describe block, `Curve.test.js` new entirely). Manual/visual verification not yet run — per
 the `no-e2e` skill, only on explicit request.
 
+## Follow-up (post-epic, user-requested): N+1 division layer-height spec
+
+Bug/spec change: layer heights used to divide the nail height into `N` equal sections and place layer
+`i` (1-based) at `i/N` - meaning the *last* layer always sat at exactly 100% of the nail height (right
+at the tip, no margin), while the first layer's margin below it (`1/N`) was asymmetric with that. New
+spec: divide into `N+1` equal sections instead, placing layer `i` at `i/(N+1)` - an equal margin at
+both ends (`1/(N+1)`), so the last layer never touches the tip and the first never touches the board.
+
+Single-line fix, all in the already-pure, already-tested `core/curveZLayers.js`:
+`normalizedColorLayerHeight` changed from `(index + 1) / count` to `(index + 1) / (count + 1)` - the
+one formula both the 3D curve renderer (`SceneSync#buildWeaveObject`) and its own doc/tests derive
+from, so nothing else needed to change. `curveZLayers.test.js` rewritten for the new expected values
+(1/11, 2/11, ..., 10/11 at count=10, not 0.1, 0.2, ..., 1.0) plus two new tests - the last layer stays
+strictly below 1 and the first stays strictly above 0 for any count, and the bottom/top margins are
+provably equal (both exactly one division of `N+1`). `SceneSync`'s own class doc updated to match.
+
+Full `vitest run`: 37 files / 254 tests passing (+2 net new). Manual/visual verification not yet run —
+per the `no-e2e` skill, only on explicit request.
+
 ## Status legend
 
 `[x]` done and verified · `[~]` partially done, scope noted · `[ ]` not started

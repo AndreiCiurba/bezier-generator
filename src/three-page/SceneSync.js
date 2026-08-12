@@ -156,11 +156,14 @@ const innerNailMaterial = new THREE.MeshStandardMaterial({ color: DEFAULT_NAIL_C
  *
  * String height model (confirmed spec): a string's height is driven by its
  * *color/weave-layer index within its own curve*, not by which curve it is -
- * with N colors, layer index `i` (0-based) sits at `(i+1)/N` of the current
- * nail height (see `core/curveZLayers.js`). Every curve sharing the same
- * color count therefore shares the same absolute per-layer heights, and
- * adding/removing *other* curves never shifts anything - height is baked
- * directly into each segment's own vertices (not a whole-object transform).
+ * with N colors, layer index `i` (0-based) sits at `(i+1)/(N+1)` of the
+ * current nail height - N+1 equal divisions, one layer per interior division
+ * point, so there's an equal margin at the board *and* the nail tip, and the
+ * last layer never sits directly on the tip (see `core/curveZLayers.js`).
+ * Every curve sharing the same color count therefore shares the same
+ * absolute per-layer heights, and adding/removing *other* curves never
+ * shifts anything - height is baked directly into each segment's own
+ * vertices (not a whole-object transform).
  */
 export class SceneSync {
   /**
