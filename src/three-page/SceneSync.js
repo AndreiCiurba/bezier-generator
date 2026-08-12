@@ -7,6 +7,7 @@ import { to3D } from './axisMapping.js';
 import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { computeWeaveSegments } from '../core/weaveMath.js';
+import { nailPositionsForCurve } from '../core/nailPositions.js';
 
 // Same margin-around-the-grid-bounding-box convention as App.js's own
 // GRID_PADDING - the board shouldn't hug the outermost nails flush against
@@ -29,6 +30,19 @@ const HEAD_RADIUS = 5;
 const SHAFT_FRACTION = 0.97; // the shaft is the bottom 97% of the nail; the head caps the top 3%
 const NAIL_RADIAL_SEGMENTS = 10;
 export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from the wood-toned board
+
+// Slimmer "inner" nails standing at every one of a drawn curve's own weave
+// subdivision points (between its control points) - not part of the base
+// lattice, and only materializing for curves that have actually been drawn
+// (hand-built or stamped from a pattern). This is the 3D-page counterpart of
+// the 2D page's own PNG export ("nails" export - see ExportRenderer.js/
+// nailPositionsForCurve.js): a real board needs small physical pins along
+// each weave path, not just at the main grid nails, and the same shape - a
+// visibly thinner shaft *and* head than the primary lattice nails - reads
+// unmistakably as "secondary/auxiliary," not more main nails.
+const INNER_NAIL_SHAFT_RADIUS = 1;
+const INNER_NAIL_HEAD_RADIUS = 2.5;
+const INNER_NAIL_RADIAL_SEGMENTS = 8; // fewer facets than the main nails' 10 - there can be many of these, and each is small enough on screen that it barely matters
 
 // Screen-space pixel width for every woven string - native WebGL lines are
 // capped at ~1px on most desktop GPU/driver combos, too thin to read as
@@ -81,20 +95,22 @@ const _scale = new THREE.Vector3(1, 1, 1);
 const _color = new THREE.Color();
 
 /**
- * Builds the shared per-nail geometry once: a slim shaft (local Y in
+ * Builds a nail's shared geometry: a slim shaft (local Y in
  * [0, SHAFT_FRACTION]) merged with a wider, flatter head (local Y in
  * [SHAFT_FRACTION, 1]) into a single `BufferGeometry`, so every nail instance
  * still costs exactly one draw call (`InstancedMesh` needs one geometry, not
- * two meshes per nail).
+ * two meshes per nail). Radii/facet count are parameters, not the main
+ * lattice nail's own constants, so the same builder produces the slimmer
+ * "inner" nail shape too (see INNER_NAIL_*).
  */
-function buildNailGeometry() {
+function buildNailGeometry(shaftRadius, headRadius, radialSegments = NAIL_RADIAL_SEGMENTS) {
   const shaftHeight = SHAFT_FRACTION;
   const headHeight = 1 - SHAFT_FRACTION;
 
-  const shaft = new THREE.CylinderGeometry(SHAFT_RADIUS, SHAFT_RADIUS, shaftHeight, NAIL_RADIAL_SEGMENTS);
+  const shaft = new THREE.CylinderGeometry(shaftRadius, shaftRadius, shaftHeight, radialSegments);
   shaft.translate(0, shaftHeight / 2, 0); // base at local y=0
 
-  const head = new THREE.CylinderGeometry(HEAD_RADIUS, HEAD_RADIUS, headHeight, NAIL_RADIAL_SEGMENTS);
+  const head = new THREE.CylinderGeometry(headRadius, headRadius, headHeight, radialSegments);
   head.translate(0, shaftHeight + headHeight / 2, 0); // sits right on top of the shaft
 
   const merged = mergeGeometries([shaft, head]);
@@ -102,6 +118,13 @@ function buildNailGeometry() {
   head.dispose();
   return merged;
 }
+
+// Shared, module-level "inner nail" geometry/material - built once and
+// reused by every instance of the combined InstancedMesh #rebuildInnerNails
+// creates (only the mesh's own instance count varies as curves are added/
+// removed - see that method), same reuse rationale as the pin markers above.
+const innerNailGeometry = buildNailGeometry(INNER_NAIL_SHAFT_RADIUS, INNER_NAIL_HEAD_RADIUS, INNER_NAIL_RADIAL_SEGMENTS);
+const innerNailMaterial = new THREE.MeshStandardMaterial({ color: DEFAULT_NAIL_COLOR });
 
 /**
  * Owns every `THREE.*` object in the scene and incrementally syncs it from
@@ -139,6 +162,8 @@ export class SceneSync {
     this.selectionGuide = null; // Drawing Mode's in-progress polyline, built lazily
     this.livePreview = null; // Drawing Mode's live woven-curve preview (>= 3 points), built lazily
     this.pinGroup = null; // Deformation pin markers, rebuilt wholesale on every change (see setDeformationPins)
+    this.innerNailMesh = null; // slimmer weave-subdivision nails for every drawn curve, rebuilt wholesale on every curve-store change (see #rebuildInnerNails)
+    this._innerNailPoints = []; // cached design-space positions behind innerNailMesh - reused by setNailHeight so a height change doesn't need to recompute them
     this._lastSelectionPoints = null;
     this._lastPreview = null;
     this.#adopt(grid, deformation);
@@ -146,8 +171,12 @@ export class SceneSync {
     // The store instance itself never changes across a grid-size rebuild
     // (only `grid`/`deformation` are swapped - see `setGrid`), so this is a
     // one-time subscription, not something `#adopt` needs to redo.
-    this.design.curveStore.onChange(() => this.#syncCurves());
+    this.design.curveStore.onChange(() => {
+      this.#syncCurves();
+      this.#rebuildInnerNails();
+    });
     this.#syncCurves();
+    this.#rebuildInnerNails();
   }
 
   /**
@@ -194,6 +223,10 @@ export class SceneSync {
     if (height === this.nailHeight) return;
     this.nailHeight = height;
     this.#writeNailMatrices();
+    // Inner nails span the same board-to-nail-height range as the main
+    // lattice (see #rebuildInnerNails) - same "matrix-only, no geometry
+    // rebuild" treatment, reusing the already-computed point list.
+    if (this.innerNailMesh) this.#writeInnerNailMatrices(this._innerNailPoints);
     this.#rebuildAllCurveObjects();
     if (this._lastSelectionPoints) this.setSelectionGuide(this._lastSelectionPoints);
     if (this._lastPreview) this.setLivePreview(this._lastPreview.points, this._lastPreview.colors);
@@ -398,7 +431,7 @@ export class SceneSync {
    * geometry rebuild, only new matrices.
    */
   #buildNails() {
-    const geometry = buildNailGeometry();
+    const geometry = buildNailGeometry(SHAFT_RADIUS, HEAD_RADIUS);
     const material = new THREE.MeshStandardMaterial({ color: this.nailColor });
     const count = this.deformation.points.length;
     this.nailMesh = new THREE.InstancedMesh(geometry, material, count);
@@ -424,6 +457,53 @@ export class SceneSync {
     this.nailMesh.geometry.dispose();
     this.nailMesh.material.dispose();
     this.nailMesh = null;
+  }
+
+  /**
+   * Rebuilds the combined "inner nail" `InstancedMesh` from every *visible*
+   * curve's own weave subdivision points (`nailPositionsForCurve` - the same
+   * pure math the 2D page's PNG export already uses, just ported to 3D) -
+   * called whenever the curve store changes (add/undo/clear/visibility) so
+   * it always matches exactly the curves currently being rendered. A hidden
+   * curve's inner nails disappear along with its strings, and the
+   * in-progress selection (not yet committed) never gets any - matches "only
+   * apply to shapes already drawn."
+   *
+   * `InstancedMesh`'s instance count is fixed at construction, so unlike a
+   * nail-height change (matrix-only, see `setNailHeight`), a *different
+   * number* of inner nails needs a new `InstancedMesh` - but never new
+   * geometry/materials, which stay the shared module-level singletons
+   * (`innerNailGeometry`/`innerNailMaterial`) for the page's entire
+   * lifetime, so there's nothing to dispose on the old one before removing it.
+   */
+  #rebuildInnerNails() {
+    if (this.innerNailMesh) {
+      this.scene.remove(this.innerNailMesh);
+      this.innerNailMesh = null;
+    }
+
+    this._innerNailPoints = [];
+    for (const entry of this.design.visibleCurves) {
+      this._innerNailPoints.push(...nailPositionsForCurve(entry.curve).innerPoints);
+    }
+    if (this._innerNailPoints.length === 0) return;
+
+    this.innerNailMesh = new THREE.InstancedMesh(innerNailGeometry, innerNailMaterial, this._innerNailPoints.length);
+    this.#writeInnerNailMatrices(this._innerNailPoints);
+    this.scene.add(this.innerNailMesh);
+  }
+
+  /** Same per-instance Y-scale-to-nail-height treatment as `#writeNailMatrices` - inner nails stand the full board-to-nail-height span too, just with a slimmer geometry (see INNER_NAIL_* / class doc). */
+  #writeInnerNailMatrices(points) {
+    _quaternion.identity();
+    _scale.set(1, this.nailHeight, 1);
+    for (let i = 0; i < points.length; i++) {
+      const world = this.toWorldPosition(points[i], 0);
+      _position.set(world.x, world.y, world.z);
+      _matrix.compose(_position, _quaternion, _scale);
+      this.innerNailMesh.setMatrixAt(i, _matrix);
+    }
+    this.innerNailMesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
@@ -548,11 +628,16 @@ export class SceneSync {
     // Not disposed here: every pin-marker Mesh only ever references the
     // shared module-level pinDotGeometry/pinRingGeometry/materials (see
     // setDeformationPins) - those are meant to outlive any single SceneSync
-    // instance, the same "reuse, don't own" contract InstancedMesh's shared
-    // nail geometry already follows.
+    // instance, not be owned/destroyed by it.
     if (this.pinGroup) {
       this.scene.remove(this.pinGroup);
       this.pinGroup = null;
+    }
+    // Same "shared, don't own" contract as the pin markers - innerNailMesh
+    // only ever references the module-level innerNailGeometry/innerNailMaterial.
+    if (this.innerNailMesh) {
+      this.scene.remove(this.innerNailMesh);
+      this.innerNailMesh = null;
     }
   }
 }

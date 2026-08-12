@@ -351,6 +351,42 @@ fully done: an explicit live/browser verification pass across all of it (deliber
 throughout per the `no-e2e` skill), and a decision on whether the known curve-count draw-call scaling
 characteristic above needs addressing for realistic large designs.
 
+## Follow-up (post-epic, user-requested): slimmer weave-subdivision nails
+
+Not one of the epic's own numbered steps - a direct fidelity request, explicitly modeled on the 2D
+page's own PNG "nails" export (`ExportRenderer`/`nailPositionsForCurve.js`): a physical board doesn't
+just have nails at the control points a curve was actually clicked through - the weave passes through
+extra intermediate points along each edge (`colors.length` segments per edge, same "more colors → more,
+closer subdivision points" math the export already uses), and a real board needs a small pin at each
+one too.
+
+`SceneSync` now builds a second, combined `InstancedMesh` ("inner nails") from every *visible* curve's
+`nailPositionsForCurve(curve).innerPoints` - the exact same pure function/math the 2D export already
+uses, no new geometry logic invented. Design decisions:
+- **Visibly slimmer than the main lattice nails** - both shaft and head radius roughly halved
+  (`INNER_NAIL_SHAFT_RADIUS`/`INNER_NAIL_HEAD_RADIUS` vs. the main nails' `SHAFT_RADIUS`/`HEAD_RADIUS`)
+  - reads as secondary/auxiliary, not more main nails. `buildNailGeometry` (previously hardcoded to
+    the main nail's own constants) now takes radii/facet-count parameters so the exact same builder
+    produces both shapes.
+- **Same full board-to-nail-height span as the main nails** (not one small nail per color layer at
+  each layer's own Z) - this mirrors the 2D export's own model, where every nail (control or inner)
+  is the *same kind* of physical nail regardless of which color happens to pass through it, matching
+  how a real board is actually nailed (one tall nail per hole; different colored wraps happen at
+  different heights along the *same* nail, which is exactly what this app's existing per-layer-Z
+  curve model already visualizes).
+- **Only for already-drawn curves** - built from `design.visibleCurves`, so a hidden curve's inner
+  nails disappear along with its strings (same trigger, `curveStore.onChange`, as the existing curve
+  sync), and the in-progress Drawing Mode selection (not yet committed) never gets any.
+- **Geometry/materials are shared module-level singletons** (`innerNailGeometry`/`innerNailMaterial`),
+  applying the same reuse lesson Slice 8 had just established for the pin markers - only the
+  `InstancedMesh`'s own instance *count* changes as curves are added/removed/hidden, never the
+  geometry it points at. A nail-height change reuses the already-computed point list and only
+  rewrites the instance-matrix buffer (no rebuild), same treatment as the main lattice.
+
+Full `vitest run`: 36 files / 242 tests passing (unchanged - `SceneSync` stays outside the unit-test
+boundary, same as every other Three-touching change in this doc). Manual/visual verification not yet
+run — per the `no-e2e` skill, only on explicit request.
+
 ## Status legend
 
 `[x]` done and verified · `[~]` partially done, scope noted · `[ ]` not started
