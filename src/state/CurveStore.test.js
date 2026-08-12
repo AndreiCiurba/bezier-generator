@@ -36,6 +36,23 @@ describe('Curve#belongsToPattern', () => {
   });
 });
 
+describe('Curve id/visible', () => {
+  it('every curve gets its own id', () => {
+    const a = new Curve([], []);
+    const b = new Curve([], []);
+    expect(a.id).toBeTruthy();
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it('defaults to visible', () => {
+    expect(new Curve([], []).visible).toBe(true);
+  });
+
+  it('an explicit visible value is honored', () => {
+    expect(new Curve([], [], null, null, false).visible).toBe(false);
+  });
+});
+
 describe('CurveStore', () => {
   it('add/undo/clear', () => {
     const store = new CurveStore();
@@ -62,5 +79,59 @@ describe('CurveStore', () => {
     expect(store.hasCurveForPattern('p1')).toBe(true);
     expect(store.hasCurveForPattern('p3')).toBe(false);
     expect(store.curvesForPattern('p1')).toHaveLength(2);
+  });
+
+  it('visibleCurves reflects only currently-visible curves, in store order', () => {
+    const store = new CurveStore();
+    const a = new Curve([], []);
+    const b = new Curve([], []);
+    store.add(a);
+    store.add(b);
+    expect(store.visibleCurves).toEqual([a, b]);
+
+    store.setVisible(a.id, false);
+    expect(store.visibleCurves).toEqual([b]);
+  });
+
+  it('setVisible is a no-op for an unknown curve id', () => {
+    const store = new CurveStore();
+    const a = new Curve([], []);
+    store.add(a);
+    store.setVisible('does-not-exist', false);
+    expect(a.visible).toBe(true);
+  });
+
+  it('onChange fires on add/undo/clear/setVisible, and the returned unsubscribe stops it', () => {
+    const store = new CurveStore();
+    let calls = 0;
+    const unsubscribe = store.onChange(() => calls++);
+
+    const a = new Curve([], []);
+    store.add(a);
+    expect(calls).toBe(1);
+
+    store.setVisible(a.id, false);
+    expect(calls).toBe(2);
+
+    store.undo();
+    expect(calls).toBe(3);
+
+    store.clear();
+    expect(calls).toBe(4);
+
+    unsubscribe();
+    store.add(new Curve([], []));
+    expect(calls).toBe(4);
+  });
+
+  it('setVisible does not notify when the value is unchanged (already at that visibility)', () => {
+    const store = new CurveStore();
+    const a = new Curve([], []);
+    store.add(a);
+    let calls = 0;
+    store.onChange(() => calls++);
+
+    store.setVisible(a.id, true); // already true
+    expect(calls).toBe(0);
   });
 });

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>String Art 3D Visualizer</title>
+
+  <!-- No bundler in this repo (see package.json) - Three.js loaded straight
+       from a version-pinned CDN build via an import map, the same "pin an
+       exact version" convention as p5.js's own CDN <script> tag. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="../src/three-page/bootstrap.js"></script>
+
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/three-page.css">
+</head>
+
+<body>
+  <div class="page-nav">
+    <a href="../" class="page-nav-link">&larr; Grid</a>
+    <a href="../freestyle/" class="page-nav-link">Freestyle</a>
+  </div>
+
+  <!-- Burger Menu Button -->
+  <div id="burger">&#9776;</div>
+
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="panel hidden">
+    <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
+
+    <!-- Grid Size Submenu - the board is always a square N x N lattice; a preset
+         dropdown (applies immediately) plus a custom field cover any N. -->
+    <div id="gridSizeSubmenu" class="panel hidden">
+      <button id="closeGridSizeSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Grid Size</div>
+
+      <select id="gridSizePreset"></select>
+
+      <input id="gridSizeCustomInput" type="number" min="3" max="41" step="1" placeholder="e.g. 13" />
+      <button id="applyGridSizeBtn" class="menu-btn">Apply</button>
+    </div>
+
+    <!-- Board thickness/color - the physical board mesh's configurable properties -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="boardThicknessInput" style="font-size: 11px; color: #EEEEEE;">Board Thickness</label>
+      <input id="boardThicknessInput" type="number" min="1" max="200" step="1" style="width: 100%;" />
+      <button id="applyBoardThicknessBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="boardColorInput" style="font-size: 11px; color: #EEEEEE;">Board Color</label>
+      <input id="boardColorInput" type="color" />
+    </div>
+
+    <!-- Nail height - global Z control for every nail and every curve's Z-layer range -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="nailHeightInput" style="font-size: 11px; color: #EEEEEE;">Nail Height</label>
+      <input id="nailHeightInput" type="number" min="1" max="300" step="1" style="width: 100%;" />
+      <button id="applyNailHeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Curves Submenu - every committed curve in Z-layer order, with a show/hide checkbox
+         each. Same shared curve-visibility feature as the 2D grid page (src/ui/CurvesUI.js) -
+         a hidden curve disappears from both renderers, not just one. -->
+    <div id="curvesSubmenu" class="panel hidden">
+      <button id="closeCurvesSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Curves</div>
+      <ul id="curvesList"
+        style="max-height: 200px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+    </div>
+
+    <!-- Number of colors: also sets the weave's subdivision fineness and line weight 1:1 -
+         same shared field/classes as both p5 pages. -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
+      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Stroke weight: set directly (independent of color count) to match the artist's actual thread thickness -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <label for="strokeWeightInput" style="font-size: 11px; color: #EEEEEE;">Stroke Weight</label>
+      <input id="strokeWeightInput" type="number" min="0.1" max="30" step="0.1" style="width: 100%;" />
+      <button id="applyStrokeWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Populated by ColorPickerUI from the palette (size set above) -->
+    <div id="colorPickerContainer"></div>
+
+    <!-- Colors Submenu (favorite bundle save/export/import/apply) - same shared FavoritesUI both p5 pages use -->
+    <div id="colorFavoritesSubmenu" class="panel hidden">
+      <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div id="favoriteBundlesContainer"></div>
+      <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+      <button id="exportColorsBtn" class="menu-btn">Export</button>
+      <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
+      <button id="importColorsBtn" class="menu-btn">Import</button>
+    </div>
+
+    <!-- Pattern Submenu - same shared PatternUI/PatternStamper the 2D grid page uses (Manual/Auto toggle included) -->
+    <div id="patternSubmenu" class="panel hidden">
+      <button id="closePatternSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
+
+      <input id="patternNameInput" type="text" placeholder="name..." />
+      <button id="saveCurrentPatternBtn" class="menu-btn">Save Current</button>
+
+      <ul id="savedPatternsList"
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+
+      <button id="exportPatternBtn" class="menu-btn">Export Pattern</button>
+      <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
+      <button id="importPatternBtn" class="menu-btn">Import Pattern</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern type</div>
+      <button id="toggleBtn" class="menu-btn">Manual</button>
+    </div>
+
+    <!-- Drawing Mode - ON locks the camera to an exact top-down orthographic view (no
+         orbit/pan/zoom) and lets clicks select nails/build curves, same as the 2D grid tool's
+         manual curve-building flow. OFF returns to free perspective inspection, restoring the
+         exact camera viewpoint from before Drawing Mode was entered. -->
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <input id="drawingModeToggle" type="checkbox" />
+      Drawing Mode
+    </label>
+
+    <button id="openGridSizeBtn" class="menu-btn">Grid Size</button>
+    <button id="openCurvesBtn" class="menu-btn">Curves</button>
+    <button id="openPatternBtn" class="menu-btn">Patterns</button>
+    <button id="openFavoritesBtn" class="menu-btn">Colors</button>
+    <button id="resetCameraBtn" class="menu-btn">Reset Camera</button>
+    <button id="resetBtn" class="menu-btn">Reset</button>
+    <button id="clearAllBtn" class="menu-btn">Clear All Points</button>
+    <button id="undoBtn" class="menu-btn">Undo</button>
+    <button id="undoLineBtn" class="menu-btn">Undo Line</button>
+  </div>
+
+  <canvas id="three-canvas"></canvas>
+</body>
+
+</html>

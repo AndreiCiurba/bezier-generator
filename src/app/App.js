@@ -4,6 +4,7 @@ import { CanvasView } from '../core/CanvasView.js';
 import { StringArtRenderer } from '../core/StringArtRenderer.js';
 import { Point } from '../core/Point.js';
 import { DeformableGrid, DEFAULT_PIN_RADIUS, DEFAULT_PIN_FALLOFF } from '../core/DeformableGrid.js';
+import { DesignModel } from '../core/DesignModel.js';
 import { Curve } from '../models/Curve.js';
 import { CurveStore } from '../state/CurveStore.js';
 import { SelectionStore } from '../state/SelectionStore.js';
@@ -18,6 +19,7 @@ import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { DeformationUI } from '../ui/DeformationUI.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
+import { CurvesUI } from '../ui/CurvesUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
@@ -79,6 +81,10 @@ export class App {
     this.selection = new SelectionStore();
     this.patterns = new PatternStore();
     this.stamper = new PatternStamper(this.deformation, this.viewport, this.curves, this.patterns);
+    // The shared design-model boundary (nails + ordered/visible curves) both
+    // this page's own draw/export paths and the 3D visualizer read from -
+    // see DesignModel.js. Never mutated, only read.
+    this.design = new DesignModel(this.deformation, this.curves);
 
     // Pan-drag state.
     this.isDragging = false;
@@ -178,6 +184,18 @@ export class App {
     );
     this.deformationUI.init();
 
+    this.curvesUI = new CurvesUI(
+      {
+        panelEl: document.getElementById('curvesSubmenu'),
+        openBtn: document.getElementById('openCurvesBtn'),
+        closeBtn: document.getElementById('closeCurvesSubmenuBtn'),
+        listEl: document.getElementById('curvesList'),
+      },
+      this.curves,
+      submenuGroup
+    );
+    this.curvesUI.init();
+
     this.colorCountUI = new ColorCountUI(
       {
         input: document.getElementById('colorCountInput'),
@@ -246,7 +264,7 @@ export class App {
 
     CanvasView.drawGridDots(this.deformation.points);
 
-    for (const curve of this.curves.curves) {
+    for (const { curve } of this.design.visibleCurves) {
       if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
@@ -362,7 +380,7 @@ export class App {
    * faithful "what you see" snapshot).
    */
   #curvesForExport() {
-    const curves = this.curves.curves.slice();
+    const curves = this.design.visibleCurves.map((entry) => entry.curve);
     if (this.selection.isReadyForCurve()) {
       curves.push(new Curve(this.selection.points, this.palette.getAll(), null, this.strokeWeight));
     }

@@ -34,7 +34,9 @@
 #colorFavoritesSubmenu,
 #patternSubmenu,
 #canvasSizeSubmenu,
-#deformationSubmenu {
+#deformationSubmenu,
+#curvesSubmenu,
+#gridSizeSubmenu {
   position: absolute;
   top: 0;
   left: calc(100% + 10px); /* anchored just to the right of #ui */
@@ -64,13 +66,18 @@
   color: var(--close-btn-color-hover);
 }
 
-/* ---- Cross-page nav link (top-right corner, both pages) ---- */
+/* ---- Cross-page nav links (top-right corner, all pages) ---- */
 
-.page-nav-link {
+.page-nav {
   position: fixed;
   top: 10px;
   right: 10px;
   z-index: var(--z-burger);
+  display: flex;
+  gap: 8px;
+}
+
+.page-nav-link {
   font-family: var(--ui-font-family);
   font-size: 13px;
   background: var(--burger-bg);

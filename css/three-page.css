@@ -1,0 +1,20 @@
+/**
+ * 3D page only: the Three.js canvas fills the whole viewport (unlike the p5
+ * pages' small, centered, fixed-size canvas - see canvas-frame.css) - the
+ * standard layout for an interactive 3D scene the user orbits/pans/zooms
+ * around freely, not a fixed print-sized board.
+ */
+
+body {
+  margin: 0;
+  background: var(--canvas-page-bg);
+  overflow: hidden;
+}
+
+#three-canvas {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}

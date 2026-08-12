@@ -16,7 +16,10 @@
 </head>
 
 <body>
-  <a href="freestyle/" class="page-nav-link">Freestyle &rarr;</a>
+  <div class="page-nav">
+    <a href="freestyle/" class="page-nav-link">Freestyle &rarr;</a>
+    <a href="3d/" class="page-nav-link">3D &rarr;</a>
+  </div>
 
   <!-- Burger Menu Button -->
   <div id="burger">&#9776;</div>
@@ -91,6 +94,16 @@
       <button id="resetDeformationBtn" class="menu-btn">Reset Deformation</button>
     </div>
 
+    <!-- Curves Submenu - shows every committed curve in draw (Z-layer) order, with a
+         show/hide checkbox each. Shared visibility state - a hidden curve disappears
+         from both this 2D canvas and the 3D visualizer. -->
+    <div id="curvesSubmenu" class="panel hidden">
+      <button id="closeCurvesSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Curves</div>
+      <ul id="curvesList"
+        style="max-height: 200px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+    </div>
+
     <!-- Number of colors: also sets the weave's subdivision fineness and line weight 1:1 -->
     <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
       <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
@@ -109,6 +122,7 @@
     <div id="colorPickerContainer"></div>
 
     <button id="openDeformationBtn" class="menu-btn">Deform Grid</button>
+    <button id="openCurvesBtn" class="menu-btn">Curves</button>
     <button id="openPatternBtn" class="menu-btn">Patterns</button>
     <button id="openFavoritesBtn" class="menu-btn">Colors</button>
     <button id="resetBtn" class="menu-btn">Reset</button>

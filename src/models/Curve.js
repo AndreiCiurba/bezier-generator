@@ -1,5 +1,14 @@
 import { strokeWeightForColorCount } from '../core/strokeWeight.js';
 
+// Curve ids are purely internal bookkeeping (never exported/imported/
+// persisted like Pattern ids are), so a plain local counter is enough - same
+// reasoning as Pin's `generatePinId` in DeformableGrid.js - no need for
+// utils/id.js's real (CDN-sourced) uuid here.
+let nextCurveId = 0;
+function generateCurveId() {
+  return `curve-${nextCurveId++}`;
+}
+
 /**
  * One woven string-art curve sitting on the canvas: an ordered path of nails plus
  * the stroke colors used to weave it. Produced either by finishing a manual
@@ -15,12 +24,18 @@ export class Curve {
    *   `null` (the grid tool's only behavior, unchanged) falls back to the
    *   live `strokeWeightForColorCount(colors.length)` derivation instead -
    *   see `renderWeight`.
+   * @param {boolean} visible whether this curve currently renders/exports -
+   *   see CurveStore#setVisible, the only place this should ever be flipped
+   *   after construction (so listeners get notified). Defaults to visible,
+   *   so no existing call site needs to change.
    */
-  constructor(points, colors, patternId = null, weight = null) {
+  constructor(points, colors, patternId = null, weight = null, visible = true) {
+    this.id = generateCurveId();
     this.points = points;
     this.colors = colors;
     this.patternId = patternId;
     this.weight = weight;
+    this.visible = visible;
     // Once true, live edits to the palette stop repainting this curve - it's
     // "locked in". Curves stamped from the currently-selected pattern start
     // false so they pick up one live recolor before locking.
