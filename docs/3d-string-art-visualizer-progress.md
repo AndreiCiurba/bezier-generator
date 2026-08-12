@@ -297,9 +297,59 @@ concrete design/rationale behind each decision below.
       `setGrid` re-anchoring against a resized grid. Full `vitest run`: 36 files / 242 tests passing
       (+4 net new). Manual/visual verification of the fix on the actual 3D page not yet run — per the
       `no-e2e` skill, only on explicit request.
-- [ ] **Slice 8 — Performance, polish, regression** (Step 11)
-      Perf check at the default 15×13 grid, geometry/material dispose audit, full `vitest run`,
-      manual regression check on `/` and `/freestyle`.
+- [x] **Slice 8 — Performance, polish, regression** (Step 11)
+      A static code audit (no live/browser stress test - see below), going through every
+      `new THREE.*Geometry`/`*Material` construction site in `src/three-page/` against its dispose
+      path:
+      - **Board** (`SceneSync`): material built once, reused for the board's whole lifetime -
+        thickness changes only dispose/rebuild the *geometry*, color changes mutate the existing
+        material's `.color` in place. Already correct since Slice 2.
+      - **Nails**: one `InstancedMesh`/one draw call regardless of grid size; per-nail transform lives
+        in the instance-matrix buffer, not per-object geometry - a nail-height change only rewrites
+        that buffer. Geometry/material only rebuilt on an actual grid-size change (`setGrid`), and
+        `#disposeNails` runs first every time. Already correct since Slice 3.
+      - **Curves**: one `LineSegments2`/geometry/material per curve (each curve's own vertex colors
+        make sharing a material impossible) - `#syncCurves` diffs by id and only disposes+rebuilds
+        ids that actually left the store, never touches surviving curves' geometry for an unrelated
+        add/undo. A nail-height change *does* rebuild every curve (color-layer height is baked into
+        vertices, not a transform - documented, deliberate). Already correct since Slice 4. **Known,
+        accepted scaling characteristic, not a bug**: this is one draw call *per curve*, so a design
+        with hundreds of curves (e.g. Auto-stamping a pattern across a large grid) means hundreds of
+        draw calls - no batching across curves exists. Left as-is: batching would cost the
+        add/remove/dispose-by-id simplicity `#syncCurves` relies on, for a win that can't be measured
+        without a live GPU (no-e2e), on top of an already-large slice.
+      - **Deformation pin markers** (new in Slice 7): *this one wasn't right* - `setDeformationPins`
+        built a brand-new `CircleGeometry`/`RingGeometry`/two `MeshBasicMaterial`s from scratch on
+        *every single call*, and a pin drag calls it on every `pointermove` - potentially dozens of
+        times a second while dragging. Fixed: `pinDotGeometry`/`pinDotMaterial`/`pinRingGeometry`/
+        `pinRingMaterial` are now module-level singletons, built once and reused by every pin
+        `Mesh` (a `Mesh` itself is just a transform + shared references, cheap to recreate). The ring
+        is a thin unit annulus scaled per-instance via `mesh.scale` to each pin's actual radius,
+        rather than baking the radius into the geometry - keeps it shareable too. `dispose()` updated
+        to match: pin markers are no longer disposed there (they don't own their geometry/material
+        any more than `InstancedMesh`'s shared nail geometry does).
+      - **Gizmo** (`OrientationGizmo`): everything built once in the constructor; `render()` reuses
+        scratch `Vector2`/`Vector3`s, no per-frame allocation. Already correct since Slice 5.
+      - **Drawing Mode camera raycasting**: reuses scratch `Raycaster`/`Vector2`/`Vector3`, no
+        per-call allocation. Already correct since Slice 6.
+      No accumulation of stale objects found anywhere else; `#animate`'s per-frame work
+      (`controls.update`/`renderer.render`/`gizmo.render`) allocates nothing new per frame either.
+      Full `vitest run`: 36 files / 242 tests passing (unchanged - this slice touched only
+      already-outside-the-test-boundary `SceneSync` internals). "No regression in 2D functionality"
+      verified by review rather than by running the page: `App.js`/`FreestyleApp.js` are untouched by
+      every 3D-only change in Slices 1-8, and the one change that *does* touch shared code (Slice 7's
+      follow-up `PatternStamper` fix) is covered by its own updated/expanded test suite, which is
+      green.
+      **Not run - live/manual verification, per the `no-e2e` skill (only on explicit request)**:
+      actual FPS/responsiveness at a large (41×41) grid or a many-curve design, live resize behavior,
+      Drawing Mode enter/exit transitions, a live deformation drag, and a live regression pass on `/`
+      and `/freestyle` in an actual browser. Say the word (or "test in the browser") if you want that
+      pass run.
+
+This closes every step (1-11) in the epic's own breakdown. Remaining before calling the epic itself
+fully done: an explicit live/browser verification pass across all of it (deliberately deferred
+throughout per the `no-e2e` skill), and a decision on whether the known curve-count draw-call scaling
+characteristic above needs addressing for realistic large designs.
 
 ## Status legend
 

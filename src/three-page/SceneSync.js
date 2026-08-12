@@ -55,6 +55,25 @@ const PIN_RADIUS_RING_OPACITY = 0.18;
 // heads so they never look like they're floating at nail height.
 const PIN_MARKER_HEIGHT = 1;
 
+// Shared, module-level pin-marker geometry/material - built once and reused
+// by every `Mesh` `setDeformationPins` creates, rather than allocating a
+// fresh geometry+material per pin on every call (Step 11's "reuse Three.js
+// materials where possible" / "avoid unnecessary geometry recreation" -
+// worth doing here specifically because a pin drag calls this once per
+// `pointermove`, potentially many times a second). The ring is a thin unit
+// annulus (5% of its own radius wide) *scaled* per-instance to each pin's
+// actual radius via `mesh.scale`, so its geometry never needs to vary either.
+const pinDotGeometry = new THREE.CircleGeometry(PIN_DOT_RADIUS, 24);
+const pinDotMaterial = new THREE.MeshBasicMaterial({ color: PIN_COLOR, side: THREE.DoubleSide, depthWrite: false });
+const pinRingGeometry = new THREE.RingGeometry(0.95, 1, 48);
+const pinRingMaterial = new THREE.MeshBasicMaterial({
+  color: PIN_RADIUS_RING_COLOR,
+  transparent: true,
+  opacity: PIN_RADIUS_RING_OPACITY,
+  side: THREE.DoubleSide,
+  depthWrite: false,
+});
+
 const _matrix = new THREE.Matrix4();
 const _position = new THREE.Vector3();
 const _quaternion = new THREE.Quaternion();
@@ -284,20 +303,21 @@ export class SceneSync {
    * Rebuilds the Deformation pin markers wholesale from the current pin set -
    * a flat dot per pin (matches the 2D page's `CanvasView.drawDeformationPins`
    * dot), plus a translucent ring at the selected pin's actual influence
-   * radius (matches that same function's selected-pin outline). Cheap enough
-   * to rebuild on every call (pin counts are small, a handful at most) that
-   * there's no need for the `curveLines`-style incremental diffing.
+   * radius (matches that same function's selected-pin outline), scaled from
+   * the shared unit-ring geometry rather than built at `pin.radius` directly.
+   * Rebuilding the `Group`/`Mesh` wrapper objects on every call is cheap
+   * (pin counts are small, a handful at most, and a `Mesh` is just a
+   * transform + shared geometry/material references, not its own GPU
+   * buffers) - see the module-level `pinDotGeometry`/`pinRingGeometry`
+   * comment for why the actual geometry/materials themselves are never
+   * recreated here, unlike an earlier version of this method.
    * @param {import('../models/Pin.js').Pin[]} pins
    * @param {import('../models/Pin.js').Pin|null} selectedPin
    */
   setDeformationPins(pins, selectedPin) {
     if (this.pinGroup) {
       this.scene.remove(this.pinGroup);
-      this.pinGroup.traverse((object) => {
-        object.geometry?.dispose();
-        object.material?.dispose();
-      });
-      this.pinGroup = null;
+      this.pinGroup = null; // every child mesh only references shared geometry/material - nothing owned to dispose
     }
     if (pins.length === 0) return;
 
@@ -306,25 +326,14 @@ export class SceneSync {
       const world = this.toWorldPosition(pin.position, PIN_MARKER_HEIGHT);
 
       if (pin === selectedPin) {
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(Math.max(pin.radius - 2, 0.1), pin.radius + 2, 48),
-          new THREE.MeshBasicMaterial({
-            color: PIN_RADIUS_RING_COLOR,
-            transparent: true,
-            opacity: PIN_RADIUS_RING_OPACITY,
-            side: THREE.DoubleSide,
-            depthWrite: false,
-          })
-        );
+        const ring = new THREE.Mesh(pinRingGeometry, pinRingMaterial);
         ring.rotation.x = -Math.PI / 2; // lay flat on the board's XZ plane (RingGeometry defaults to facing +Z)
+        ring.scale.set(pin.radius, pin.radius, 1); // the shared geometry is a unit ring - scale to this pin's actual radius
         ring.position.set(world.x, world.y, world.z);
         group.add(ring);
       }
 
-      const dot = new THREE.Mesh(
-        new THREE.CircleGeometry(PIN_DOT_RADIUS, 24),
-        new THREE.MeshBasicMaterial({ color: PIN_COLOR, side: THREE.DoubleSide, depthWrite: false })
-      );
+      const dot = new THREE.Mesh(pinDotGeometry, pinDotMaterial);
       dot.rotation.x = -Math.PI / 2;
       dot.position.set(world.x, world.y, world.z);
       group.add(dot);
@@ -536,12 +545,13 @@ export class SceneSync {
       this.livePreview.material.dispose();
       this.livePreview = null;
     }
+    // Not disposed here: every pin-marker Mesh only ever references the
+    // shared module-level pinDotGeometry/pinRingGeometry/materials (see
+    // setDeformationPins) - those are meant to outlive any single SceneSync
+    // instance, the same "reuse, don't own" contract InstancedMesh's shared
+    // nail geometry already follows.
     if (this.pinGroup) {
       this.scene.remove(this.pinGroup);
-      this.pinGroup.traverse((object) => {
-        object.geometry?.dispose();
-        object.material?.dispose();
-      });
       this.pinGroup = null;
     }
   }
