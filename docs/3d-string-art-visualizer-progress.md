@@ -387,6 +387,23 @@ Full `vitest run`: 36 files / 242 tests passing (unchanged - `SceneSync` stays o
 boundary, same as every other Three-touching change in this doc). Manual/visual verification not yet
 run — per the `no-e2e` skill, only on explicit request.
 
+**Follow-up to the follow-up (same request): toggle + 40% slimmer overall.** Two more asks in the same
+message:
+- **"Show Inner Nails" checkbox**, default checked (matches the feature's existing always-on
+  behavior) - `SceneSync#setInnerNailsVisible(visible)` is a cheap `.visible` flip on the existing
+  `InstancedMesh`, no rebuild, mirroring how a single curve's own visibility toggle already works in
+  `#syncCurves`. Since a curve-store change (`#rebuildInnerNails`) replaces the `InstancedMesh` object
+  wholesale, the chosen visibility has to be re-applied to the *new* object every time, not just set
+  once - `this.innerNailsVisible` is the persistent flag both paths read.
+- **All nails - control *and* inner - 40% slimmer**, both shaft and head. Rather than four
+  independently hand-edited radii, added one `NAIL_SLIMNESS_FACTOR = 0.6` multiplier applied to both
+  the main (`SHAFT_RADIUS`/`HEAD_RADIUS`) and inner (`INNER_NAIL_SHAFT_RADIUS`/
+  `INNER_NAIL_HEAD_RADIUS`) constants, so the relative "inner nails are visibly thinner than control
+  nails" proportion from the previous follow-up is preserved exactly, not just approximately re-eyeballed.
+
+Full `vitest run`: 36 files / 242 tests passing (unchanged). Manual/visual verification not yet run —
+per the `no-e2e` skill, only on explicit request.
+
 ## Status legend
 
 `[x]` done and verified · `[~]` partially done, scope noted · `[ ]` not started

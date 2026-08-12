@@ -163,6 +163,7 @@ export class ThreeApp {
     this.#initGridSizeControls();
     this.#initBoardControls();
     this.#initNailHeightControls();
+    this.#initInnerNailsToggle();
     this.#initDeformationControls();
     this.#initCurvesUI();
     this.#initCameraReset();
@@ -222,6 +223,13 @@ export class ThreeApp {
       DEFAULT_NAIL_HEIGHT,
       (height) => this.sceneSync.setNailHeight(height)
     ).init();
+  }
+
+  /** "Show Inner Nails" checkbox - cheap visibility flip, no rebuild (see SceneSync#setInnerNailsVisible). Checkbox starts checked in the HTML, matching SceneSync's own default-on state. */
+  #initInnerNailsToggle() {
+    document.getElementById('innerNailsToggle').addEventListener('change', (event) => {
+      this.sceneSync.setInnerNailsVisible(event.target.checked);
+    });
   }
 
   /**

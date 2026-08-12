@@ -25,8 +25,15 @@ export const BOARD_TOP_Y = 0;
 // in the same local unit-height space `#buildNails` builds once and scales
 // per instance, so "thicker head" stays proportionally correct at any nail
 // height without a geometry rebuild.
-const SHAFT_RADIUS = 2;
-const HEAD_RADIUS = 5;
+//
+// NAIL_SLIMNESS_FACTOR (user-requested, applies to *every* nail - control
+// and inner) scales both this shaft/head pair and INNER_NAIL_*'s below by
+// the same amount, so "40% slimmer" stays one number to tune rather than
+// four independently-hand-edited radii drifting out of proportion with
+// each other.
+const NAIL_SLIMNESS_FACTOR = 0.6; // 40% slimmer than the original silhouette
+const SHAFT_RADIUS = 2 * NAIL_SLIMNESS_FACTOR;
+const HEAD_RADIUS = 5 * NAIL_SLIMNESS_FACTOR;
 const SHAFT_FRACTION = 0.97; // the shaft is the bottom 97% of the nail; the head caps the top 3%
 const NAIL_RADIAL_SEGMENTS = 10;
 export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from the wood-toned board
@@ -40,8 +47,8 @@ export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from t
 // each weave path, not just at the main grid nails, and the same shape - a
 // visibly thinner shaft *and* head than the primary lattice nails - reads
 // unmistakably as "secondary/auxiliary," not more main nails.
-const INNER_NAIL_SHAFT_RADIUS = 1;
-const INNER_NAIL_HEAD_RADIUS = 2.5;
+const INNER_NAIL_SHAFT_RADIUS = 1 * NAIL_SLIMNESS_FACTOR;
+const INNER_NAIL_HEAD_RADIUS = 2.5 * NAIL_SLIMNESS_FACTOR;
 const INNER_NAIL_RADIAL_SEGMENTS = 8; // fewer facets than the main nails' 10 - there can be many of these, and each is small enough on screen that it barely matters
 
 // Screen-space pixel width for every woven string - native WebGL lines are
@@ -164,6 +171,7 @@ export class SceneSync {
     this.pinGroup = null; // Deformation pin markers, rebuilt wholesale on every change (see setDeformationPins)
     this.innerNailMesh = null; // slimmer weave-subdivision nails for every drawn curve, rebuilt wholesale on every curve-store change (see #rebuildInnerNails)
     this._innerNailPoints = []; // cached design-space positions behind innerNailMesh - reused by setNailHeight so a height change doesn't need to recompute them
+    this.innerNailsVisible = true; // user-facing toggle (see setInnerNailsVisible) - applied to innerNailMesh whenever it's (re)built, since a rebuild would otherwise reset to visible
     this._lastSelectionPoints = null;
     this._lastPreview = null;
     this.#adopt(grid, deformation);
@@ -489,8 +497,15 @@ export class SceneSync {
     if (this._innerNailPoints.length === 0) return;
 
     this.innerNailMesh = new THREE.InstancedMesh(innerNailGeometry, innerNailMaterial, this._innerNailPoints.length);
+    this.innerNailMesh.visible = this.innerNailsVisible; // a rebuild starts a brand-new object, so the user's toggle choice has to be re-applied every time, not just once
     this.#writeInnerNailMatrices(this._innerNailPoints);
     this.scene.add(this.innerNailMesh);
+  }
+
+  /** User-facing "Show Inner Nails" toggle - a cheap `.visible` flip on the existing mesh, no rebuild (mirrors how a single curve's visibility toggle works in `#syncCurves`). */
+  setInnerNailsVisible(visible) {
+    this.innerNailsVisible = visible;
+    if (this.innerNailMesh) this.innerNailMesh.visible = visible;
   }
 
   /** Same per-instance Y-scale-to-nail-height treatment as `#writeNailMatrices` - inner nails stand the full board-to-nail-height span too, just with a slimmer geometry (see INNER_NAIL_* / class doc). */

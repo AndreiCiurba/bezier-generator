@@ -68,6 +68,13 @@
       <button id="applyNailHeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
+    <!-- Inner (weave-subdivision) nails - the small pins along a drawn curve's own weave path,
+         between its control points. On by default; toggle off for a cleaner "control points only" view. -->
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 6px;">
+      <input id="innerNailsToggle" type="checkbox" checked />
+      Show Inner Nails
+    </label>
+
     <!-- Deformation Submenu (Puppet Warp) - same shared DeformationUI the 2D grid page uses.
          Pin interactions (Ctrl+Click/Drag/Alt+Click) only work while Drawing Mode is ON, since
          that's the only time clicks raycast onto the board/nail plane at all - see ThreeApp's
