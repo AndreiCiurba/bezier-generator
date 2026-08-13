@@ -64,12 +64,22 @@ describe('StrokePalette', () => {
       expect(palette.getSlot(3).color).toBe('#3');
     });
 
-    it('defaults to random (well-formed, not all identical) colors when no fill function is given', () => {
+    it('defaults to cycling category lead colors (well-formed, not all identical) when no fill function is given', () => {
       const palette = new StrokePalette(['#a']);
       palette.resize(5);
       const newColors = [1, 2, 3, 4].map((i) => palette.getSlot(i).color);
       for (const c of newColors) expect(c).toMatch(/^#[0-9a-f]{6}$/);
       expect(new Set(newColors).size).toBeGreaterThan(1);
+    });
+
+    it('passes each new slot its own absolute index, so growth continues the same cycle rather than restarting it', () => {
+      const palette = new StrokePalette(['#a', '#b']);
+      const receivedIndices = [];
+      palette.resize(4, (index) => {
+        receivedIndices.push(index);
+        return '#fill';
+      });
+      expect(receivedIndices).toEqual([2, 3]);
     });
 
     it('is a no-op when resizing to the current size', () => {

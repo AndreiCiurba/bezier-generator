@@ -13,6 +13,7 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { CurvesUI } from '../ui/CurvesUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
+import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
@@ -311,6 +312,11 @@ export class ThreeApp {
   #initColorControls() {
     this.colorPickerUI = new ColorPickerUI(document.getElementById('colorPickerContainer'), this.palette);
     this.colorPickerUI.init();
+
+    new PickerModeUI(
+      { defaultBtn: document.getElementById('pickerModeDefaultBtn'), customBtn: document.getElementById('pickerModeCustomBtn') },
+      this.colorPickerUI
+    ).init();
 
     this.colorCountUI = new ColorCountUI(
       { input: document.getElementById('colorCountInput'), applyBtn: document.getElementById('applyColorCountBtn') },

@@ -1,0 +1,86 @@
+/**
+ * Color Picker V2 - Custom mode. Two distinct places reuse the `.color-btn`
+ * square-swatch class from colors.css (originally built for favorite-bundle
+ * rows):
+ *   1. `#colorPickerContainer .color-btn` - the per-slot swatch shown in the
+ *      main color row when Custom mode is active, sized/styled to match the
+ *      native `<input type="color">` swatch it replaces (see styles.css'
+ *      `#colorPickerContainer input[type='color']` rules) so switching
+ *      modes doesn't shift the layout.
+ *   2. `.custom-palette-popover .color-btn` - the categorized picker itself
+ *      (CustomColorPopover.js), a compact 12.6px square (30% smaller than
+ *      an 18px baseline) so a category with many colors still fits without
+ *      the popover sprawling.
+ * `.color-btn`'s own `flex: 1 1 0` (meant for `.bundle`'s equal-width rows)
+ * is overridden to a fixed size in both places below.
+ */
+
+/* Default/Custom picker-mode toggle (PickerModeUI.js) - two `.menu-btn`s,
+   the active one picked out via full opacity + an accent outline instead of
+   the usual hover-only opacity bump. */
+#colorPickerModeToggle {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+#colorPickerModeToggle .menu-btn {
+  width: auto;
+  padding: 4px 10px;
+}
+
+.menu-btn.picker-mode-active {
+  opacity: 1;
+  outline: 2px solid var(--btn-text);
+  outline-offset: 1px;
+}
+
+#colorPickerContainer .color-btn {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 6px;
+  box-shadow: 0 0 4px var(--color-picker-glow);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+#colorPickerContainer .color-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 8px var(--color-picker-glow-hover);
+}
+
+.custom-palette-popover {
+  position: fixed;
+  z-index: var(--z-popover);
+  max-width: min(280px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: var(--panel-bg-submenu);
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow-submenu);
+  font-family: var(--ui-font-family);
+}
+
+.custom-palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.custom-palette-row + .custom-palette-row {
+  margin-top: 6px;
+}
+
+.custom-palette-popover .color-btn {
+  flex: none;
+  width: 12.6px; /* 18px, 30% smaller */
+  height: 12.6px;
+  border-radius: 3px;
+  border: 2px solid transparent;
+}
+
+.custom-palette-popover .color-btn:hover {
+  border-color: var(--swatch-hover-border-color);
+  transform: scale(1.08);
+}

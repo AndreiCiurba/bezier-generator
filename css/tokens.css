@@ -38,6 +38,10 @@
 
   /* Favorite bundle swatches */
   --swatch-selected-border: 3px solid rgb(162, 162, 162);
+  --swatch-hover-border-color: rgb(162, 162, 162);
+
+  /* Custom color picker popover (Color Picker V2) */
+  --z-popover: 1002;
 
   /* Form inputs (submenu text/number/select fields) */
   --input-bg: #22262b;

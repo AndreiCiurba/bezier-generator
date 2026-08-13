@@ -14,6 +14,7 @@ import { FavoritesStore } from '../state/FavoritesStore.js';
 import { PatternStamper } from './PatternStamper.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
+import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
@@ -115,6 +116,11 @@ export class App {
     const colorPickerContainer = document.getElementById('colorPickerContainer');
     this.colorPickerUI = new ColorPickerUI(colorPickerContainer, this.palette);
     this.colorPickerUI.init();
+
+    new PickerModeUI(
+      { defaultBtn: document.getElementById('pickerModeDefaultBtn'), customBtn: document.getElementById('pickerModeCustomBtn') },
+      this.colorPickerUI
+    ).init();
 
     // Colors and Patterns submenus render in the same spot next to the main
     // menu, so keep them mutually exclusive - opening one closes the other.

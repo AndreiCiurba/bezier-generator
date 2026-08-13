@@ -13,6 +13,7 @@ import { FavoritesStore } from '../state/FavoritesStore.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
+import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
@@ -103,6 +104,11 @@ export class FreestyleApp {
     const colorPickerContainer = document.getElementById('colorPickerContainer');
     this.colorPickerUI = new ColorPickerUI(colorPickerContainer, this.palette);
     this.colorPickerUI.init();
+
+    new PickerModeUI(
+      { defaultBtn: document.getElementById('pickerModeDefaultBtn'), customBtn: document.getElementById('pickerModeCustomBtn') },
+      this.colorPickerUI
+    ).init();
 
     // Canvas Size, Colors, and Patterns submenus all render in the same spot
     // next to the main menu - keep them mutually exclusive.

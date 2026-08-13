@@ -21,6 +21,7 @@
 
   <link rel="stylesheet" href="../css/tokens.css">
   <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/customPalette.css">
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="stylesheet" href="../css/three-page.css">
 </head>
@@ -136,6 +137,12 @@
       <label for="strokeWeightInput" style="font-size: 11px; color: #EEEEEE;">Stroke Weight</label>
       <input id="strokeWeightInput" type="number" min="0.1" max="30" step="0.1" style="width: 100%;" />
       <button id="applyStrokeWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Default/Custom picker-mode toggle - see PickerModeUI.js -->
+    <div id="colorPickerModeToggle">
+      <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
+      <button id="pickerModeCustomBtn" class="menu-btn">Custom</button>
     </div>
 
     <!-- Populated by ColorPickerUI from the palette (size set above) -->

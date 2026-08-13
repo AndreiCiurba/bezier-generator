@@ -1,15 +1,10 @@
-import { randomHexColor } from '../utils/color.js';
+import { leadColorForIndex } from '../data/categoryLeadColors.js';
 
-const DEFAULT_COLORS = [
-  '#AEC8A4',
-  '#8A784E',
-  '#3B3B1A',
-  '#33eaa2',
-  '#11ff11',
-  '#1111ff',
-  '#ff1111',
-  '#ffffff',
-];
+const DEFAULT_SLOT_COUNT = 8;
+// Each default slot gets that category's lead color (see categoryLeadColors.js) -
+// real, curated colors from the custom palette instead of an arbitrary hardcoded
+// list, so Default-mode swatches start out already matching a Custom-mode category.
+const DEFAULT_COLORS = Array.from({ length: DEFAULT_SLOT_COUNT }, (_, i) => leadColorForIndex(i));
 
 /**
  * The fixed set of stroke "slots" (one per color input in the UI). Each slot has
@@ -54,18 +49,22 @@ export class StrokePalette {
 
   /**
    * Grows or shrinks the slot count. Shrinking truncates from the end;
-   * growing appends new enabled slots, each colored by calling `fillColorFn`
-   * once per new slot (default: a random color each, not a single repeated
-   * one - more useful than several identical new swatches). Existing slots
-   * that remain in range keep their color/enabled state untouched.
+   * growing appends new enabled slots, each colored by calling
+   * `fillColorFn(index)` once per new slot - `index` is that slot's
+   * absolute position in the palette, so growth after growth keeps
+   * advancing through the same sequence rather than restarting it.
+   * Defaults to `leadColorForIndex`, cycling through each category's lead
+   * color (see categoryLeadColors.js) rather than a random one - more
+   * useful than several identical or arbitrary new swatches. Existing
+   * slots that remain in range keep their color/enabled state untouched.
    */
-  resize(newSize, fillColorFn = randomHexColor) {
+  resize(newSize, fillColorFn = leadColorForIndex) {
     if (newSize === this.#slots.length) return;
     if (newSize < this.#slots.length) {
       this.#slots.length = newSize;
     } else {
       for (let i = this.#slots.length; i < newSize; i++) {
-        this.#slots.push({ color: fillColorFn(), enabled: true });
+        this.#slots.push({ color: fillColorFn(i), enabled: true });
       }
     }
     this.#notify();
