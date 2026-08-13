@@ -26,6 +26,7 @@ import { SceneSync, DEFAULT_BOARD_THICKNESS, DEFAULT_BOARD_COLOR } from './Scene
 import { BoardControlsUI } from './BoardControlsUI.js';
 import { GridSizeUI } from './GridSizeUI.js';
 import { DEFAULT_GRID_SIZE } from './gridSize.js';
+import { DEFAULT_GRID_SHAPE } from './gridShape.js';
 import { NailHeightUI } from './NailHeightUI.js';
 import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
 import { defaultCameraPosition } from './cameraFraming.js';
@@ -33,13 +34,22 @@ import { OrientationGizmo } from './OrientationGizmo.js';
 import { DrawingModeCamera } from './DrawingModeCamera.js';
 
 // Same equidistant-lattice generation as the main grid page's own Grid class
-// (spacing/rotated-layout math untouched), but always square (N x N) and
-// user-resizable via the "Grid Size" control - unlike the 2D grid tool's
-// fixed 15x13 rectangle. The 3D page owns its own independent Grid/
-// DeformableGrid instance either way (see the progress doc's "stated
-// assumption": not a live mirror of whatever's open in the `/` tab).
+// (spacing/rotated-layout math untouched) for the 'triangle' shape, but
+// always square (N x N) and user-resizable via the "Grid Size" control -
+// unlike the 2D grid tool's fixed 15x13 rectangle. 'square' is concentric
+// polygon rings instead (see Grid.js#buildPolygonRings) - N there means the
+// outermost ring's nails-per-edge count. 'hexagon' reuses the exact same
+// N x N rectangular config as 'triangle' (it's the same lattice with 1 of
+// its 3 sublattices removed - see Grid.js#buildHexagon), just ~2/3 as many
+// points. The 3D page owns its own independent Grid/DeformableGrid instance
+// either way (see the progress doc's "stated assumption": not a live mirror
+// of whatever's open in the `/` tab).
 const GRID_SPACING = 60;
-function buildGridConfig(size) {
+function buildGridConfig(size, shape) {
+  if (shape === 'square') return { layout: 'square', rows: size, spacing: GRID_SPACING };
+  if (shape === 'hexagon') {
+    return { layout: 'hexagon', rows: size, cols: size, spacing: GRID_SPACING, rowHeight: (GRID_SPACING * Math.sqrt(3)) / 2 };
+  }
   return { layout: 'rotated', rows: size, cols: size, spacing: GRID_SPACING, rowHeight: (GRID_SPACING * Math.sqrt(3)) / 2 };
 }
 
@@ -114,7 +124,12 @@ export class ThreeApp {
     // UI yet (that's Slice 7), means nails already read through its *current*
     // (possibly deformed) positions - so wiring up real deformation later
     // needs no change here, just a UI that mutates this same instance.
-    this.grid = new Grid(buildGridConfig(DEFAULT_GRID_SIZE));
+    // Current shape choice from the Grid Size submenu's Grid Shape selector
+    // (see gridShape.js) - tracked here so a size-only Apply (or vice versa)
+    // still rebuilds against the currently-selected shape, not always the
+    // default.
+    this.gridShape = DEFAULT_GRID_SHAPE;
+    this.grid = new Grid(buildGridConfig(DEFAULT_GRID_SIZE, this.gridShape));
     this.deformation = new DeformableGrid(this.grid);
     // Own, independent CurveStore/StrokePalette/SelectionStore/PatternStore/
     // FavoritesStore too (see the same "not a live mirror" note above).
@@ -195,10 +210,12 @@ export class ThreeApp {
         presetSelect: document.getElementById('gridSizePreset'),
         customInput: document.getElementById('gridSizeCustomInput'),
         applyBtn: document.getElementById('applyGridSizeBtn'),
+        shapeSelect: document.getElementById('gridShapeSelect'),
       },
       this.submenuGroup,
       DEFAULT_GRID_SIZE,
-      this.#handleGridSizeChange
+      DEFAULT_GRID_SHAPE,
+      this.#handleGridChange
     ).init();
   }
 
@@ -696,14 +713,15 @@ export class ThreeApp {
    * with the new one.
    * @param {number} size
    */
-  #handleGridSizeChange = (size) => {
+  #handleGridChange = (size, shape) => {
+    this.gridShape = shape;
     this.patterns.clearSelection();
     this.patternUI.resetSelectionVisual();
     this.selection.reset();
     this.sceneSync.clearSelectionGuide();
     this.sceneSync.clearLivePreview();
     this.curves.clear();
-    this.grid = new Grid(buildGridConfig(size));
+    this.grid = new Grid(buildGridConfig(size, shape));
     this.deformation = new DeformableGrid(this.grid);
     this.sceneSync.setGrid(this.grid, this.deformation);
     // `this.stamper` was constructed once against the *original* deformation

@@ -1,33 +1,55 @@
 import { Panel } from '../ui/Panel.js';
 import { parseGridSize, GRID_SIZE_PRESETS, MIN_GRID_SIZE, MAX_GRID_SIZE } from './gridSize.js';
+import { GRID_SHAPES, GRID_SHAPE_LABELS } from './gridShape.js';
 
 /**
  * Wires the "Grid Size" submenu: a preset dropdown of common square sizes
  * (applies immediately on selection) plus a custom N field + Apply for
- * anything else - mirrors freestyle's `CanvasSizeUI` shape exactly. The
- * lattice here is always square (N x N nails), not the 2D grid tool's fixed
- * 15x13 rectangle.
+ * anything else - mirrors freestyle's `CanvasSizeUI` shape exactly. Also
+ * owns the "Grid Shape" selector (Triangle/Square/Hexagon - see
+ * `gridShape.js`) since size and shape are always applied together,
+ * funneled into one `onApply(size, shape)` callback. For 'triangle'/
+ * 'hexagon' the lattice is the N x N rectangle it's always been (hexagon
+ * just has ~2/3 as many nails - see `Grid.js#buildHexagon`); for 'square' N
+ * instead means the outermost ring's nails-per-edge count (see
+ * `Grid.js#buildPolygonRings`) - not the 2D grid tool's fixed 15x13
+ * rectangle either way.
  */
 export class GridSizeUI {
   /**
-   * @param {{panelEl: HTMLElement, openBtn: HTMLElement, closeBtn: HTMLElement, presetSelect: HTMLSelectElement, customInput: HTMLInputElement, applyBtn: HTMLElement}} elements
+   * @param {{panelEl: HTMLElement, openBtn: HTMLElement, closeBtn: HTMLElement, presetSelect: HTMLSelectElement, customInput: HTMLInputElement, applyBtn: HTMLElement, shapeSelect: HTMLSelectElement}} elements
    * @param {import('../ui/PanelGroup.js').PanelGroup} submenuGroup
    * @param {number} initialSize
-   * @param {(size: number) => void} onApply
+   * @param {string} initialShape
+   * @param {(size: number, shape: string) => void} onApply
    */
-  constructor(elements, submenuGroup, initialSize, onApply) {
+  constructor(elements, submenuGroup, initialSize, initialShape, onApply) {
     this.el = elements;
     this.panel = submenuGroup.register(new Panel(elements.panelEl));
     this.submenuGroup = submenuGroup;
     this.size = initialSize;
+    this.shape = initialShape;
     this.onApply = onApply;
   }
 
   init() {
-    const { openBtn, closeBtn, presetSelect, customInput, applyBtn } = this.el;
+    const { openBtn, closeBtn, presetSelect, customInput, applyBtn, shapeSelect } = this.el;
 
     openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
+
+    shapeSelect.innerHTML = '';
+    GRID_SHAPES.forEach((shape) => {
+      const option = document.createElement('option');
+      option.value = shape;
+      option.textContent = GRID_SHAPE_LABELS[shape];
+      shapeSelect.appendChild(option);
+    });
+    shapeSelect.value = this.shape;
+    shapeSelect.addEventListener('change', () => {
+      this.shape = shapeSelect.value;
+      this.onApply(this.size, this.shape);
+    });
 
     presetSelect.innerHTML = '<option value="">Custom…</option>';
     GRID_SIZE_PRESETS.forEach((n) => {
@@ -59,6 +81,6 @@ export class GridSizeUI {
     }
     this.size = parsed;
     this.#reflectSize();
-    this.onApply(parsed);
+    this.onApply(this.size, this.shape);
   }
 }

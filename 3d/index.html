@@ -39,12 +39,18 @@
   <div id="ui" class="panel hidden">
     <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
 
-    <!-- Grid Size Submenu - the board is always a square N x N lattice; a preset
-         dropdown (applies immediately) plus a custom field cover any N. -->
+    <!-- Grid Size Submenu - a preset dropdown (applies immediately) plus a
+         custom field cover any N. Grid Shape (Triangle/Square/Hexagon - see
+         GridSizeUI.js/gridShape.js) lives here too since size and shape are
+         always applied together; Triangle/Hexagon are the rectangular N x N
+         lattice this page has always had (Hexagon is Triangle with 1 of its
+         3 sublattices removed - a true honeycomb), Square rings N nails
+         per edge. -->
     <div id="gridSizeSubmenu" class="panel hidden">
       <button id="closeGridSizeSubmenuBtn" class="panel-close-btn">X</button>
       <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Grid Size</div>
 
+      <select id="gridShapeSelect"></select>
       <select id="gridSizePreset"></select>
 
       <input id="gridSizeCustomInput" type="number" min="3" max="41" step="1" placeholder="e.g. 13" />

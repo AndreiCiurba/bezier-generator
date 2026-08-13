@@ -421,6 +421,13 @@ export class SceneSync {
     this.#buildNails();
   }
 
+  // No Grid Shape needs a special case here. Triangle/Hexagon are both a
+  // rectangular lattice (Hexagon is just Triangle with points removed - see
+  // Grid.js#buildHexagon), so their bounding box is already the right
+  // rectangle; Square's ring layout is already a true axis-aligned square
+  // (see Grid.js#buildPolygonRings's `Math.PI / 4` rotation offset), so its
+  // bounding box is already a square too. `boardWidth`/`boardDepth` (from
+  // the nail bounding box) describe the right shape either way.
   #buildBoard() {
     const geometry = new THREE.BoxGeometry(this.boardWidth, this.boardThickness, this.boardDepth);
     const material = new THREE.MeshStandardMaterial({ color: this.boardColor });
