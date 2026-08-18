@@ -55,7 +55,7 @@ export class PatternUI {
   init() {
     const { openBtn, closeBtn, exportBtn, importBtn, importInput, saveBtn, toggleModeBtn } = this.el;
 
-    openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
+    openBtn.addEventListener('click', () => this.submenuGroup.toggleOpen(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     exportBtn.addEventListener('click', () => {

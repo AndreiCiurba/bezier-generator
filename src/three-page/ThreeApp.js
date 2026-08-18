@@ -10,6 +10,7 @@ import { PatternStore } from '../state/PatternStore.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { Curve, isLiveAutoPatternCurve } from '../models/Curve.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { Panel } from '../ui/Panel.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { CurvesUI } from '../ui/CurvesUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -32,6 +33,8 @@ import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
 import { defaultCameraPosition } from './cameraFraming.js';
 import { OrientationGizmo } from './OrientationGizmo.js';
 import { DrawingModeCamera } from './DrawingModeCamera.js';
+import { ThemeToggle } from './ThemeToggle.js';
+import { SidebarResize } from './SidebarResize.js';
 
 // Same equidistant-lattice generation as the main grid page's own Grid class
 // (spacing/rotated-layout math untouched) for the 'triangle' shape, but
@@ -176,14 +179,19 @@ export class ThreeApp {
     this.gizmo = new OrientationGizmo();
 
     this.#initMenu();
+    this.#initThemeToggle();
+    this.#initSidebarResize();
     this.#initGridSizeControls();
     this.#initBoardControls();
+    this.#initBoardSubmenuToggle();
     this.#initNailHeightControls();
+    this.#initNailsSubmenuToggle();
     this.#initInnerNailsToggle();
     this.#initDeformationControls();
     this.#initCurvesUI();
     this.#initCameraReset();
     this.#initColorControls();
+    this.#initColorsSubmenuToggle();
     this.#initStrokeWeightControls();
     this.#initFavoritesUI();
     this.#initPatternsUI();
@@ -199,6 +207,16 @@ export class ThreeApp {
 
   #initMenu() {
     new MenuUI(document.getElementById('burger'), document.getElementById('ui'), document.getElementById('closeUiBtn')).init();
+  }
+
+  /** Light/dark toggle - see ThemeToggle.js. Purely visual; touches nothing else here. */
+  #initThemeToggle() {
+    new ThemeToggle(document.getElementById('themeToggleBtn')).init();
+  }
+
+  /** Drag-to-resize the sidebar's width - see SidebarResize.js. Purely visual; touches nothing else here. */
+  #initSidebarResize() {
+    new SidebarResize(document.getElementById('ui'), document.getElementById('sidebarResizeHandle')).init();
   }
 
   #initGridSizeControls() {
@@ -232,6 +250,21 @@ export class ThreeApp {
     ).init();
   }
 
+  /**
+   * Wraps the Board fields (built above by `BoardControlsUI`, which only
+   * ever reads/writes its own inputs and never assumed anything about their
+   * surrounding markup) in a collapsible `Panel`, so the toolbar's "Board"
+   * button opens/closes it the same way every other group already does -
+   * this group just never had that affordance before, when it sat inline
+   * in the sidebar. Same pattern as `#initNailsSubmenuToggle`/
+   * `#initColorsSubmenuToggle` below.
+   */
+  #initBoardSubmenuToggle() {
+    const panel = this.submenuGroup.register(new Panel(document.getElementById('boardSubmenu')));
+    document.getElementById('openBoardBtn').addEventListener('click', () => this.submenuGroup.toggleOpen(panel));
+    document.getElementById('closeBoardSubmenuBtn').addEventListener('click', () => panel.close());
+  }
+
   #initNailHeightControls() {
     new NailHeightUI(
       {
@@ -241,6 +274,13 @@ export class ThreeApp {
       DEFAULT_NAIL_HEIGHT,
       (height) => this.sceneSync.setNailHeight(height)
     ).init();
+  }
+
+  /** Wraps Nail Height + "Show Inner Nails" in a collapsible `Panel` - see `#initBoardSubmenuToggle` for why. */
+  #initNailsSubmenuToggle() {
+    const panel = this.submenuGroup.register(new Panel(document.getElementById('nailsSubmenu')));
+    document.getElementById('openNailsBtn').addEventListener('click', () => this.submenuGroup.toggleOpen(panel));
+    document.getElementById('closeNailsSubmenuBtn').addEventListener('click', () => panel.close());
   }
 
   /** "Show Inner Nails" checkbox - cheap visibility flip, no rebuild (see SceneSync#setInnerNailsVisible). Checkbox starts checked in the HTML, matching SceneSync's own default-on state. */
@@ -350,6 +390,13 @@ export class ThreeApp {
     // now that's only the Auto-mode "keep already-stamped pattern curves
     // live" feature.
     this.palette.onChange(this.#refreshLivePatternCurves);
+  }
+
+  /** Wraps the Colors group (count/stroke-weight/swatches) in a collapsible `Panel` - see `#initBoardSubmenuToggle` for why. */
+  #initColorsSubmenuToggle() {
+    const panel = this.submenuGroup.register(new Panel(document.getElementById('colorsSubmenu')));
+    document.getElementById('openColorsBtn').addEventListener('click', () => this.submenuGroup.toggleOpen(panel));
+    document.getElementById('closeColorsSubmenuBtn').addEventListener('click', () => panel.close());
   }
 
   /**

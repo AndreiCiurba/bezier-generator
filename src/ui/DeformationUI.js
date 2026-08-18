@@ -71,8 +71,13 @@ export class DeformationUI {
     } = this.el;
 
     openBtn.addEventListener('click', () => {
-      this.#active = true;
-      this.submenuGroup.openOnly(this.panel);
+      if (this.panel.isOpen) {
+        this.#active = false;
+        this.panel.close();
+      } else {
+        this.#active = true;
+        this.submenuGroup.openOnly(this.panel);
+      }
     });
     closeBtn.addEventListener('click', () => {
       this.#active = false;

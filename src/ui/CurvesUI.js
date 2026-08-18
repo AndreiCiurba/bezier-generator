@@ -28,7 +28,7 @@ export class CurvesUI {
 
   init() {
     const { openBtn, closeBtn } = this.el;
-    openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
+    openBtn.addEventListener('click', () => this.submenuGroup.toggleOpen(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     this.curveStore.onChange(() => this.render());

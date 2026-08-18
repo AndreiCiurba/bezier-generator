@@ -42,13 +42,7 @@ export class FavoritesUI {
   init() {
     const { openBtn, closeBtn, saveBtn, exportBtn, importBtn, importInput } = this.el;
 
-    openBtn.addEventListener('click', () => {
-      if (this.panel.isOpen) {
-        this.panel.close();
-      } else {
-        this.submenuGroup.openOnly(this.panel);
-      }
-    });
+    openBtn.addEventListener('click', () => this.submenuGroup.toggleOpen(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     saveBtn.addEventListener('click', () => {

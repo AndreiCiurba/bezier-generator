@@ -35,7 +35,7 @@ export class GridSizeUI {
   init() {
     const { openBtn, closeBtn, presetSelect, customInput, applyBtn, shapeSelect } = this.el;
 
-    openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
+    openBtn.addEventListener('click', () => this.submenuGroup.toggleOpen(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     shapeSelect.innerHTML = '';

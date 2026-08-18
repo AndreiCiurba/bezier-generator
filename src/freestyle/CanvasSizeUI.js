@@ -40,7 +40,7 @@ export class CanvasSizeUI {
   init() {
     const { openBtn, closeBtn, presetSelect, widthInput, heightInput, dpiInput, applyBtn } = this.el;
 
-    openBtn.addEventListener('click', () => this.submenuGroup.openOnly(this.panel));
+    openBtn.addEventListener('click', () => this.submenuGroup.toggleOpen(this.panel));
     closeBtn.addEventListener('click', () => this.panel.close());
 
     presetSelect.innerHTML = '<option value="">Custom…</option>';

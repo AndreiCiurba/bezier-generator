@@ -20,4 +20,18 @@ export class PanelGroup {
     }
     panel.open();
   }
+
+  /**
+   * For a trigger button that opens `panel`: if it's already the open one,
+   * closes it (a second click on the same trigger collapses it, instead of
+   * `openOnly` re-opening it and doing nothing visible); otherwise opens it
+   * exclusively via `openOnly`.
+   */
+  toggleOpen(panel) {
+    if (panel.isOpen) {
+      panel.close();
+    } else {
+      this.openOnly(panel);
+    }
+  }
 }
