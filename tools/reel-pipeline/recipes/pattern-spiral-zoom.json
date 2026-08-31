@@ -1,0 +1,22 @@
+{
+  "durationSeconds": 6,
+  "pattern": "../patterns/variety.json",
+  "patternId": "variety-spiral",
+  "strokeWeight": null,
+  "camera": {
+    "startAngle": 0,
+    "endAngle": 130,
+    "easing": "easeInOutQuad",
+    "radius": { "keyframes": [{ "t": 0, "value": 950 }, { "t": 1, "value": 160 }], "easing": "easeInOutQuad" },
+    "height": { "keyframes": [{ "t": 0, "value": 520 }, { "t": 1, "value": 140 }], "easing": "easeInOutQuad" },
+    "wobble": {
+      "radius": { "amplitude": 10, "frequency": 6, "seed": 11 },
+      "height": { "amplitude": 8, "frequency": 4, "seed": 13 },
+      "angleDegrees": { "amplitude": 1.5, "frequency": 5, "seed": 17 }
+    }
+  },
+  "colors": [
+    { "layer": 0, "keyframes": [{ "t": 0, "color": "#ff9500" }, { "t": 1, "color": "#ff2d55" }] },
+    { "layer": 1, "keyframes": [{ "t": 0, "color": "#ffcc00" }, { "t": 1, "color": "#af52de" }] }
+  ]
+}

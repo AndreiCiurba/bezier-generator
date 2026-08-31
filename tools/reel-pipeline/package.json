@@ -1,0 +1,14 @@
+{
+  "name": "reel-pipeline",
+  "private": true,
+  "type": "module",
+  "description": "Headless Puppeteer + ffmpeg pipeline that drives the /3d page's ReelTimeline (see ../../src/three-page/ReelTimeline.js) frame-by-frame and stitches the captured frames into a vertical MP4. Separate tooling with its own dependencies - not part of the zero-build app deployed to GitHub Pages (see the repo root package.json's own description).",
+  "scripts": {
+    "serve": "node static-server.js",
+    "render": "node render.js"
+  },
+  "dependencies": {
+    "ffmpeg-static": "^5.2.0",
+    "puppeteer": "^25.9.0"
+  }
+}

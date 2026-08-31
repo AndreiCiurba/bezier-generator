@@ -1,0 +1,23 @@
+{
+  "durationSeconds": 6,
+  "pattern": "../patterns/variety.json",
+  "patternId": "variety-zigzag",
+  "strokeWeight": null,
+  "camera": {
+    "startAngle": 0,
+    "endAngle": 220,
+    "easing": "easeInOutQuad",
+    "radius": 750,
+    "height": 420,
+    "wobble": {
+      "radius": { "amplitude": 18, "frequency": 5, "seed": 4 },
+      "height": { "amplitude": 12, "frequency": 3.5, "seed": 7 },
+      "angleDegrees": { "amplitude": 2, "frequency": 4, "seed": 9 }
+    }
+  },
+  "colors": [
+    { "layer": 0, "keyframes": [{ "t": 0, "color": "#32ade6" }, { "t": 1, "color": "#af52de" }] },
+    { "layer": 1, "keyframes": [{ "t": 0, "color": "#34c759" }, { "t": 1, "color": "#ffcc00" }] },
+    { "layer": 2, "keyframes": [{ "t": 0, "color": "#ff2d55" }, { "t": 1, "color": "#5e5ce6" }] }
+  ]
+}

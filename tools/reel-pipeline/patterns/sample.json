@@ -1,0 +1,58 @@
+[
+  {
+    "id": "sample-diamond",
+    "name": "sample-diamond",
+    "points": [
+      {
+        "x": 259.80762113533154,
+        "y": 270
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 150
+      },
+      {
+        "x": 363.7306695894642,
+        "y": 150
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 270
+      }
+    ],
+    "colors": [
+      {
+        "color": "#1b2f29",
+        "enabled": true
+      },
+      {
+        "color": "#cbf100",
+        "enabled": true
+      },
+      {
+        "color": "#85e9ff",
+        "enabled": true
+      },
+      {
+        "color": "#2e2852",
+        "enabled": true
+      },
+      {
+        "color": "#acbeee",
+        "enabled": true
+      },
+      {
+        "color": "#5b3bc7",
+        "enabled": true
+      },
+      {
+        "color": "#a280cf",
+        "enabled": true
+      },
+      {
+        "color": "#6a3c96",
+        "enabled": true
+      }
+    ]
+  }
+]

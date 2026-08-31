@@ -1,0 +1,258 @@
+[
+  {
+    "id": "variety-diamond",
+    "name": "variety-diamond",
+    "points": [
+      {
+        "x": 259.80762113533154,
+        "y": 270
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 150
+      },
+      {
+        "x": 363.7306695894642,
+        "y": 150
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 270
+      }
+    ],
+    "colors": [
+      {
+        "color": "#1b2f29",
+        "enabled": true
+      },
+      {
+        "color": "#cbf100",
+        "enabled": true
+      },
+      {
+        "color": "#85e9ff",
+        "enabled": true
+      },
+      {
+        "color": "#2e2852",
+        "enabled": true
+      },
+      {
+        "color": "#acbeee",
+        "enabled": true
+      },
+      {
+        "color": "#5b3bc7",
+        "enabled": true
+      },
+      {
+        "color": "#a280cf",
+        "enabled": true
+      },
+      {
+        "color": "#6a3c96",
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "id": "variety-zigzag",
+    "name": "variety-zigzag",
+    "points": [
+      {
+        "x": 207.84609690826525,
+        "y": 420
+      },
+      {
+        "x": 311.76914536239786,
+        "y": 300
+      },
+      {
+        "x": 207.84609690826525,
+        "y": 300
+      },
+      {
+        "x": 311.76914536239786,
+        "y": 180
+      },
+      {
+        "x": 207.84609690826525,
+        "y": 180
+      },
+      {
+        "x": 311.76914536239786,
+        "y": 60
+      },
+      {
+        "x": 207.84609690826525,
+        "y": 60
+      }
+    ],
+    "colors": [
+      {
+        "color": "#1b2f29",
+        "enabled": true
+      },
+      {
+        "color": "#cbf100",
+        "enabled": true
+      },
+      {
+        "color": "#85e9ff",
+        "enabled": true
+      },
+      {
+        "color": "#2e2852",
+        "enabled": true
+      },
+      {
+        "color": "#acbeee",
+        "enabled": true
+      },
+      {
+        "color": "#5b3bc7",
+        "enabled": true
+      },
+      {
+        "color": "#a280cf",
+        "enabled": true
+      },
+      {
+        "color": "#6a3c96",
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "id": "variety-star",
+    "name": "variety-star",
+    "points": [
+      {
+        "x": 155.88457268119893,
+        "y": 270
+      },
+      {
+        "x": 467.6537180435968,
+        "y": 750
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 390
+      },
+      {
+        "x": 259.80762113533154,
+        "y": 30
+      },
+      {
+        "x": 415.6921938165305,
+        "y": 240
+      },
+      {
+        "x": 155.88457268119893,
+        "y": 270
+      }
+    ],
+    "colors": [
+      {
+        "color": "#1b2f29",
+        "enabled": true
+      },
+      {
+        "color": "#cbf100",
+        "enabled": true
+      },
+      {
+        "color": "#85e9ff",
+        "enabled": true
+      },
+      {
+        "color": "#2e2852",
+        "enabled": true
+      },
+      {
+        "color": "#acbeee",
+        "enabled": true
+      },
+      {
+        "color": "#5b3bc7",
+        "enabled": true
+      },
+      {
+        "color": "#a280cf",
+        "enabled": true
+      },
+      {
+        "color": "#6a3c96",
+        "enabled": true
+      }
+    ]
+  },
+  {
+    "id": "variety-spiral",
+    "name": "variety-spiral",
+    "points": [
+      {
+        "x": 311.76914536239786,
+        "y": 180
+      },
+      {
+        "x": 311.76914536239786,
+        "y": 60
+      },
+      {
+        "x": 207.84609690826525,
+        "y": 120
+      },
+      {
+        "x": 207.84609690826525,
+        "y": 360
+      },
+      {
+        "x": 415.6921938165305,
+        "y": 240
+      },
+      {
+        "x": 467.6537180435968,
+        "y": 690
+      },
+      {
+        "x": 155.88457268119893,
+        "y": 90
+      }
+    ],
+    "colors": [
+      {
+        "color": "#1b2f29",
+        "enabled": true
+      },
+      {
+        "color": "#cbf100",
+        "enabled": true
+      },
+      {
+        "color": "#85e9ff",
+        "enabled": true
+      },
+      {
+        "color": "#2e2852",
+        "enabled": true
+      },
+      {
+        "color": "#acbeee",
+        "enabled": true
+      },
+      {
+        "color": "#5b3bc7",
+        "enabled": true
+      },
+      {
+        "color": "#a280cf",
+        "enabled": true
+      },
+      {
+        "color": "#6a3c96",
+        "enabled": true
+      }
+    ]
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "durationSeconds": 6,
+  "pattern": "../patterns/variety.json",
+  "patternId": "variety-diamond",
+  "strokeWeight": null,
+  "camera": {
+    "startAngle": 0,
+    "endAngle": 100,
+    "easing": "linear",
+    "radius": 820,
+    "height": 450,
+    "wobble": {
+      "radius": { "amplitude": 12, "frequency": 4, "seed": 21 },
+      "angleDegrees": { "amplitude": 1.5, "frequency": 3, "seed": 23 }
+    }
+  },
+  "nailHeight": {
+    "keyframes": [
+      { "t": 0, "value": 15 },
+      { "t": 0.25, "value": 260 },
+      { "t": 0.5, "value": 15 },
+      { "t": 0.75, "value": 260 },
+      { "t": 1, "value": 15 }
+    ],
+    "easing": "easeInOutQuad"
+  },
+  "colors": [
+    { "layer": 0, "keyframes": [{ "t": 0, "color": "#5e5ce6" }, { "t": 1, "color": "#32ade6" }] },
+    { "layer": 1, "keyframes": [{ "t": 0, "color": "#ffcc00" }, { "t": 1, "color": "#34c759" }] }
+  ]
+}

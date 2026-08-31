@@ -1,0 +1,16 @@
+{
+  "durationSeconds": 8,
+  "pattern": "../patterns/sample.json",
+  "strokeWeight": null,
+  "camera": {
+    "radius": 900,
+    "height": 500,
+    "startAngle": 0,
+    "endAngle": 360,
+    "easing": "linear"
+  },
+  "colors": [
+    { "layer": 0, "keyframes": [{ "t": 0, "color": "#ff2d55" }, { "t": 0.5, "color": "#5e5ce6" }, { "t": 1, "color": "#ff2d55" }] },
+    { "layer": 1, "keyframes": [{ "t": 0, "color": "#ffcc00" }, { "t": 0.5, "color": "#34c759" }, { "t": 1, "color": "#ffcc00" }] }
+  ]
+}
