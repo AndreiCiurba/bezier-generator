@@ -1,4 +1,5 @@
 import { weaveSegmentsForCurve } from './weaveMath.js';
+import { closedWeaveSegmentsForCurve } from './closedWeaveMath.js';
 import { nailPositionsForCurve } from './nailPositions.js';
 import { controlPointDiameterForColorCount, innerPointDiameterForColorCount } from './nailDotSize.js';
 
@@ -55,15 +56,18 @@ export class ExportRenderer {
       // Stroke Weight setting), else derived from its own color count -
       // never the *current* setting, so this always matches what the curve
       // actually renders as on screen.
-      ExportRenderer.#drawWeave(pg, curve.points, curve.colors, curve.colors.length, curve.renderWeight);
+      const segments = curve.isClosedWeave
+        ? closedWeaveSegmentsForCurve(curve.closedWeave.cellCorners, curve.closedWeave.n, curve.closedWeave.leap, curve.colors)
+        : weaveSegmentsForCurve(curve.points, curve.colors, curve.colors.length);
+      ExportRenderer.#drawWeave(pg, segments, curve.renderWeight);
     }
     ExportRenderer.#drawNails(pg, curves, lattice);
   }
 
-  static #drawWeave(pg, points, strokes, segments, weight) {
+  static #drawWeave(pg, segments, weight) {
     pg.strokeWeight(weight);
     pg.noFill();
-    for (const { from, to, color } of weaveSegmentsForCurve(points, strokes, segments)) {
+    for (const { from, to, color } of segments) {
       pg.stroke(color);
       pg.line(from.x, from.y, to.x, to.y);
     }

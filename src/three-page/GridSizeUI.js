@@ -8,12 +8,11 @@ import { GRID_SHAPES, GRID_SHAPE_LABELS } from './gridShape.js';
  * anything else - mirrors freestyle's `CanvasSizeUI` shape exactly. Also
  * owns the "Grid Shape" selector (Triangle/Square/Hexagon - see
  * `gridShape.js`) since size and shape are always applied together,
- * funneled into one `onApply(size, shape)` callback. For 'triangle'/
- * 'hexagon' the lattice is the N x N rectangle it's always been (hexagon
- * just has ~2/3 as many nails - see `Grid.js#buildHexagon`); for 'square' N
- * instead means the outermost ring's nails-per-edge count (see
- * `Grid.js#buildPolygonRings`) - not the 2D grid tool's fixed 15x13
- * rectangle either way.
+ * funneled into one `onApply(size, shape)` callback. N is always the same
+ * N x N rectangle for all three shapes (hexagon just has ~2/3 as many nails -
+ * see `Grid.js#buildHexagon`; square has no row-parity stagger - see
+ * `Grid.js#buildSquareTiled`) - not the 2D grid tool's fixed 15x13 rectangle
+ * either way.
  */
 export class GridSizeUI {
   /**

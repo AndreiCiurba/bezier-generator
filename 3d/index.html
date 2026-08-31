@@ -173,7 +173,7 @@
         <label class="switch-row">
           <span class="field-label">Show Inner Nails</span>
           <span class="switch">
-            <input id="innerNailsToggle" type="checkbox" checked />
+            <input id="innerNailsToggle" type="checkbox" />
             <span class="switch-track"></span>
           </span>
         </label>
@@ -383,6 +383,75 @@
         <button id="importPatternBtn" class="menu-btn">Import Pattern</button>
         <div class="section-title section-title--sub">Pattern type</div>
         <button id="toggleBtn" class="menu-btn">Manual</button>
+      </div>
+    </div>
+
+    <!-- Weave - closed-polygon "leap weave" over one grid cell at a time,
+         the exact shared WeaveUI the 2D grid page uses. In Drawing Mode:
+         plain click a cell to place/select it; Ctrl+Click toggles it into/
+         out of the live selection (keeps tracking N/leap/palette until
+         Reset) - see ThreeApp's #handleWeaveClick. -->
+    <div class="toolbar-group">
+      <button id="openWeaveBtn" class="toolbar-btn">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polygon points="12,3 21,8.5 21,15.5 12,21 3,15.5 3,8.5" />
+          <polyline points="3,8.5 12,14 21,8.5" />
+          <line x1="12" y1="14" x2="12" y2="21" />
+        </svg>
+        <span class="toolbar-btn-label">Weave</span>
+        <svg class="icon icon--sm chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="9,5 16,12 9,19" />
+        </svg>
+      </button>
+      <div id="weaveSubmenu" class="panel hidden">
+        <button id="closeWeaveSubmenuBtn" class="panel-close-btn" aria-label="Close">
+          <svg class="icon icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" aria-hidden="true">
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="18" y1="6" x2="6" y2="18" />
+          </svg>
+        </button>
+        <div class="section-title">Weave</div>
+        <p class="field-hint">
+          In Drawing Mode: Click a cell: place/select it &middot; Ctrl+Click: toggle live editing
+        </p>
+
+        <div class="field-row">
+          <span class="field-label">Shape</span>
+          <span id="weaveShapeLabel"></span>
+        </div>
+        <div class="field-row">
+          <label for="weaveNInput" class="field-label">Inner Nails (N)</label>
+          <input id="weaveNInput" type="number" min="0" step="1" />
+        </div>
+        <div class="field-row">
+          <label for="weaveLeapInput" class="field-label">Leap</label>
+          <input id="weaveLeapInput" type="number" step="1" />
+        </div>
+
+        <div class="section-title section-title--sub">Placement</div>
+        <button id="weaveToggleModeBtn" class="menu-btn">Manual</button>
+        <div class="field-row" title="Manual mode only: also places/selects this many rings of neighboring cells around the one you click - 0 = just that cell, 1 = +8 neighbors, 2 = +24, and so on.">
+          <label for="weaveNeighborRadiusInput" class="field-label">Neighborhood</label>
+          <input id="weaveNeighborRadiusInput" type="number" min="0" step="1" />
+        </div>
+        <button id="weavePopulateAllBtn" class="menu-btn menu-btn--primary">Populate All</button>
+        <button id="weaveSelectAllBtn" class="menu-btn" title="Live-selects every already-placed weave cell at once, so palette/N/leap edits apply to the whole board.">Select All</button>
+        <button id="weaveResetBtn" class="menu-btn">Reset Live Selection</button>
+
+        <!-- Saved Weaves - name the current N/leap, save it, export/import
+             the whole list as JSON. Designs come from the standalone
+             playground (tools/leap-weave-playground.html), which exports
+             the same shape. -->
+        <div class="section-title section-title--sub">Saved Weaves</div>
+        <input id="weaveNameInput" type="text" placeholder="name..." />
+        <button id="saveCurrentWeaveBtn" class="menu-btn menu-btn--primary">Save Current</button>
+        <ul id="savedWeavesList" style="max-height: 150px; overflow-y: auto;"></ul>
+        <button id="exportWeaveBtn" class="menu-btn">Export</button>
+        <input type="file" id="importWeaveInput" accept=".json,.txt" style="display:none;" />
+        <button id="importWeaveBtn" class="menu-btn">Import</button>
       </div>
     </div>
 

@@ -48,4 +48,18 @@ describe('nailPositionsForCurve', () => {
     expect(() => nailPositionsForCurve(curve)).not.toThrow();
     expect(nailPositionsForCurve(curve).innerPoints).toEqual([]);
   });
+
+  it('for a closed-weave curve, derives inner points from its own cellCorners/n instead of colors.length', () => {
+    const cellCorners = [new Point(0, 0), new Point(9, 0), new Point(9, 9), new Point(0, 9)];
+    const curve = new Curve(cellCorners, colorsOfLength(1), null, null, true, {
+      cellCorners,
+      n: 2,
+      leap: 3,
+      cellId: 'cell-1',
+    });
+    const { controlPoints, innerPoints } = nailPositionsForCurve(curve);
+    expect(controlPoints).toBe(cellCorners);
+    // n=2 inner nails per edge * 4 edges, regardless of colors.length being 1.
+    expect(innerPoints).toHaveLength(2 * 4);
+  });
 });

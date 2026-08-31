@@ -36,6 +36,22 @@ describe('Curve#belongsToPattern', () => {
   });
 });
 
+describe('Curve#isClosedWeave / belongsToCell', () => {
+  it('an ordinary curve is not a closed weave and belongs to no cell', () => {
+    const curve = new Curve([], []);
+    expect(curve.isClosedWeave).toBe(false);
+    expect(curve.belongsToCell('cell-1')).toBe(false);
+  });
+
+  it('a closed-weave curve reports true and matches only its own cellId', () => {
+    const closedWeave = { cellCorners: [], n: 8, leap: 3, cellId: 'cell-1' };
+    const curve = new Curve([], [], null, null, true, closedWeave);
+    expect(curve.isClosedWeave).toBe(true);
+    expect(curve.belongsToCell('cell-1')).toBe(true);
+    expect(curve.belongsToCell('cell-2')).toBe(false);
+  });
+});
+
 describe('Curve id/visible', () => {
   it('every curve gets its own id', () => {
     const a = new Curve([], []);
@@ -79,6 +95,27 @@ describe('CurveStore', () => {
     expect(store.hasCurveForPattern('p1')).toBe(true);
     expect(store.hasCurveForPattern('p3')).toBe(false);
     expect(store.curvesForPattern('p1')).toHaveLength(2);
+  });
+
+  it('hasCurveForCell / findByCellId only match closed-weave curves tagged with that cellId', () => {
+    const store = new CurveStore();
+    const weaveA = new Curve([], [], null, null, true, { cellCorners: [], n: 8, leap: 3, cellId: 'cell-1' });
+    store.add(new Curve([], [])); // ordinary curve
+    store.add(weaveA);
+
+    expect(store.hasCurveForCell('cell-1')).toBe(true);
+    expect(store.hasCurveForCell('cell-2')).toBe(false);
+    expect(store.findByCellId('cell-1')).toBe(weaveA);
+    expect(store.findByCellId('cell-2')).toBeNull();
+  });
+
+  it('weaveCellIds lists every closed-weave curve\'s cell id, ignoring ordinary curves - the Weave menu\'s "Select All" source list', () => {
+    const store = new CurveStore();
+    store.add(new Curve([], [])); // ordinary curve, no cell id at all
+    store.add(new Curve([], [], null, null, true, { cellCorners: [], n: 8, leap: 3, cellId: 'cell-1' }));
+    store.add(new Curve([], [], null, null, true, { cellCorners: [], n: 8, leap: 3, cellId: 'cell-2' }));
+
+    expect(store.weaveCellIds()).toEqual(['cell-1', 'cell-2']);
   });
 
   it('visibleCurves reflects only currently-visible curves, in store order', () => {

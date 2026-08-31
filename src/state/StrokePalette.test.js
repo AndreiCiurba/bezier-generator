@@ -35,6 +35,24 @@ describe('StrokePalette', () => {
     expect(snap[0].color).toBe('#a');
   });
 
+  describe('setColors', () => {
+    it('sets every targeted slot', () => {
+      const palette = new StrokePalette(['#a', '#b', '#c']);
+      palette.setColors([{ index: 0, hex: '#111111' }, { index: 2, hex: '#333333' }]);
+      expect(palette.getSlot(0).color).toBe('#111111');
+      expect(palette.getSlot(1).color).toBe('#b');
+      expect(palette.getSlot(2).color).toBe('#333333');
+    });
+
+    it('notifies exactly once regardless of how many slots were updated', () => {
+      const palette = new StrokePalette(['#a', '#b', '#c']);
+      let calls = 0;
+      palette.onChange(() => calls++);
+      palette.setColors([{ index: 0, hex: '#1' }, { index: 1, hex: '#2' }, { index: 2, hex: '#3' }]);
+      expect(calls).toBe(1);
+    });
+  });
+
   describe('resize', () => {
     it('shrinking truncates from the end, keeping earlier slots untouched', () => {
       const palette = new StrokePalette(['#a', '#b', '#c']);

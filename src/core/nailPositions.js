@@ -1,4 +1,5 @@
 import { subdivide } from './weaveMath.js';
+import { closedWeaveInnerNailPositions } from './closedWeaveMath.js';
 
 /**
  * The physical nail positions one curve actually needs on the board: the
@@ -13,10 +14,19 @@ import { subdivide } from './weaveMath.js';
  * draws for this curve starts and ends on one of `subdivide(points[i],
  * points[i+1], segments)`'s own points - so this is exactly the full set of
  * nails the physical weave actually touches, no more, no less.
+ *
+ * A Weave-feature closed-polygon curve (`curve.isClosedWeave`) needs
+ * different math - its inner nails are wherever its own `n` puts them, not
+ * derived from `colors.length` - see `closedWeaveMath.js#closedWeaveInnerNailPositions`.
  * @param {import('../models/Curve.js').Curve} curve
  * @returns {{controlPoints: import('./Point.js').Point[], innerPoints: import('./Point.js').Point[]}}
  */
 export function nailPositionsForCurve(curve) {
+  if (curve.isClosedWeave) {
+    const { cellCorners, n } = curve.closedWeave;
+    return closedWeaveInnerNailPositions(cellCorners, n);
+  }
+
   const segments = Math.max(1, curve.colors.length);
   const innerPoints = [];
 

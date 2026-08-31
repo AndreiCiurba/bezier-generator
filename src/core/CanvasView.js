@@ -21,6 +21,13 @@ const CONTROL_POINT_ACTIVE_COLOR = '#ffcc00';
 const CONTROL_POINT_DIAMETER = 7;
 const CONTROL_POINT_ACTIVE_DIAMETER = 11;
 
+// A bright cyan, unmistakable against both nail dots and any thread color -
+// marks which Weave cells are currently "live" (see WeaveState) so it's
+// obvious at a glance which shapes a Weave-menu N/leap/color/stroke-weight
+// change is about to affect.
+const WEAVE_HIGHLIGHT_COLOR = '#00e5ff';
+const WEAVE_HIGHLIGHT_WEIGHT = 3;
+
 // A bright red/pink, unmistakable against both the grey nail dots and any
 // string color - deformation pins are drag handles, not part of the artwork.
 const PIN_COLOR = '#ff3b6b';
@@ -113,6 +120,24 @@ export class CanvasView {
         ellipse(curve.points[i].x, curve.points[i].y, d, d);
       }
     }
+  }
+
+  /**
+   * Outlines one Weave cell's own corner polygon in a bright, unmistakable
+   * accent color - drawn on top of its woven strings for every cell
+   * currently in the Weave menu's live selection (see `WeaveState`), so it's
+   * visually obvious which shapes are about to react to the next N/leap/
+   * color/stroke-weight change, the same way a selection highlight works in
+   * any editor.
+   * @param {{x:number,y:number}[]} cellCorners
+   */
+  static drawWeaveHighlight(cellCorners) {
+    noFill();
+    stroke(WEAVE_HIGHLIGHT_COLOR);
+    strokeWeight(WEAVE_HIGHLIGHT_WEIGHT);
+    beginShape();
+    for (const p of cellCorners) vertex(p.x, p.y);
+    endShape(CLOSE);
   }
 
   /**

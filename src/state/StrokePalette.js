@@ -41,6 +41,22 @@ export class StrokePalette {
     this.#notify();
   }
 
+  /**
+   * Sets multiple slots' colors in one batch, notifying listeners exactly
+   * once at the end - equivalent to calling `setColor` once per entry, just
+   * without the extra `onChange` notifications in between. Matters when a
+   * listener does real work per notification (e.g. the 3D page's Auto-mode
+   * "keep live pattern curves in sync" listener disposes/rebuilds geometry -
+   * see `ThreeApp#refreshLivePatternCurves`/`ReelTimeline#applyColors`):
+   * animating N palette layers via N separate `setColor` calls would rebuild
+   * that geometry N times per frame instead of once.
+   * @param {{index:number, hex:string}[]} updates
+   */
+  setColors(updates) {
+    for (const { index, hex } of updates) this.#slots[index].color = hex;
+    this.#notify();
+  }
+
   toggleEnabled(index) {
     this.#slots[index].enabled = !this.#slots[index].enabled;
     this.#notify();

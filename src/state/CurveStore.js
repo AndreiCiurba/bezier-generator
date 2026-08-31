@@ -43,6 +43,20 @@ export class CurveStore {
     return this.#curves.some((c) => c.belongsToPattern(patternId));
   }
 
+  /** The Weave-feature curve already placed on `cellId`, if any - see `Curve#belongsToCell`. */
+  findByCellId(cellId) {
+    return this.#curves.find((c) => c.belongsToCell(cellId)) ?? null;
+  }
+
+  hasCurveForCell(cellId) {
+    return this.#curves.some((c) => c.belongsToCell(cellId));
+  }
+
+  /** Every cell id currently holding a Weave-feature curve, in store order - the source list for the Weave menu's "Select All" action (see `WeaveUI`), which live-selects every already-placed weave cell at once (e.g. right after Auto mode's "Populate All"). */
+  weaveCellIds() {
+    return this.#curves.filter((c) => c.isClosedWeave).map((c) => c.closedWeave.cellId);
+  }
+
   /**
    * The only path that should ever flip a curve's visibility - a direct
    * `curve.visible = x` mutation would silently skip notifying listeners

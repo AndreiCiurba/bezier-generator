@@ -7,6 +7,7 @@ import { to3D } from './axisMapping.js';
 import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { computeWeaveSegments } from '../core/weaveMath.js';
+import { closedWeaveSegmentsForCurve } from '../core/closedWeaveMath.js';
 import { nailPositionsForCurve } from '../core/nailPositions.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 
@@ -81,6 +82,14 @@ const SELECTION_GUIDE_COLOR = '#ffcc00';
 // Deformation pin markers - same palette as the 2D page's own
 // CanvasView.drawDeformationPins (PIN_COLOR/PIN_DIAMETER/etc.), so a pin
 // reads as "the same kind of thing" on both renderers.
+// Matches CanvasView's own WEAVE_HIGHLIGHT_COLOR on the 2D page - a bright
+// cyan, unmistakable against nails/board/thread colors alike.
+const WEAVE_HIGHLIGHT_COLOR = 0x00e5ff;
+// A small, fixed height above the board surface (independent of any curve's
+// own per-color-layer height) - just enough that the outline doesn't
+// z-fight with the board mesh/nail bases sitting at y = 0.
+const WEAVE_HIGHLIGHT_HEIGHT = 3;
+
 const PIN_COLOR = 0xff3b6b;
 const PIN_DOT_RADIUS = 6; // world units - matches the 2D page's PIN_DIAMETER (12) as a radius
 const PIN_RADIUS_RING_COLOR = 0xff3b6b;
@@ -186,9 +195,10 @@ export class SceneSync {
     this.selectionGuide = null; // Drawing Mode's in-progress polyline, built lazily
     this.livePreview = null; // Drawing Mode's live woven-curve preview (>= 3 points), built lazily
     this.pinGroup = null; // Deformation pin markers, rebuilt wholesale on every change (see setDeformationPins)
+    this.weaveHighlightGroup = null; // outline of every "live" Weave-menu cell, rebuilt wholesale on every change (see setWeaveHighlights)
     this.innerNailMesh = null; // slimmer weave-subdivision nails for every drawn curve, rebuilt wholesale on every curve-store change (see #rebuildInnerNails)
     this._innerNailPoints = []; // cached design-space positions behind innerNailMesh - reused by setNailHeight so a height change doesn't need to recompute them
-    this.innerNailsVisible = true; // user-facing toggle (see setInnerNailsVisible) - applied to innerNailMesh whenever it's (re)built, since a rebuild would otherwise reset to visible
+    this.innerNailsVisible = false; // user-facing toggle (see setInnerNailsVisible) - applied to innerNailMesh whenever it's (re)built, since a rebuild would otherwise reset to visible; starts off, matching the checkbox's default-unchecked state in 3d/index.html
     this._lastSelectionPoints = null;
     this._lastPreview = null;
     this.#adopt(grid, deformation);
@@ -421,13 +431,12 @@ export class SceneSync {
     this.#buildNails();
   }
 
-  // No Grid Shape needs a special case here. Triangle/Hexagon are both a
-  // rectangular lattice (Hexagon is just Triangle with points removed - see
-  // Grid.js#buildHexagon), so their bounding box is already the right
-  // rectangle; Square's ring layout is already a true axis-aligned square
-  // (see Grid.js#buildPolygonRings's `Math.PI / 4` rotation offset), so its
-  // bounding box is already a square too. `boardWidth`/`boardDepth` (from
-  // the nail bounding box) describe the right shape either way.
+  // No Grid Shape needs a special case here - Triangle/Square/Hexagon are
+  // all a rectangular lattice one way or another (Hexagon is just Triangle
+  // with points removed, Square has no row-parity stagger - see
+  // Grid.js#buildHexagon / #buildSquareTiled), so the nail bounding box is
+  // already the right shape (square when rows === cols, as the 3D page
+  // always configures it). `boardWidth`/`boardDepth` describe it either way.
   #buildBoard() {
     const geometry = new THREE.BoxGeometry(this.boardWidth, this.boardThickness, this.boardDepth);
     const material = new THREE.MeshStandardMaterial({ color: this.boardColor });
@@ -571,7 +580,15 @@ export class SceneSync {
 
     for (const entry of entries) {
       if (this.curveLines.has(entry.id)) continue;
-      const object = this.#buildWeaveObject(entry.curve.points, entry.curve.colors, entry.curve.renderWeight);
+      const object = entry.curve.isClosedWeave
+        ? this.#buildClosedWeaveObject(
+            entry.curve.closedWeave.cellCorners,
+            entry.curve.closedWeave.n,
+            entry.curve.closedWeave.leap,
+            entry.curve.colors,
+            entry.curve.renderWeight
+          )
+        : this.#buildWeaveObject(entry.curve.points, entry.curve.colors, entry.curve.renderWeight);
       if (!object) continue; // a degenerate (<3-point) curve produces zero weave segments - nothing to show
       this.scene.add(object);
       this.curveLines.set(entry.id, object);
@@ -660,6 +677,42 @@ export class SceneSync {
         }
       });
     }
+    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution);
+  }
+
+  /**
+   * The Weave feature's own `#buildWeaveObject` equivalent - same per-layer
+   * world-Y height baking, just sourcing its segments from
+   * `closedWeaveSegmentsForCurve` (a cell's own corners/n/leap) instead of
+   * `computeWeaveSegments`'s open-triplet walk. `closedWeaveSegmentsForCurve`
+   * already includes `layerIndex` per segment (see that function's own doc)
+   * specifically so this loop doesn't need its own nested per-triplet/
+   * per-layer structure to know each segment's height.
+   * @param {{x:number,y:number}[]} cellCorners
+   * @param {number} n
+   * @param {number} leap
+   * @param {{color:string,enabled:boolean}[]} colors
+   * @param {number} weight
+   * @returns {LineSegments2 | null}
+   */
+  #buildClosedWeaveObject(cellCorners, n, leap, colors, weight) {
+    const colorCount = colors.length;
+    const positions = [];
+    const vertexColors = [];
+
+    for (const { from, to, color, layerIndex } of closedWeaveSegmentsForCurve(cellCorners, n, leap, colors)) {
+      const y = worldColorLayerHeight(layerIndex, colorCount, 0, this.nailHeight);
+      _color.set(color);
+      const worldFrom = this.toWorldPosition(from, y);
+      const worldTo = this.toWorldPosition(to, y);
+      positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
+      vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
+    }
+    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution);
+  }
+
+  /** Shared `LineSegments2` assembly for `#buildWeaveObject`/`#buildClosedWeaveObject` - everything past "here are the world-space vertex positions/colors" is identical for both. */
+  static #assembleWeaveObject(positions, vertexColors, weight, lineResolution) {
     if (positions.length === 0) return null;
 
     const geometry = new LineSegmentsGeometry();
@@ -669,12 +722,56 @@ export class SceneSync {
     const material = new LineMaterial({
       vertexColors: true,
       linewidth: weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
-      resolution: this.lineResolution,
+      resolution: lineResolution,
     });
 
     const object = new LineSegments2(geometry, material);
     object.computeLineDistances();
     return object;
+  }
+
+  /**
+   * Rebuilds the Weave menu's "live selection" highlight outlines wholesale
+   * - one closed line loop per cell in `cellCornersList`, in a bright,
+   * unmistakable accent color, matching `CanvasView#drawWeaveHighlight`'s
+   * role on the 2D page. Always disposes the previous set first, so calling
+   * this with an empty list (e.g. after `WeaveState#reset`) correctly clears
+   * every outline rather than leaving stale ones behind.
+   *
+   * Plain `THREE.Line` rather than the "fat line" `LineSegments2`/
+   * `LineMaterial` machinery `#buildWeaveObject` uses for actual thread
+   * geometry - a selection outline is a secondary UI affordance, not part of
+   * the artwork, so native GL line width (thin, but visible) is an
+   * acceptable tradeoff for not needing a resize-aware `linewidth`/
+   * `resolution` here.
+   * @param {{x:number,y:number}[][]} cellCornersList
+   */
+  setWeaveHighlights(cellCornersList) {
+    if (this.weaveHighlightGroup) {
+      this.scene.remove(this.weaveHighlightGroup);
+      for (const line of this.weaveHighlightGroup.children) line.geometry.dispose();
+      this.weaveHighlightGroup.userData.material.dispose();
+      this.weaveHighlightGroup = null;
+    }
+    if (cellCornersList.length === 0) return;
+
+    const material = new THREE.LineBasicMaterial({ color: WEAVE_HIGHLIGHT_COLOR });
+    const group = new THREE.Group();
+    group.userData.material = material;
+
+    for (const cellCorners of cellCornersList) {
+      const positions = [];
+      for (const corner of [...cellCorners, cellCorners[0]]) {
+        const world = this.toWorldPosition(corner, WEAVE_HIGHLIGHT_HEIGHT);
+        positions.push(world.x, world.y, world.z);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      group.add(new THREE.Line(geometry, material));
+    }
+
+    this.scene.add(group);
+    this.weaveHighlightGroup = group;
   }
 
   /** Disposes every owned geometry/material - called when the page unloads or the scene is torn down. */
@@ -703,6 +800,12 @@ export class SceneSync {
     if (this.pinGroup) {
       this.scene.remove(this.pinGroup);
       this.pinGroup = null;
+    }
+    if (this.weaveHighlightGroup) {
+      this.scene.remove(this.weaveHighlightGroup);
+      for (const line of this.weaveHighlightGroup.children) line.geometry.dispose();
+      this.weaveHighlightGroup.userData.material.dispose();
+      this.weaveHighlightGroup = null;
     }
     // Same "shared, don't own" contract as the pin markers - innerNailMesh
     // only ever references the module-level innerNailGeometry/innerNailMaterial.

@@ -8,6 +8,7 @@ import { SelectionStore } from '../state/SelectionStore.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { PatternStore } from '../state/PatternStore.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
+import { WeaveState } from '../state/WeaveState.js';
 import { Curve, isLiveAutoPatternCurve } from '../models/Curve.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { Panel } from '../ui/Panel.js';
@@ -20,10 +21,19 @@ import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { PatternUI } from '../ui/PatternUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { DeformationUI } from '../ui/DeformationUI.js';
+import { WeaveUI } from '../ui/WeaveUI.js';
+import {
+  enumerateCells,
+  nearestCellByCentroid,
+  cellsWithinNeighborRadius,
+  sidesForGridLayout,
+  cellIdForCorners,
+} from '../core/cellDetection.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { PatternStamper } from '../app/PatternStamper.js';
 import { SceneSync, DEFAULT_BOARD_THICKNESS, DEFAULT_BOARD_COLOR } from './SceneSync.js';
+import { ReelTimeline } from './ReelTimeline.js';
 import { BoardControlsUI } from './BoardControlsUI.js';
 import { GridSizeUI } from './GridSizeUI.js';
 import { DEFAULT_GRID_SIZE } from './gridSize.js';
@@ -39,17 +49,17 @@ import { SidebarResize } from './SidebarResize.js';
 // Same equidistant-lattice generation as the main grid page's own Grid class
 // (spacing/rotated-layout math untouched) for the 'triangle' shape, but
 // always square (N x N) and user-resizable via the "Grid Size" control -
-// unlike the 2D grid tool's fixed 15x13 rectangle. 'square' is concentric
-// polygon rings instead (see Grid.js#buildPolygonRings) - N there means the
-// outermost ring's nails-per-edge count. 'hexagon' reuses the exact same
-// N x N rectangular config as 'triangle' (it's the same lattice with 1 of
+// unlike the 2D grid tool's fixed 15x13 rectangle. 'square' is its own
+// plain N x N rectangular lattice, no row-parity stagger (see
+// Grid.js#buildSquareTiled). 'hexagon' reuses the exact same N x N
+// rectangular config as 'triangle' (it's the same lattice with 1 of
 // its 3 sublattices removed - see Grid.js#buildHexagon), just ~2/3 as many
 // points. The 3D page owns its own independent Grid/DeformableGrid instance
 // either way (see the progress doc's "stated assumption": not a live mirror
 // of whatever's open in the `/` tab).
 const GRID_SPACING = 60;
 function buildGridConfig(size, shape) {
-  if (shape === 'square') return { layout: 'square', rows: size, spacing: GRID_SPACING };
+  if (shape === 'square') return { layout: 'square', rows: size, cols: size, spacing: GRID_SPACING };
   if (shape === 'hexagon') {
     return { layout: 'hexagon', rows: size, cols: size, spacing: GRID_SPACING, rowHeight: (GRID_SPACING * Math.sqrt(3)) / 2 };
   }
@@ -71,6 +81,21 @@ const NEAREST_NAIL_RADIUS = 10;
 // Same grab tolerance as App.js's own PIN_PICK_RADIUS - see that file for the
 // "bigger than a nail's own snap radius" rationale.
 const PIN_PICK_RADIUS = 15;
+// World-space pick radius for a Weave click landing "close enough" to a
+// cell - see App.js's own WEAVE_CELL_RADIUS for the sizing rationale
+// (GRID_SPACING here is the same fixed 60 App.js's GRID_CONFIG.spacing uses).
+const WEAVE_CELL_RADIUS = GRID_SPACING * 1.5;
+
+// Reel pipeline mode (see ReelTimeline.js + tools/reel-pipeline/) - inert on
+// the normal deployed page, only read by a headless Puppeteer driver that
+// navigates here with `?reel=1`. Gates two things: exposing
+// `window.__reelTimeline` at all (no surface area on the public page
+// otherwise), and `preserveDrawingBuffer` on the renderer (needed so a
+// screenshot taken right after a scripted `render()` call reliably reads
+// the frame just drawn, not an already-cleared buffer - the standard fix
+// for "render once, then screenshot" WebGL capture, and not worth the
+// default-off memory/perf cost during normal interactive use).
+const REEL_MODE = new URLSearchParams(window.location.search).get('reel') === '1';
 
 /**
  * The 3D visualizer's top-level app class - structurally parallel to
@@ -143,6 +168,7 @@ export class ThreeApp {
     this.palette = new StrokePalette();
     this.selection = new SelectionStore();
     this.patterns = new PatternStore();
+    this.weaveState = new WeaveState();
     this.favorites = new FavoritesStore();
     this.strokeWeight = BASELINE_STROKE_WEIGHT;
     // { pin } while a Ctrl-grabbed deformation pin is actively being dragged
@@ -166,6 +192,16 @@ export class ThreeApp {
 
   init() {
     this.canvas = document.getElementById('three-canvas');
+    // Reel captures are the canvas only - the editing toolbar/nav links
+    // that normally sit on top of it (see 3d/index.html: #ui starts open by
+    // default) have no place in a posted clip. Hidden as early as possible,
+    // before any of the UI wiring below even runs, so a screenshot never
+    // catches it mid-flash.
+    if (REEL_MODE) {
+      document.getElementById('ui')?.style.setProperty('display', 'none');
+      document.getElementById('burger')?.style.setProperty('display', 'none');
+      document.querySelector('.page-nav')?.style.setProperty('display', 'none');
+    }
     this.#createScene();
     // sceneSync (and its board dimensions) has to exist before the camera -
     // the initial camera position is framed against the *actual* default
@@ -195,6 +231,7 @@ export class ThreeApp {
     this.#initStrokeWeightControls();
     this.#initFavoritesUI();
     this.#initPatternsUI();
+    this.#initWeaveUI();
     this.#initFlipKeys();
     this.#initMouseTracking();
     this.#initDrawingMode();
@@ -203,6 +240,22 @@ export class ThreeApp {
     this.#handleResize();
 
     this.#animate();
+
+    // See REEL_MODE's own doc - only wired up (and only reachable from
+    // outside the page) when a headless driver explicitly asks for it.
+    if (REEL_MODE) {
+      this.reelTimeline = new ReelTimeline({
+        camera: this.camera,
+        controls: this.controls,
+        renderer: this.renderer,
+        scene: this.scene,
+        palette: this.palette,
+        sceneSync: this.sceneSync,
+        patterns: this.patterns,
+        stamper: this.stamper,
+      });
+      window.__reelTimeline = this.reelTimeline;
+    }
   }
 
   #initMenu() {
@@ -283,7 +336,7 @@ export class ThreeApp {
     document.getElementById('closeNailsSubmenuBtn').addEventListener('click', () => panel.close());
   }
 
-  /** "Show Inner Nails" checkbox - cheap visibility flip, no rebuild (see SceneSync#setInnerNailsVisible). Checkbox starts checked in the HTML, matching SceneSync's own default-on state. */
+  /** "Show Inner Nails" checkbox - cheap visibility flip, no rebuild (see SceneSync#setInnerNailsVisible). Checkbox starts unchecked in the HTML, matching SceneSync's own default-off state. */
   #initInnerNailsToggle() {
     document.getElementById('innerNailsToggle').addEventListener('change', (event) => {
       this.sceneSync.setInnerNailsVisible(event.target.checked);
@@ -390,6 +443,7 @@ export class ThreeApp {
     // now that's only the Auto-mode "keep already-stamped pattern curves
     // live" feature.
     this.palette.onChange(this.#refreshLivePatternCurves);
+    this.palette.onChange(this.#refreshLiveWeaveCurves);
   }
 
   /** Wraps the Colors group (count/stroke-weight/swatches) in a collapsible `Panel` - see `#initBoardSubmenuToggle` for why. */
@@ -414,6 +468,7 @@ export class ThreeApp {
     this.sceneSync.clearSelectionGuide();
     this.sceneSync.clearLivePreview();
     this.curves.clear();
+    this.weaveState.reset();
     this.palette.resize(count);
     this.colorPickerUI.rebuild();
   };
@@ -425,6 +480,7 @@ export class ThreeApp {
       (weight) => {
         this.strokeWeight = weight;
         this.#refreshLivePatternCurves();
+        this.#refreshLiveWeaveCurves();
       }
     ).init();
   }
@@ -449,6 +505,34 @@ export class ThreeApp {
       ids.push(entry.id);
     }
     if (ids.length > 0) this.sceneSync.rebuildCurves(ids);
+  };
+
+  /**
+   * The Weave feature's own `#refreshLivePatternCurves` equivalent - re-syncs
+   * whichever committed weave curves are currently in the Weave menu's live
+   * selection (see `WeaveState#liveSelection`) with its *current* N/leap/
+   * stroke weight and the current palette, and refreshes their highlight
+   * outlines (see `SceneSync#setWeaveHighlights`) to match. Called on every
+   * palette change (same subscription `#refreshLivePatternCurves` is on),
+   * every "Stroke Weight" apply, and every Weave menu change
+   * (`WeaveState#onChange` - N/leap/toggleLive/selectOnlyMany/reset all
+   * route through it). Always refreshes highlights (even to an empty list),
+   * so releasing the selection actually clears them.
+   */
+  #refreshLiveWeaveCurves = () => {
+    const ids = [];
+    const highlightCorners = [];
+    for (const entry of this.design.visibleCurves) {
+      if (!entry.curve.isClosedWeave || !this.weaveState.isLive(entry.curve.closedWeave.cellId)) continue;
+      entry.curve.closedWeave.n = this.weaveState.n;
+      entry.curve.closedWeave.leap = this.weaveState.leap;
+      entry.curve.recolor(this.palette.getAll());
+      entry.curve.weight = this.strokeWeight;
+      ids.push(entry.id);
+      highlightCorners.push(entry.curve.closedWeave.cellCorners);
+    }
+    if (ids.length > 0) this.sceneSync.rebuildCurves(ids);
+    this.sceneSync.setWeaveHighlights(highlightCorners);
   };
 
   /** "Colors" (favorite bundle save/export/import/apply) submenu - the exact shared `FavoritesUI` both p5 pages use. Must run after `#initColorControls` (needs `this.colorPickerUI`/`this.colorCountUI` already built). */
@@ -496,6 +580,70 @@ export class ThreeApp {
       () => this.strokeWeight
     );
     this.patternUI.init();
+  }
+
+  /** "Weave" submenu (N, leap, Manual/Auto placement, Populate All, Reset) - the exact shared `WeaveUI` the 2D grid page uses. */
+  #initWeaveUI() {
+    this.weaveUI = new WeaveUI(
+      {
+        panelEl: document.getElementById('weaveSubmenu'),
+        openBtn: document.getElementById('openWeaveBtn'),
+        closeBtn: document.getElementById('closeWeaveSubmenuBtn'),
+        shapeLabelEl: document.getElementById('weaveShapeLabel'),
+        nInput: document.getElementById('weaveNInput'),
+        leapInput: document.getElementById('weaveLeapInput'),
+        neighborRadiusInput: document.getElementById('weaveNeighborRadiusInput'),
+        toggleModeBtn: document.getElementById('weaveToggleModeBtn'),
+        populateAllBtn: document.getElementById('weavePopulateAllBtn'),
+        selectAllBtn: document.getElementById('weaveSelectAllBtn'),
+        resetBtn: document.getElementById('weaveResetBtn'),
+        nameInput: document.getElementById('weaveNameInput'),
+        saveBtn: document.getElementById('saveCurrentWeaveBtn'),
+        listEl: document.getElementById('savedWeavesList'),
+        exportBtn: document.getElementById('exportWeaveBtn'),
+        importBtn: document.getElementById('importWeaveBtn'),
+        importInput: document.getElementById('importWeaveInput'),
+      },
+      this.weaveState,
+      this.palette,
+      this.colorPickerUI,
+      this.submenuGroup,
+      this.#handlePopulateAllWeave,
+      this.#handleSelectAllWeave,
+      (newSize) => this.colorCountUI.setCount(newSize)
+    );
+    this.weaveUI.init();
+    this.weaveUI.setGridLayout(this.grid.layout);
+    this.weaveState.onChange(this.#refreshLiveWeaveCurves);
+  }
+
+  /**
+   * Weave's Auto mode "Populate All" - the exact same logic as App.js's own
+   * handler, against this page's own (base, undeformed) `this.grid`.
+   */
+  #handlePopulateAllWeave = () => {
+    const sides = sidesForGridLayout(this.grid.layout);
+    for (const cellCorners of enumerateCells(this.grid.points, sides)) {
+      const cellId = cellIdForCorners(cellCorners);
+      if (this.curves.hasCurveForCell(cellId)) continue;
+      this.curves.add(this.#buildWeaveCurve(cellCorners, cellId));
+    }
+  };
+
+  /**
+   * Weave menu's "Select All" - the exact same logic as App.js's own
+   * handler: live-selects every already-placed weave cell at once (see
+   * `CurveStore#weaveCellIds`), so palette/N/leap edits apply to the whole
+   * board without ctrl+clicking each cell one at a time.
+   */
+  #handleSelectAllWeave = () => {
+    this.weaveState.selectOnlyMany(this.curves.weaveCellIds());
+  };
+
+  /** A new Weave-feature `Curve` for `cellCorners` - identical shape to App.js's own `#buildWeaveCurve`. */
+  #buildWeaveCurve(cellCorners, cellId) {
+    const closedWeave = { cellCorners, n: this.weaveState.n, leap: this.weaveState.leap, cellId };
+    return new Curve(cellCorners, this.palette.snapshot(), null, this.strokeWeight, true, closedWeave);
   }
 
   /** Held-key pattern flip (V/H), guarded against firing while typing and against a stuck-flipped state if focus leaves the page mid-hold - identical wiring to App.js. */
@@ -643,18 +791,55 @@ export class ThreeApp {
 
   /**
    * Drawing Mode's single pointer-down entry point - the *exact* branch
-   * `App.js#mousePressed` takes on the 2D page: Deformation Mode (if active)
-   * gets first refusal at the click (pin create/select/remove), otherwise it
-   * falls through to normal curve building/pattern stamping.
+   * `App.js#mousePressed` takes on the 2D page: Weave Mode (if active) gets
+   * first refusal, then Deformation Mode (pin create/select/remove),
+   * otherwise it falls through to normal curve building/pattern stamping.
    * @param {PointerEvent} event
    */
   #handleCanvasPointerDown = (event) => {
+    if (this.weaveUI.isActive) {
+      this.#handleWeaveClick(event);
+      return;
+    }
     if (this.deformationUI.isActive) {
       this.#handleDeformationClick(event);
       return;
     }
     this.#handleDrawingClick(event);
   };
+
+  /**
+   * Handles a pointer-down while Weave Mode is active - the *exact* branch
+   * `App.js#handleWeaveClick` takes on the 2D page (including the
+   * neighborhood-radius brush and ctrl+click's create-if-missing behavior -
+   * see that method's own doc), always against this page's own *base*,
+   * undeformed `this.grid` (not `this.deformation`).
+   * @param {PointerEvent} event
+   */
+  #handleWeaveClick(event) {
+    const worldPos = this.#raycastClientPointToDesignPosition(event.clientX, event.clientY);
+    if (!worldPos) return;
+
+    const sides = sidesForGridLayout(this.grid.layout);
+    const allCells = enumerateCells(this.grid.points, sides);
+    const targetCell = nearestCellByCentroid(allCells, worldPos, WEAVE_CELL_RADIUS);
+    if (!targetCell) return;
+
+    if (event.ctrlKey) {
+      const cellId = cellIdForCorners(targetCell);
+      if (!this.curves.hasCurveForCell(cellId)) this.curves.add(this.#buildWeaveCurve(targetCell, cellId));
+      this.weaveState.toggleLive(cellId);
+      return;
+    }
+
+    const cells = cellsWithinNeighborRadius(allCells, targetCell, this.weaveState.neighborRadius);
+    const ids = cells.map((cell) => {
+      const cellId = cellIdForCorners(cell);
+      if (!this.curves.hasCurveForCell(cellId)) this.curves.add(this.#buildWeaveCurve(cell, cellId));
+      return cellId;
+    });
+    this.weaveState.selectOnlyMany(ids);
+  }
 
   /** While a pin is Ctrl-grabbed (see `#handleDeformationClick`), drags it live - mirrors `App.js#mouseDragged`'s pin-drag branch. A no-op the rest of the time (most pointer moves in Drawing Mode aren't dragging anything). */
   #handleCanvasPointerMove = (event) => {
@@ -768,9 +953,13 @@ export class ThreeApp {
     this.sceneSync.clearSelectionGuide();
     this.sceneSync.clearLivePreview();
     this.curves.clear();
+    this.weaveState.reset();
     this.grid = new Grid(buildGridConfig(size, shape));
     this.deformation = new DeformableGrid(this.grid);
     this.sceneSync.setGrid(this.grid, this.deformation);
+    // Weave's shape auto-detection reads `this.grid.layout` - refresh the
+    // menu's read-only label now that it may have changed.
+    this.weaveUI.setGridLayout(this.grid.layout);
     // `this.stamper` was constructed once against the *original* deformation
     // instance - without repointing it here, Auto/manual pattern stamping
     // would keep anchoring/snapping against the stale, now-replaced grid
@@ -814,7 +1003,7 @@ export class ThreeApp {
   }
 
   #createRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, preserveDrawingBuffer: REEL_MODE });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 

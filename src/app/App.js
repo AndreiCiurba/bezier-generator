@@ -11,6 +11,7 @@ import { SelectionStore } from '../state/SelectionStore.js';
 import { PatternStore } from '../state/PatternStore.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
+import { WeaveState } from '../state/WeaveState.js';
 import { PatternStamper } from './PatternStamper.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -21,7 +22,15 @@ import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { DeformationUI } from '../ui/DeformationUI.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { CurvesUI } from '../ui/CurvesUI.js';
+import { WeaveUI } from '../ui/WeaveUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
+import {
+  enumerateCells,
+  nearestCellByCentroid,
+  cellsWithinNeighborRadius,
+  sidesForGridLayout,
+  cellIdForCorners,
+} from '../core/cellDetection.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
@@ -32,6 +41,13 @@ const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
 
 const NEAREST_NAIL_RADIUS = 10;
+// World-space pick radius for a Weave click landing "close enough" to a
+// cell - a click roughly anywhere inside or near a cell should hit it, so
+// this needs to comfortably clear a cell's own circumradius (for this grid's
+// spacing, an equilateral-triangle cell's circumradius is
+// spacing / sqrt(3) =~ 34.6px - well inside this radius) rather than being a
+// tight single-nail tolerance like NEAREST_NAIL_RADIUS.
+const WEAVE_CELL_RADIUS = GRID_CONFIG.spacing * 1.5;
 // World-space pick radius for grabbing/removing an existing deformation pin -
 // a touch larger than a nail's own snap radius since pins are bigger,
 // deliberately-grabbable markers. Not zoom-adjusted, matching how
@@ -81,6 +97,7 @@ export class App {
     this.curves = new CurveStore();
     this.selection = new SelectionStore();
     this.patterns = new PatternStore();
+    this.weaveState = new WeaveState();
     this.stamper = new PatternStamper(this.deformation, this.viewport, this.curves, this.patterns);
     // The shared design-model boundary (nails + ordered/visible curves) both
     // this page's own draw/export paths and the 3D visualizer read from -
@@ -202,6 +219,37 @@ export class App {
     );
     this.curvesUI.init();
 
+    this.weaveUI = new WeaveUI(
+      {
+        panelEl: document.getElementById('weaveSubmenu'),
+        openBtn: document.getElementById('openWeaveBtn'),
+        closeBtn: document.getElementById('closeWeaveSubmenuBtn'),
+        shapeLabelEl: document.getElementById('weaveShapeLabel'),
+        nInput: document.getElementById('weaveNInput'),
+        leapInput: document.getElementById('weaveLeapInput'),
+        neighborRadiusInput: document.getElementById('weaveNeighborRadiusInput'),
+        toggleModeBtn: document.getElementById('weaveToggleModeBtn'),
+        populateAllBtn: document.getElementById('weavePopulateAllBtn'),
+        selectAllBtn: document.getElementById('weaveSelectAllBtn'),
+        resetBtn: document.getElementById('weaveResetBtn'),
+        nameInput: document.getElementById('weaveNameInput'),
+        saveBtn: document.getElementById('saveCurrentWeaveBtn'),
+        listEl: document.getElementById('savedWeavesList'),
+        exportBtn: document.getElementById('exportWeaveBtn'),
+        importBtn: document.getElementById('importWeaveBtn'),
+        importInput: document.getElementById('importWeaveInput'),
+      },
+      this.weaveState,
+      this.palette,
+      this.colorPickerUI,
+      submenuGroup,
+      this.handlePopulateAllWeave,
+      this.handleSelectAllWeave,
+      (newSize) => this.colorCountUI.setCount(newSize)
+    );
+    this.weaveUI.init();
+    this.weaveUI.setGridLayout(this.grid.layout);
+
     this.colorCountUI = new ColorCountUI(
       {
         input: document.getElementById('colorCountInput'),
@@ -280,13 +328,36 @@ export class App {
       } else if (curve.belongsToPattern(this.patterns.selectedPatternId) && !curve.previouslyDrawn) {
         curve.recolor(this.palette.getAll());
       }
-      // Subdivision fineness always matches this curve's own color count;
-      // weight is its own explicit setting if it has one (the "Stroke
-      // Weight" field, see StrokeWeightUI) or the same color-count-derived
-      // fallback as before - either way, never the *current* setting (unless
-      // it's still a live Auto-pattern curve, handled above), so
-      // curves/patterns from before a change keep rendering exactly as drawn.
-      StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
+
+      if (curve.isClosedWeave) {
+        const isLive = this.weaveState.isLive(curve.closedWeave.cellId);
+        if (isLive) {
+          // Ctrl-selected (or placed as part of a neighborhood-radius brush)
+          // in the Weave menu - keep tracking the *current* n/leap/palette/
+          // stroke weight for as long as it stays selected, not just the
+          // moment it was placed (mirrors the Auto-pattern branch above).
+          curve.closedWeave.n = this.weaveState.n;
+          curve.closedWeave.leap = this.weaveState.leap;
+          curve.recolor(this.palette.getAll());
+          curve.weight = this.strokeWeight;
+        }
+        StringArtRenderer.drawClosedWeave(
+          curve.closedWeave.cellCorners,
+          curve.closedWeave.n,
+          curve.closedWeave.leap,
+          curve.colors,
+          curve.renderWeight
+        );
+        if (isLive) CanvasView.drawWeaveHighlight(curve.closedWeave.cellCorners);
+      } else {
+        // Subdivision fineness always matches this curve's own color count;
+        // weight is its own explicit setting if it has one (the "Stroke
+        // Weight" field, see StrokeWeightUI) or the same color-count-derived
+        // fallback as before - either way, never the *current* setting (unless
+        // it's still a live Auto-pattern curve, handled above), so
+        // curves/patterns from before a change keep rendering exactly as drawn.
+        StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
+      }
       curve.previouslyDrawn = true;
     }
 
@@ -326,6 +397,7 @@ export class App {
   handleClearAll = () => {
     this.selection.reset();
     this.curves.clear();
+    this.weaveState.reset();
   };
 
   /** Undoes the whole current figure - the last committed curve, however many lines/points it has, plus whatever's still in progress. */
@@ -413,6 +485,7 @@ export class App {
     this.patternUI.resetSelectionVisual();
     this.selection.reset();
     this.curves.clear();
+    this.weaveState.reset();
 
     this.palette.resize(count);
     this.colorPickerUI.rebuild();
@@ -433,12 +506,48 @@ export class App {
     this.deformation.invalidate();
   };
 
+  /**
+   * Weave's Auto mode "Populate All" - stamps the current N/leap/palette
+   * onto every cell of the grid's current shape at once, skipping any cell
+   * that already has a weave curve (mirrors `PatternStamper#stampThroughoutGrid`'s
+   * own idempotency via `hasCurveForPattern`). Newly-populated cells don't
+   * join the live selection - only explicit clicks/ctrl+clicks manage that.
+   */
+  handlePopulateAllWeave = () => {
+    const sides = sidesForGridLayout(this.grid.layout);
+    for (const cellCorners of enumerateCells(this.grid.points, sides)) {
+      const cellId = cellIdForCorners(cellCorners);
+      if (this.curves.hasCurveForCell(cellId)) continue;
+      this.curves.add(this.#buildWeaveCurve(cellCorners, cellId));
+    }
+  };
+
+  /**
+   * Weave menu's "Select All" - live-selects every already-placed weave
+   * cell at once (see `CurveStore#weaveCellIds`), so palette/N/leap edits
+   * apply to the whole board without ctrl+clicking each cell one at a time
+   * (the natural next step right after Auto mode's "Populate All").
+   */
+  handleSelectAllWeave = () => {
+    this.weaveState.selectOnlyMany(this.curves.weaveCellIds());
+  };
+
   mousePressed = (event) => {
     if (touchesMenus(winMouseX, winMouseY)) return;
 
     if (mouseButton === CENTER) {
       this.isDragging = true;
       this.dragStart = new Point(mouseX, mouseY);
+      return;
+    }
+
+    // Weave Mode takes priority over Deformation Mode if both happen to be
+    // "active" at once (possible since, like DeformationUI's own isActive,
+    // neither flag is tied to the submenu panel's open/closed state - see
+    // WeaveUI's class doc) - the same already-accepted quirk, just extended
+    // to a second mode.
+    if (this.weaveUI.isActive) {
+      this.#handleWeaveClick(event);
       return;
     }
 
@@ -457,6 +566,11 @@ export class App {
   };
 
   touchEnded = () => {
+    // Same reasoning as Deformation Mode below: Weave's Ctrl+Click behavior
+    // has no touch equivalent, so a plain tap here is a no-op rather than
+    // falling through to placing an ordinary curve point.
+    if (this.weaveUI.isActive) return false;
+
     // Deformation Mode's pin interactions are Ctrl/Alt+Click, a keyboard+
     // mouse-only gesture with no touch equivalent - a plain tap is a no-op
     // here too, same as an unmodified click, rather than falling through to
@@ -512,6 +626,60 @@ export class App {
     // are right now (epic AC10).
     const nearest = this.deformation.findNearestPoint(worldPos, NEAREST_NAIL_RADIUS);
     if (nearest) this.selection.add(nearest.copy());
+  }
+
+  /**
+   * Handles a click while Weave Mode is active (see WeaveUI) - always
+   * against the grid's *base*, undeformed lattice (`this.grid`, not
+   * `this.deformation`), regardless of any Puppet Warp currently applied
+   * elsewhere on the board.
+   *
+   * Ctrl+click always targets just the one cell under the cursor: toggles it
+   * in/out of the live selection without touching any other cell (additive
+   * multi-select), creating a fresh weave curve for it first (using the
+   * menu's current N/leap/palette) if it doesn't have one yet - so you can
+   * build a multi-cell selection over empty board space and then apply a
+   * saved weave (see `WeaveUI#loadRecipe`) to the whole group at once, not
+   * just cells that already happened to be woven.
+   *
+   * A plain click targets the clicked cell plus, if the Weave menu's
+   * neighborhood radius is above 0, its nearest ring(s) of neighbors too
+   * (see `WeaveState#neighborRadius`/`cellsWithinNeighborRadius`) - a
+   * Manual-mode "brush size". Every cell in that group gets a weave curve if
+   * it doesn't have one yet (using the menu's current N/leap/palette), and
+   * the whole group becomes the live selection together (replacing whatever
+   * was live before - standard select-replaces convention), so a cell that
+   * already existed still gets pulled into the group and picks up the
+   * current settings via the live-refresh in `draw()`, not just brand-new ones.
+   * @param {MouseEvent} [event]
+   */
+  #handleWeaveClick(event) {
+    const worldPos = this.viewport.toWorld(mouseX, mouseY);
+    const sides = sidesForGridLayout(this.grid.layout);
+    const allCells = enumerateCells(this.grid.points, sides);
+    const targetCell = nearestCellByCentroid(allCells, worldPos, WEAVE_CELL_RADIUS);
+    if (!targetCell) return;
+
+    if (event?.ctrlKey) {
+      const cellId = cellIdForCorners(targetCell);
+      if (!this.curves.hasCurveForCell(cellId)) this.curves.add(this.#buildWeaveCurve(targetCell, cellId));
+      this.weaveState.toggleLive(cellId);
+      return;
+    }
+
+    const cells = cellsWithinNeighborRadius(allCells, targetCell, this.weaveState.neighborRadius);
+    const ids = cells.map((cell) => {
+      const cellId = cellIdForCorners(cell);
+      if (!this.curves.hasCurveForCell(cellId)) this.curves.add(this.#buildWeaveCurve(cell, cellId));
+      return cellId;
+    });
+    this.weaveState.selectOnlyMany(ids);
+  }
+
+  /** A new Weave-feature `Curve` for `cellCorners`, using the Weave menu's current N/leap and a frozen snapshot of the current palette. */
+  #buildWeaveCurve(cellCorners, cellId) {
+    const closedWeave = { cellCorners, n: this.weaveState.n, leap: this.weaveState.leap, cellId };
+    return new Curve(cellCorners, this.palette.snapshot(), null, this.strokeWeight, true, closedWeave);
   }
 
   /**

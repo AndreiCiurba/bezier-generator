@@ -106,4 +106,21 @@ describe('ExportRenderer.renderNailsAndStrings', () => {
     expect(pg.lines.length).toBeGreaterThan(0);
     expect(pg.ellipses.length).toBeGreaterThan(0);
   });
+
+  it('draws a closed-weave curve using closedWeaveMath instead of the open-triplet weave', () => {
+    const cellCorners = [new Point(0, 0), new Point(10, 0), new Point(10, 10), new Point(0, 10)];
+    const curve = new Curve(cellCorners, colorsOf(1), null, 3, true, {
+      cellCorners,
+      n: 3,
+      leap: 2,
+      cellId: 'cell-1',
+    });
+    const pg = createMockPg();
+
+    ExportRenderer.renderNailsAndStrings(pg, [curve]);
+
+    // (n + 1) * sides = 4 * 4 = 16 segments for the one enabled color layer.
+    expect(pg.lines).toHaveLength(16);
+    expect(pg.ellipses.length).toBeGreaterThan(0);
+  });
 });

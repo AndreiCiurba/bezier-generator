@@ -28,14 +28,29 @@ export class Curve {
    *   see CurveStore#setVisible, the only place this should ever be flipped
    *   after construction (so listeners get notified). Defaults to visible,
    *   so no existing call site needs to change.
+   * @param {{cellCorners: import('../core/Point.js').Point[], n: number, leap: number, cellId: string}|null} closedWeave
+   *   set when this curve is a Weave-feature closed-polygon leap weave
+   *   rather than an ordinary hand-drawn/pattern-stamped open curve - see
+   *   `src/core/closedWeaveMath.js`. `points` is still populated (with
+   *   `cellCorners`, so every existing "just read `curve.points`" consumer
+   *   keeps working, e.g. `CanvasView`'s selection guide or a JSON export),
+   *   but rendering/export code that needs the *actual* weave geometry
+   *   (`StringArtRenderer`, `ExportRenderer`, `SceneSync`, `nailPositions.js`)
+   *   must branch on this field and call the `closedWeaveMath.js` functions
+   *   instead of the ordinary triplet-based ones. `cellId` is a stable key
+   *   for "which cell is this", derived from the cell's own corner
+   *   positions - used the same way `patternId` is used today, to answer
+   *   "does a weave curve already exist for this cell" (see
+   *   `CurveStore#hasCurveForPattern`'s Weave-feature equivalent).
    */
-  constructor(points, colors, patternId = null, weight = null, visible = true) {
+  constructor(points, colors, patternId = null, weight = null, visible = true, closedWeave = null) {
     this.id = generateCurveId();
     this.points = points;
     this.colors = colors;
     this.patternId = patternId;
     this.weight = weight;
     this.visible = visible;
+    this.closedWeave = closedWeave;
     // Once true, live edits to the palette stop repainting this curve - it's
     // "locked in". Curves stamped from the currently-selected pattern start
     // false so they pick up one live recolor before locking.
@@ -44,6 +59,15 @@ export class Curve {
 
   belongsToPattern(patternId) {
     return this.patternId !== null && this.patternId === patternId;
+  }
+
+  /** Whether this curve is a Weave-feature closed-polygon leap weave (see the constructor doc) rather than an ordinary curve. */
+  get isClosedWeave() {
+    return this.closedWeave !== null;
+  }
+
+  belongsToCell(cellId) {
+    return this.closedWeave !== null && this.closedWeave.cellId === cellId;
   }
 
   /**

@@ -1,7 +1,5 @@
 import { Point } from './Point.js';
 import { findNearestPoint } from './nearestPoint.js';
-import { subdivide } from './weaveMath.js';
-import { polygonCircumradius, polygonVertices } from './polygonRing.js';
 
 /**
  * The lattice of "nails" the whole app is built around.
@@ -36,7 +34,7 @@ export class Grid {
 
   generate() {
     if (this.layout === 'standard') this.#points = this.#buildStandard();
-    else if (this.layout === 'square') this.#points = this.#buildPolygonRings(4, Math.PI / 4);
+    else if (this.layout === 'square') this.#points = this.#buildSquareTiled();
     else if (this.layout === 'hexagon') this.#points = this.#buildHexagon();
     else this.#points = this.#buildRotated(); // 'rotated' and any unrecognized value - same fallback as before
     return this.#points;
@@ -113,39 +111,30 @@ export class Grid {
   }
 
   /**
-   * Grid Shape "Square" - concentric regular-polygon rings of nails (an
-   * onion of nested squares) instead of a rectangle filled with the offset
-   * triangular lattice. Written generically over `sides` (currently only
-   * called with 4, for Square - there's no Pentagon grid shape; a regular
-   * pentagon can't tile into a lattice this way at all, unlike Square or
-   * Hexagon). `rows` is reused
-   * as N, the outermost ring's nails-per-edge count (`cols`/`rowHeight` are
-   * unused for this layout, unlike `#buildStandard`/`#buildRotated`). Each
-   * ring's edges are subdivided with the same `subdivide()` helper
-   * `weaveMath.js` uses for curve weave segments, so nail-to-nail spacing
-   * along an edge is exactly `spacing`. `nailsPerEdge` shrinks by 2 per
-   * layer inward (same layer decomposition as peeling concentric borders
-   * off an N x N grid) down to a single center nail. Rings are centered at
-   * (0, 0) - `boundingBox()` still centers everything correctly downstream,
-   * so no special-casing is needed by callers.
-   * @param {number} sides
-   * @param {number} rotationOffset
+   * Grid Shape "Square" - a real tiled pegboard of small unit squares: a
+   * plain `rows` x `cols` rectangular lattice of nails at even `spacing` on
+   * both axes (unlike `#buildStandard`/`#buildRotated`, there's no row-parity
+   * stagger and `rowHeight` is unused - every row sits directly above the
+   * next, so every 2x2 block of neighboring nails is an actual axis-aligned
+   * square). This is what lets the Weave feature's cell detection
+   * (`src/core/cellDetection.js`) find a genuine 4-nail square wherever you
+   * click, with real touching neighbors on every side, rather than the
+   * concentric nested-square rings this layout used to be (see git history -
+   * that shape had no nails at all *inside* a ring except the next ring in
+   * and the center, so "the 4 nearest nails" could land on 3 nearly-collinear
+   * points from one ring's straight edge plus 1 from a different ring
+   * entirely: a degenerate sliver, never a proper square). Centered at
+   * (0, 0), same as every other layout, so `boundingBox()` needs no special
+   * casing for it.
    */
-  #buildPolygonRings(sides, rotationOffset) {
-    const { rows: n, spacing: s } = this;
+  #buildSquareTiled() {
+    const { rows, cols, spacing: s } = this;
+    const offsetX = ((cols - 1) * s) / 2;
+    const offsetY = ((rows - 1) * s) / 2;
     const points = [];
-    const maxLayer = Math.floor((n - 1) / 2);
-    for (let layer = 0; layer <= maxLayer; layer++) {
-      const nailsPerEdge = n - 2 * layer;
-      if (nailsPerEdge <= 1) {
-        points.push(new Point(0, 0));
-        break;
-      }
-      const segmentsPerEdge = nailsPerEdge - 1;
-      const vertices = polygonVertices(sides, polygonCircumradius(sides, segmentsPerEdge, s), rotationOffset);
-      for (let i = 0; i < sides; i++) {
-        // Drop the last point of each edge - it's the next edge's first vertex (shared corner).
-        points.push(...subdivide(vertices[i], vertices[(i + 1) % sides], segmentsPerEdge).slice(0, -1));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        points.push(new Point(col * s - offsetX, row * s - offsetY));
       }
     }
     return points;

@@ -60,7 +60,7 @@ describe('Grid', () => {
     });
   });
 
-  describe('Grid Shape: square ring layout', () => {
+  describe('Grid Shape: square tiled layout', () => {
     it("at N=13 produces exactly N^2 points - the same nail count as today's rectangular N x N triangular fill", () => {
       const grid = new Grid({ rows: 13, cols: 13, spacing: 60, layout: 'square' });
       expect(grid.points.length).toBe(13 * 13);
@@ -89,6 +89,33 @@ describe('Grid', () => {
       const grid = new Grid({ rows: 13, cols: 13, spacing: 60, layout: 'square' });
       const seen = new Set(grid.points.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`));
       expect(seen.size).toBe(grid.points.length);
+    });
+
+    it('is a real tiled lattice - every interior nail has 4 orthogonal neighbors at exactly one spacing away, forming an actual square', () => {
+      // The whole point of this layout (see Grid.js#buildSquareTiled's own
+      // doc) is that "the 4 nearest nails to a click" are always a genuine
+      // axis-aligned unit square, unlike the old concentric-rings shape
+      // where a click could land on 3 nearly-collinear points from one
+      // ring's edge plus 1 from a completely different ring.
+      const spacing = 60;
+      const grid = new Grid({ rows: 5, cols: 5, spacing, layout: 'square' });
+      const center = grid.points.find((p) => Math.abs(p.x) < 1e-6 && Math.abs(p.y) < 1e-6);
+      expect(center).toBeDefined();
+
+      const right = grid.points.find((p) => Math.abs(p.x - spacing) < 1e-6 && Math.abs(p.y) < 1e-6);
+      const down = grid.points.find((p) => Math.abs(p.x) < 1e-6 && Math.abs(p.y - spacing) < 1e-6);
+      const diagonal = grid.points.find((p) => Math.abs(p.x - spacing) < 1e-6 && Math.abs(p.y - spacing) < 1e-6);
+      expect(right).toBeDefined();
+      expect(down).toBeDefined();
+      expect(diagonal).toBeDefined();
+
+      // center-right-diagonal-down is a proper unit square: two sides of
+      // length `spacing`, one diagonal of length `spacing * sqrt(2)`.
+      expect(center.distanceTo(right)).toBeCloseTo(spacing, 5);
+      expect(center.distanceTo(down)).toBeCloseTo(spacing, 5);
+      expect(right.distanceTo(diagonal)).toBeCloseTo(spacing, 5);
+      expect(down.distanceTo(diagonal)).toBeCloseTo(spacing, 5);
+      expect(center.distanceTo(diagonal)).toBeCloseTo(spacing * Math.SQRT2, 5);
     });
   });
 
