@@ -18,9 +18,16 @@ export class StringArtRenderer {
    * @param {number} segments sub-divisions per side; higher = smoother curve
    * @param {number} weight line thickness - freestyle varies this with color
    *   count (see strokeWeight.js); the grid tool leaves it at the default.
+   * @param {object} renderer a p5 instance/`p5.Graphics` buffer to draw onto
+   *   (anything with `stroke`/`noFill`/`strokeWeight`/`line`) - defaults to
+   *   `window`, i.e. the main canvas, matching every original call site.
+   *   App.js's Weave live-selection dimming draws non-selected curves onto
+   *   its own offscreen buffer instead (see `Curve#renderAlpha`'s own doc
+   *   and App.js's `dimBuffer`) so the whole buffer can get one cheap
+   *   blur+desaturate composite, rather than filtering per stroke.
    */
-  static drawCurve(points, strokes, segments = 8, weight = DEFAULT_STROKE_WEIGHT) {
-    StringArtRenderer.#drawSegments(weaveSegmentsForCurve(points, strokes, segments), weight);
+  static drawCurve(points, strokes, segments = 8, weight = DEFAULT_STROKE_WEIGHT, renderer = window) {
+    StringArtRenderer.#drawSegments(weaveSegmentsForCurve(points, strokes, segments), weight, renderer);
   }
 
   /**
@@ -33,18 +40,19 @@ export class StringArtRenderer {
    * @param {number} leap
    * @param {{color:string,enabled:boolean}[]} strokes
    * @param {number} weight
+   * @param {object} renderer see `drawCurve`'s own doc.
    */
-  static drawClosedWeave(cellCorners, n, leap, strokes, weight = DEFAULT_STROKE_WEIGHT) {
-    StringArtRenderer.#drawSegments(closedWeaveSegmentsForCurve(cellCorners, n, leap, strokes), weight);
+  static drawClosedWeave(cellCorners, n, leap, strokes, weight = DEFAULT_STROKE_WEIGHT, renderer = window) {
+    StringArtRenderer.#drawSegments(closedWeaveSegmentsForCurve(cellCorners, n, leap, strokes), weight, renderer);
   }
 
-  static #drawSegments(segments, weight) {
-    strokeWeight(weight);
-    noFill();
+  static #drawSegments(segments, weight, renderer = window) {
+    renderer.strokeWeight(weight);
+    renderer.noFill();
 
     for (const { from, to, color } of segments) {
-      stroke(color);
-      line(from.x, from.y, to.x, to.y);
+      renderer.stroke(color);
+      renderer.line(from.x, from.y, to.x, to.y);
     }
   }
 }

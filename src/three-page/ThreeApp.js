@@ -85,6 +85,9 @@ const PIN_PICK_RADIUS = 15;
 // cell - see App.js's own WEAVE_CELL_RADIUS for the sizing rationale
 // (GRID_SPACING here is the same fixed 60 App.js's GRID_CONFIG.spacing uses).
 const WEAVE_CELL_RADIUS = GRID_SPACING * 1.5;
+// Same "dim everything but what's selected" opacity as App.js's own
+// WEAVE_DIMMED_ALPHA - see that constant's doc for the rationale.
+const WEAVE_DIMMED_ALPHA = 0.4;
 
 // Reel pipeline mode (see ReelTimeline.js + tools/reel-pipeline/) - inert on
 // the normal deployed page, only read by a headless Puppeteer driver that
@@ -511,25 +514,36 @@ export class ThreeApp {
    * The Weave feature's own `#refreshLivePatternCurves` equivalent - re-syncs
    * whichever committed weave curves are currently in the Weave menu's live
    * selection (see `WeaveState#liveSelection`) with its *current* N/leap/
-   * stroke weight and the current palette, and refreshes their highlight
-   * outlines (see `SceneSync#setWeaveHighlights`) to match. Called on every
-   * palette change (same subscription `#refreshLivePatternCurves` is on),
-   * every "Stroke Weight" apply, and every Weave menu change
+   * stroke weight and the current palette, refreshes their highlight
+   * outlines (see `SceneSync#setWeaveHighlights`) to match, and (since this
+   * is also the one place that always sees every visible curve alongside the
+   * current selection) keeps every curve's `renderAlpha` in sync - dimmed
+   * to `WEAVE_DIMMED_ALPHA` while *not* selected and a selection exists,
+   * full opacity otherwise (see `Curve#renderAlpha`'s own doc). Called on
+   * every palette change (same subscription `#refreshLivePatternCurves` is
+   * on), every "Stroke Weight" apply, and every Weave menu change
    * (`WeaveState#onChange` - N/leap/toggleLive/selectOnlyMany/reset all
    * route through it). Always refreshes highlights (even to an empty list),
    * so releasing the selection actually clears them.
    */
   #refreshLiveWeaveCurves = () => {
+    const hasSelection = this.weaveState.liveSelection.size > 0;
     const ids = [];
     const highlightCorners = [];
     for (const entry of this.design.visibleCurves) {
-      if (!entry.curve.isClosedWeave || !this.weaveState.isLive(entry.curve.closedWeave.cellId)) continue;
-      entry.curve.closedWeave.n = this.weaveState.n;
-      entry.curve.closedWeave.leap = this.weaveState.leap;
-      entry.curve.recolor(this.palette.getAll());
-      entry.curve.weight = this.strokeWeight;
-      ids.push(entry.id);
-      highlightCorners.push(entry.curve.closedWeave.cellCorners);
+      const isLiveWeave = entry.curve.isClosedWeave && this.weaveState.isLive(entry.curve.closedWeave.cellId);
+      if (isLiveWeave) {
+        entry.curve.closedWeave.n = this.weaveState.n;
+        entry.curve.closedWeave.leap = this.weaveState.leap;
+        entry.curve.recolor(this.palette.getAll());
+        entry.curve.weight = this.strokeWeight;
+        highlightCorners.push(entry.curve.closedWeave.cellCorners);
+      }
+
+      const newAlpha = hasSelection && !isLiveWeave ? WEAVE_DIMMED_ALPHA : 1;
+      const alphaChanged = entry.curve.renderAlpha !== newAlpha;
+      entry.curve.renderAlpha = newAlpha;
+      if (isLiveWeave || alphaChanged) ids.push(entry.id);
     }
     if (ids.length > 0) this.sceneSync.rebuildCurves(ids);
     this.sceneSync.setWeaveHighlights(highlightCorners);
@@ -615,6 +629,11 @@ export class ThreeApp {
     this.weaveUI.init();
     this.weaveUI.setGridLayout(this.grid.layout);
     this.weaveState.onChange(this.#refreshLiveWeaveCurves);
+    // A brand-new curve (hand-drawn, stamped, or Populate-All'd) always
+    // starts at renderAlpha = 1 - if a live selection already exists when it
+    // shows up, it needs to pick up that dimming right away rather than
+    // waiting for some other, unrelated change to trigger a refresh.
+    this.curves.onChange(this.#refreshLiveWeaveCurves);
   }
 
   /**
@@ -626,6 +645,10 @@ export class ThreeApp {
     for (const cellCorners of enumerateCells(this.grid.points, sides)) {
       const cellId = cellIdForCorners(cellCorners);
       if (this.curves.hasCurveForCell(cellId)) continue;
+      // Each add fires CurveStore#onChange, which #refreshLiveWeaveCurves is
+      // itself subscribed to (see #initWeaveUI) - so a newly-stamped cell
+      // picks up any already-active selection's dimming immediately, not
+      // just whenever something else happens to trigger a refresh next.
       this.curves.add(this.#buildWeaveCurve(cellCorners, cellId));
     }
   };

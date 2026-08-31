@@ -123,6 +123,22 @@ const _position = new THREE.Vector3();
 const _quaternion = new THREE.Quaternion();
 const _scale = new THREE.Vector3(1, 1, 1);
 const _color = new THREE.Color();
+const _hsl = { h: 0, s: 0, l: 0 }; // scratch object for THREE.Color#getHSL, reused like _color/_matrix/etc. above
+
+// Same "slightly greyed out" saturation cut as App.js's WEAVE_DIMMED_SATURATION
+// (45%, i.e. multiply saturation by 0.45) - see that constant's own doc.
+// There's no equivalent blur here: a real one would need a selective
+// render-to-texture post-process pass (blur everything except the live
+// selection, composite), which this page's renderer doesn't have set up -
+// left as a known gap rather than faked with something that isn't blur.
+const WEAVE_DIMMED_SATURATION_FACTOR = 0.45;
+
+/** Desaturates `threeColor` in place toward WEAVE_DIMMED_SATURATION_FACTOR of its own saturation - a no-op at alpha >= 1 (nothing dimmed). @param {THREE.Color} threeColor @param {number} alpha */
+function desaturateForDimming(threeColor, alpha) {
+  if (alpha >= 1) return;
+  threeColor.getHSL(_hsl);
+  threeColor.setHSL(_hsl.h, _hsl.s * WEAVE_DIMMED_SATURATION_FACTOR, _hsl.l);
+}
 
 /**
  * Builds a nail's shared geometry: a slim shaft (local Y in
@@ -586,9 +602,10 @@ export class SceneSync {
             entry.curve.closedWeave.n,
             entry.curve.closedWeave.leap,
             entry.curve.colors,
-            entry.curve.renderWeight
+            entry.curve.renderWeight,
+            entry.curve.renderAlpha
           )
-        : this.#buildWeaveObject(entry.curve.points, entry.curve.colors, entry.curve.renderWeight);
+        : this.#buildWeaveObject(entry.curve.points, entry.curve.colors, entry.curve.renderWeight, entry.curve.renderAlpha);
       if (!object) continue; // a degenerate (<3-point) curve produces zero weave segments - nothing to show
       this.scene.add(object);
       this.curveLines.set(entry.id, object);
@@ -655,9 +672,12 @@ export class SceneSync {
    * @param {{x:number,y:number}[]} points
    * @param {{color:string,enabled:boolean}[]} colors
    * @param {number} weight
+   * @param {number} alpha 0-1 - see `Curve#renderAlpha`'s own doc (dimming
+   *   everything outside a Weave live selection). 1 for anything untouched
+   *   by that feature.
    * @returns {LineSegments2 | null} null if there are fewer than 3 points (no weave segments to draw)
    */
-  #buildWeaveObject(points, colors, weight) {
+  #buildWeaveObject(points, colors, weight, alpha = 1) {
     if (points.length < 3) return null;
     const colorCount = colors.length;
 
@@ -669,6 +689,7 @@ export class SceneSync {
         if (!layer.enabled) return;
         const y = worldColorLayerHeight(layerIndex, colorCount, 0, this.nailHeight);
         _color.set(layer.color);
+        desaturateForDimming(_color, alpha);
         for (const { from, to } of computeWeaveSegments(p1, p2, p3, layerIndex, colorCount)) {
           const worldFrom = this.toWorldPosition(from, y);
           const worldTo = this.toWorldPosition(to, y);
@@ -677,7 +698,7 @@ export class SceneSync {
         }
       });
     }
-    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution);
+    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution, alpha);
   }
 
   /**
@@ -693,9 +714,10 @@ export class SceneSync {
    * @param {number} leap
    * @param {{color:string,enabled:boolean}[]} colors
    * @param {number} weight
+   * @param {number} alpha 0-1 - see `#buildWeaveObject`'s own doc.
    * @returns {LineSegments2 | null}
    */
-  #buildClosedWeaveObject(cellCorners, n, leap, colors, weight) {
+  #buildClosedWeaveObject(cellCorners, n, leap, colors, weight, alpha = 1) {
     const colorCount = colors.length;
     const positions = [];
     const vertexColors = [];
@@ -703,16 +725,24 @@ export class SceneSync {
     for (const { from, to, color, layerIndex } of closedWeaveSegmentsForCurve(cellCorners, n, leap, colors)) {
       const y = worldColorLayerHeight(layerIndex, colorCount, 0, this.nailHeight);
       _color.set(color);
+      desaturateForDimming(_color, alpha);
       const worldFrom = this.toWorldPosition(from, y);
       const worldTo = this.toWorldPosition(to, y);
       positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
       vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
     }
-    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution);
+    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution, alpha);
   }
 
-  /** Shared `LineSegments2` assembly for `#buildWeaveObject`/`#buildClosedWeaveObject` - everything past "here are the world-space vertex positions/colors" is identical for both. */
-  static #assembleWeaveObject(positions, vertexColors, weight, lineResolution) {
+  /**
+   * Shared `LineSegments2` assembly for `#buildWeaveObject`/
+   * `#buildClosedWeaveObject` - everything past "here are the world-space
+   * vertex positions/colors" is identical for both. `alpha < 1` is only ever
+   * true while a Weave live selection is isolating a working set (see
+   * `Curve#renderAlpha`); `transparent` is set to match so three.js actually
+   * honors a non-1 opacity instead of silently ignoring it.
+   */
+  static #assembleWeaveObject(positions, vertexColors, weight, lineResolution, alpha = 1) {
     if (positions.length === 0) return null;
 
     const geometry = new LineSegmentsGeometry();
@@ -723,6 +753,8 @@ export class SceneSync {
       vertexColors: true,
       linewidth: weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
       resolution: lineResolution,
+      transparent: alpha < 1,
+      opacity: alpha,
     });
 
     const object = new LineSegments2(geometry, material);

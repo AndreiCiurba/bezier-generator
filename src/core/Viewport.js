@@ -32,9 +32,16 @@ export class Viewport {
     return new Point(worldX * this.zoom + this.x, worldY * this.zoom + this.y);
   }
 
-  /** Applies the current pan/zoom to the active p5 drawing context. */
-  applyTransform() {
-    translate(this.x, this.y);
-    scale(this.zoom);
+  /**
+   * Applies the current pan/zoom to a p5 drawing context - the main canvas
+   * by default (`window`, since p5's global mode attaches `translate`/
+   * `scale` there), or an explicit `p5.Graphics` offscreen buffer so its own
+   * drawing lines up in the same world-space coordinates (see App.js's
+   * `dimBuffer`, used for the Weave live-selection's blurred-background view).
+   * @param {{translate: (x:number,y:number)=>void, scale: (s:number)=>void}} [target]
+   */
+  applyTransform(target = window) {
+    target.translate(this.x, this.y);
+    target.scale(this.zoom);
   }
 }

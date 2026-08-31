@@ -48,6 +48,22 @@ const NEAREST_NAIL_RADIUS = 10;
 // spacing / sqrt(3) =~ 34.6px - well inside this radius) rather than being a
 // tight single-nail tolerance like NEAREST_NAIL_RADIUS.
 const WEAVE_CELL_RADIUS = GRID_CONFIG.spacing * 1.5;
+// The Weave menu's "isolate what I'm working on" live-selection view (see
+// Curve#renderAlpha's own doc): every curve NOT in the current live
+// selection fades to WEAVE_DIMMED_ALPHA, loses most of its saturation
+// (WEAVE_DIMMED_SATURATION%, applied via a canvas `saturate()` filter - not
+// literal grayscale, just "slightly greyed out"), and gets a soft
+// WEAVE_DIMMED_BLUR_PX blur - unmistakably de-emphasized background context,
+// not competing with the sharp, full-color selection, but never near-zero -
+// the user still wants to see roughly what's around it. All three are
+// applied as ONE composite of the offscreen `dimBuffer` (see `draw()`)
+// rather than per-stroke - a canvas `filter` genuinely re-rasterizes
+// whatever it touches, so doing this per line segment across potentially
+// hundreds of dimmed curves would be a real frame-rate cost; one filtered
+// `image()` call is not.
+const WEAVE_DIMMED_ALPHA = 0.4;
+const WEAVE_DIMMED_SATURATION = 45; // percent - CSS/canvas saturate() syntax
+const WEAVE_DIMMED_BLUR_PX = 2.5;
 // World-space pick radius for grabbing/removing an existing deformation pin -
 // a touch larger than a nail's own snap radius since pins are bigger,
 // deliberately-grabbable markers. Not zoom-adjusted, matching how
@@ -318,6 +334,22 @@ export class App {
 
     CanvasView.drawGridDots(this.deformation.points);
 
+    // A non-empty Weave live selection means the user is actively isolating
+    // a working set. Every other curve (weave or not) draws onto
+    // `this.dimBuffer` instead of the main canvas, in full color at this
+    // point - the blur/desaturate/fade all happen together in one composite
+    // after this loop, not per curve (see WEAVE_DIMMED_ALPHA's own doc).
+    // Selected/sharp curves still draw directly, inline, same as always -
+    // the composite happening *after* this loop (rather than before) is
+    // safe precisely because cells never spatially overlap each other, so
+    // it never actually paints over anything sharp already on the canvas,
+    // only the untouched space around it.
+    const hasWeaveSelection = this.weaveState.liveSelection.size > 0;
+
+    this.dimBuffer.clear();
+    this.dimBuffer.push();
+    this.viewport.applyTransform(this.dimBuffer);
+
     for (const { curve } of this.design.visibleCurves) {
       if (isLiveAutoPatternCurve(curve, this.patterns)) {
         // Auto-stamped and still the active selection - keep tracking the
@@ -341,12 +373,15 @@ export class App {
           curve.recolor(this.palette.getAll());
           curve.weight = this.strokeWeight;
         }
+        const isDimmed = hasWeaveSelection && !isLive;
+        curve.renderAlpha = isDimmed ? WEAVE_DIMMED_ALPHA : 1;
         StringArtRenderer.drawClosedWeave(
           curve.closedWeave.cellCorners,
           curve.closedWeave.n,
           curve.closedWeave.leap,
           curve.colors,
-          curve.renderWeight
+          curve.renderWeight,
+          isDimmed ? this.dimBuffer : window
         );
         if (isLive) CanvasView.drawWeaveHighlight(curve.closedWeave.cellCorners);
       } else {
@@ -356,9 +391,32 @@ export class App {
         // fallback as before - either way, never the *current* setting (unless
         // it's still a live Auto-pattern curve, handled above), so
         // curves/patterns from before a change keep rendering exactly as drawn.
-        StringArtRenderer.drawCurve(curve.points, curve.colors, curve.colors.length, curve.renderWeight);
+        // An ordinary curve is never itself part of a Weave selection, so it
+        // simply dims whenever one exists at all.
+        const isDimmed = hasWeaveSelection;
+        curve.renderAlpha = isDimmed ? WEAVE_DIMMED_ALPHA : 1;
+        StringArtRenderer.drawCurve(
+          curve.points,
+          curve.colors,
+          curve.colors.length,
+          curve.renderWeight,
+          isDimmed ? this.dimBuffer : window
+        );
       }
       curve.previouslyDrawn = true;
+    }
+
+    this.dimBuffer.pop();
+
+    if (hasWeaveSelection) {
+      push();
+      resetMatrix(); // dimBuffer already carries the viewport transform baked into its own pixels - composite it in raw canvas space
+      drawingContext.filter = `blur(${WEAVE_DIMMED_BLUR_PX}px) saturate(${WEAVE_DIMMED_SATURATION}%)`;
+      tint(255, WEAVE_DIMMED_ALPHA * 255);
+      image(this.dimBuffer, 0, 0);
+      noTint();
+      drawingContext.filter = 'none';
+      pop();
     }
 
     if (this.selection.isReadyForCurve()) {
@@ -757,5 +815,9 @@ export class App {
   #createCanvas() {
     const renderer = createCanvas(this.canvasWidth, this.canvasHeight);
     renderer.canvas.classList.add('centered-canvas');
+    // Offscreen buffer every Weave-dimmed curve draws onto instead of the
+    // main canvas (see WEAVE_DIMMED_ALPHA's own doc) - same size as the main
+    // canvas so `image(this.dimBuffer, 0, 0)` composites 1:1, no scaling.
+    this.dimBuffer = createGraphics(this.canvasWidth, this.canvasHeight);
   }
 }

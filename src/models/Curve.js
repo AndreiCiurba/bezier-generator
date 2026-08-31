@@ -55,6 +55,19 @@ export class Curve {
     // "locked in". Curves stamped from the currently-selected pattern start
     // false so they pick up one live recolor before locking.
     this.previouslyDrawn = patternId === null;
+    // 0-1 - the Weave menu's "dim everything except what I'm working on"
+    // live-selection view (see WEAVE_DIMMED_ALPHA in both App.js and
+    // ThreeApp.js). Set every frame/refresh by App.js's draw loop and
+    // ThreeApp.js's #refreshLiveWeaveCurves while a Weave live selection is
+    // active; 1 (fully opaque) the rest of the time, including for every
+    // curve that was never touched by Weave at all. On the 2D page this
+    // value only decides *whether* a curve draws onto App.js's offscreen
+    // `dimBuffer` instead of the main canvas - the actual fade (plus a blur
+    // and desaturation) happens once, for the whole buffer, at composite
+    // time, not per curve (see App.js's own doc for why). The 3D page has no
+    // such buffer to composite through, so `renderAlpha` there is applied
+    // directly as the curve's `LineMaterial.opacity`.
+    this.renderAlpha = 1;
   }
 
   belongsToPattern(patternId) {

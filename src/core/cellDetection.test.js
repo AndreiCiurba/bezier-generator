@@ -30,6 +30,49 @@ function squareCellGrid(size) {
   return cells;
 }
 
+// Mirrors Grid.js#buildStandard's exact formula - a real triangular lattice,
+// row-parity stagger included, not just a plain rectangular grid of points
+// (which has no equilateral triangles in it at all - the diagonal neighbors
+// sit at spacing*sqrt(2), not spacing).
+function triangularLattice(rows, cols, spacing) {
+  const rowHeight = (spacing * Math.sqrt(3)) / 2;
+  const points = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (row % 2 === 0 && col === 0) continue;
+      const x = col * spacing + (row % 2) * (spacing / 2);
+      const y = row * rowHeight;
+      points.push(new Point(x, y));
+    }
+  }
+  return points;
+}
+
+// Mirrors Grid.js#buildHexagon's exact formula (same rectangular footprint
+// as #buildRotated, with the same #hexSublattice 3-coloring, dropping color
+// 2) - a real honeycomb lattice, not just "a triangular lattice with some
+// points missing" in some arbitrary/incorrect pattern.
+function hexagonalLattice(rows, cols, spacing) {
+  const rowHeight = (spacing * Math.sqrt(3)) / 2;
+  const offsetY = cols * spacing;
+  const sublatticeOf = (row, col) => {
+    const q = col - Math.floor(row / 2);
+    const r = row;
+    return (((q - r) % 3) + 3) % 3;
+  };
+  const points = [];
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (row % 2 === 0 && col === 0) continue;
+      if (sublatticeOf(row, col) === 2) continue;
+      const x = row * rowHeight;
+      const y = offsetY - (col * spacing + (row % 2) * (spacing / 2));
+      points.push(new Point(x, y));
+    }
+  }
+  return points;
+}
+
 describe('shapeNameForSides', () => {
   it('names the three shapes the app\'s own Grid supports', () => {
     expect(shapeNameForSides(3)).toBe('Triangle');
@@ -219,16 +262,20 @@ describe('enumerateCells', () => {
     expect(cells[0]).toHaveLength(4);
   });
 
-  it('never lets two cells share a point, for a shape whose lattice needs disjoint tiles (triangle/hexagon)', () => {
-    // sides !== 4 still goes through the generic greedy-nearest-neighbors
-    // path, which is meant to produce disjoint tiles - unlike sides === 4's
-    // deliberately-overlapping dense squares (see the "sides === 4" describe
-    // block below).
+  it('never lets two cells share a point, for a shape count with no exact path at all (the generic greedy fallback)', () => {
+    // 3 (triangle), 4 (square), and 6 (hexagon) all have their own exact
+    // construction now (see the "sides === 4"/"sides === 3"/"sides === 6"
+    // describe blocks below) - only some *other* side count (not a real
+    // `Grid` layout, but still nameable on a hand-edited `WeaveRecipe`) still
+    // goes through the generic greedy-nearest-neighbors path, which is meant
+    // to produce disjoint tiles rather than the exact paths' own
+    // deliberately-touching dense tilings.
     const points = [];
     for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < 6; col++) points.push(new Point(col * 10, row * 10));
+      for (let col = 0; col < 10; col++) points.push(new Point(col * 10, row * 10));
     }
-    const cells = enumerateCells(points, 3);
+    const cells = enumerateCells(points, 5);
+    expect(cells.length).toBeGreaterThan(0); // otherwise this isn't testing anything
     const seen = new Set();
     for (const cell of cells) {
       for (const p of cell) {
@@ -297,6 +344,137 @@ describe('enumerateCells', () => {
 
       const shared = first.filter((p) => rightNeighbor.includes(p));
       expect(shared).toHaveLength(2); // the whole shared edge, not just a corner
+    });
+  });
+
+  describe('sides === 3 (Grid Shape "Triangle") on a real triangular lattice', () => {
+    // A regression case: the generic greedy nearest-neighbors grouping (see
+    // the "generic greedy fallback" test above) does not respect the
+    // lattice's row-parity stagger at all, so an anchor's "2 nearest
+    // neighbors" could easily land on 2 points that aren't mutually
+    // adjacent - a non-equilateral,
+    // visibly-wrong sliver "triangle" a few cells over from any actual
+    // boundary. `enumerateTriangularCells`'s exact angular-neighbor-pairing
+    // math is what fixes this for good.
+    it('produces only proper equilateral triangles, never a distorted sliver', () => {
+      const spacing = 60;
+      const points = triangularLattice(13, 13, spacing);
+      const cells = enumerateCells(points, 3);
+      expect(cells.length).toBeGreaterThan(0);
+
+      for (const cell of cells) {
+        expect(cell).toHaveLength(3);
+        const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+        expect(d(cell[0], cell[1])).toBeCloseTo(spacing, 5);
+        expect(d(cell[1], cell[2])).toBeCloseTo(spacing, 5);
+        expect(d(cell[2], cell[0])).toBeCloseTo(spacing, 5);
+      }
+    });
+
+    it('shares a full edge (2 nails) with its immediate up/down-pointing neighbor, not disjoint tiles', () => {
+      const points = triangularLattice(13, 13, 60);
+      const cells = enumerateCells(points, 3);
+
+      // Every interior edge of a triangulated lattice borders exactly 2
+      // triangles - so some pair of cells sharing exactly 2 points (one full
+      // edge) must exist, the same "touching, not disjoint" shape the square
+      // lattice's cells deliberately have.
+      let foundSharedEdge = false;
+      outer: for (let i = 0; i < cells.length; i++) {
+        for (let j = i + 1; j < cells.length; j++) {
+          const shared = cells[i].filter((p) => cells[j].includes(p));
+          if (shared.length === 2) {
+            foundSharedEdge = true;
+            break outer;
+          }
+          expect(shared.length).toBeLessThanOrEqual(2); // never overlapping on more than one shared edge
+        }
+      }
+      expect(foundSharedEdge).toBe(true);
+    });
+
+    it('never produces the same triangle twice, even though every triangle is found once from each of its 3 corners', () => {
+      const points = triangularLattice(9, 9, 60);
+      const cells = enumerateCells(points, 3);
+      const ids = new Set(cells.map((c) => cellIdForCorners(c)));
+      expect(ids.size).toBe(cells.length);
+    });
+
+    it('fills solid - end to end with a real triangular-lattice enumerateCells() population, not just the outer ring', () => {
+      // Mirrors the equivalent square-lattice test above: enumerate real
+      // triangle cells, find the one nearest a click, then confirm the
+      // neighborhood-radius brush comes back as a filled blob.
+      const points = triangularLattice(13, 13, 60);
+      const allCells = enumerateCells(points, 3);
+      const target = nearestCellByCentroid(allCells, allCells[Math.floor(allCells.length / 2)].reduce(
+        (acc, p, i, arr) => ({ x: acc.x + p.x / arr.length, y: acc.y + p.y / arr.length }),
+        { x: 0, y: 0 }
+      ));
+
+      const ring1 = cellsWithinNeighborRadius(allCells, target, 1);
+      expect(ring1.length).toBeGreaterThan(1); // has real touching neighbors, not stranded alone
+      expect(ring1[0]).toBe(target);
+    });
+  });
+
+  describe('sides === 6 (Grid Shape "Hexagon") on a real honeycomb lattice', () => {
+    // A regression case mirroring square/triangle's own: the generic greedy
+    // nearest-neighbors grouping doesn't understand a honeycomb's "every
+    // survivor has exactly 3 neighbors" structure at all, so an anchor's "5
+    // nearest neighbors" could easily reach clear across a hexagonal hole to
+    // grab points that don't actually belong to the same cell - a visibly
+    // wrong, non-hexagonal shape. `enumerateHexagonalCells`'s exact
+    // honeycomb-hole reconstruction is what fixes this for good.
+    it('produces only proper regular hexagons - 6 corners, every edge the same length', () => {
+      const spacing = 60;
+      const points = hexagonalLattice(15, 15, spacing);
+      const cells = enumerateCells(points, 6);
+      expect(cells.length).toBeGreaterThan(0);
+
+      for (const cell of cells) {
+        expect(cell).toHaveLength(6);
+        const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+        for (let i = 0; i < 6; i++) {
+          expect(d(cell[i], cell[(i + 1) % 6])).toBeCloseTo(spacing, 5);
+        }
+      }
+    });
+
+    it('shares a full edge (2 nails) with its immediate honeycomb neighbor, not disjoint tiles', () => {
+      const points = hexagonalLattice(15, 15, 60);
+      const cells = enumerateCells(points, 6);
+
+      let foundSharedEdge = false;
+      outer: for (let i = 0; i < cells.length; i++) {
+        for (let j = i + 1; j < cells.length; j++) {
+          const shared = cells[i].filter((p) => cells[j].includes(p));
+          if (shared.length === 2) {
+            foundSharedEdge = true;
+            break outer;
+          }
+          expect(shared.length).toBeLessThanOrEqual(2);
+        }
+      }
+      expect(foundSharedEdge).toBe(true);
+    });
+
+    it('never produces the same hexagon twice, even though every hexagon is found from several of its own edges', () => {
+      const points = hexagonalLattice(15, 15, 60);
+      const cells = enumerateCells(points, 6);
+      const ids = new Set(cells.map((c) => cellIdForCorners(c)));
+      expect(ids.size).toBe(cells.length);
+    });
+
+    it('fills solid - end to end with a real honeycomb enumerateCells() population, not just the outer ring', () => {
+      const points = hexagonalLattice(15, 15, 60);
+      const allCells = enumerateCells(points, 6);
+      const mid = allCells[Math.floor(allCells.length / 2)];
+      const centroid = mid.reduce((acc, p, i, arr) => ({ x: acc.x + p.x / arr.length, y: acc.y + p.y / arr.length }), { x: 0, y: 0 });
+      const target = nearestCellByCentroid(allCells, centroid);
+
+      const ring1 = cellsWithinNeighborRadius(allCells, target, 1);
+      expect(ring1.length).toBeGreaterThan(1); // has real touching neighbors, not stranded alone
+      expect(ring1[0]).toBe(target);
     });
   });
 });

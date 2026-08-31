@@ -2,16 +2,23 @@
  * Turns a flat list of grid nails (see `Grid.js`) into "cells" - the 3, 4,
  * or 6 nails that make up one repeating tile of the current layout - for
  * the Weave feature. `Grid` itself has no cell/face concept for any of its
- * four layouts (`standard`/`rotated` are a triangular lattice, `square` is
- * concentric rings, `hexagon` is a honeycomb with a non-uniform boundary),
- * and reconstructing exact per-layout lattice topology would mean bespoke
- * code duplicated per layout, kept in sync with `Grid`'s own row/col math
- * forever after. Instead this works purely geometrically, off whatever
- * points are actually there: "the `sides` nearest nails to a point, wound
- * into a simple polygon" - which handles all four layouts (including
- * `square`'s non-uniform rings and the boundary of any layout) uniformly,
- * at the cost of being an approximation rather than an exact tiling (see
- * `enumerateCells`'s own doc for what that costs Auto mode specifically).
+ * four layouts, and reconstructing each one's exact lattice topology means
+ * real, layout-specific geometry rather than one shared trick - `square`
+ * (a plain rectangular nail grid) matches cells by exact coordinate,
+ * `standard`/`rotated` (a triangular lattice) matches them by angular
+ * neighbor-pairing at the lattice's own spacing, and `hexagon` (a honeycomb -
+ * a triangular lattice with 1 of its 3 sublattices removed) matches them by
+ * reconstructing each honeycomb hole's implied center (see
+ * `enumerateAxisAlignedSquareCells`/`enumerateTriangularCells`/
+ * `enumerateHexagonalCells`). Any side count outside {3,4,6} - not a real
+ * `Grid` layout, but still nameable on a hand-edited `WeaveRecipe` - falls
+ * back to a generic "nearest `sides` nails, wound into a polygon"
+ * approximation (see `enumerateCells`'s own doc for what that approximation
+ * costs). `findNearestCell` (a single from-a-click lookup, rather than a
+ * whole-grid enumeration) still uses that same generic nearest-neighbor
+ * approach for every shape - it isn't part of the app's actual click flow
+ * anymore (`enumerateCells` + `nearestCellByCentroid` is), but stays exact-
+ * shape-agnostic since nothing currently depends on it being precise.
  */
 
 // Grid#layout -> how many nails make up one cell of that layout's lattice.
@@ -147,33 +154,215 @@ function enumerateAxisAlignedSquareCells(points) {
 }
 
 /**
+ * The lattice's own nail-to-nail spacing - the minimum distance between any
+ * two distinct points. Every exact (non-greedy) cell-detection path below
+ * needs this as its "what counts as touching" tolerance, since unlike
+ * `enumerateAxisAlignedSquareCells` (which can match nails by exact
+ * coordinate), a triangular lattice's row-parity stagger means two adjacent
+ * nails essentially never share an X or a Y - only their distance apart is
+ * ever exactly `spacing`.
+ * @param {{x:number,y:number, distanceTo: (p:{x:number,y:number}) => number}[]} points
+ * @returns {number}
+ */
+function latticeSpacing(points) {
+  let min = Infinity;
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const d = points[i].distanceTo(points[j]);
+      if (d < min) min = d;
+    }
+  }
+  return min;
+}
+
+/**
+ * Every small equilateral triangle in a triangular lattice (Grid.js's
+ * `standard`/`rotated` layouts) - exact geometry instead of nearest-neighbor
+ * guessing, the triangle equivalent of `enumerateAxisAlignedSquareCells`.
+ *
+ * The key fact this leans on: for any point `P` and two of its lattice
+ * neighbors `A`/`B` (both at the lattice spacing `s` from `P`) that are 60°
+ * apart as seen from `P`, `A` and `B` are *also* exactly `s` apart from each
+ * other - `P`/`A`/`B` form a real equilateral triangle. In a triangular
+ * lattice every interior point has up to 6 such neighbors spaced 60° apart
+ * all the way around, so walking each point's neighbors in angular order and
+ * pairing up consecutive ones (wrapping around) finds every small triangle
+ * touching that point - up/down-pointing alike, and it degrades safely at
+ * the grid's boundary: a missing neighbor just means a wider angular gap
+ * there, whose two flanking neighbors are more than `s` apart and so never
+ * form a false triangle. Each real triangle gets found once from each of its
+ * 3 corners, so `cellIdForCorners` dedupes down to the true cell list.
+ * @param {{x:number,y:number, distanceTo: (p:{x:number,y:number}) => number}[]} points
+ * @returns {typeof points[]}
+ */
+function enumerateTriangularCells(points) {
+  if (points.length < 3) return [];
+
+  const spacing = latticeSpacing(points);
+  const tolerance = spacing * 0.05; // absorbs float noise without conflating spacing with the next lattice tier (s*sqrt(3), s*2, ...)
+  const seen = new Set();
+  const cells = [];
+
+  for (const p of points) {
+    const neighbors = points
+      .filter((q) => q !== p && Math.abs(p.distanceTo(q) - spacing) < tolerance)
+      .sort((a, b) => Math.atan2(a.y - p.y, a.x - p.x) - Math.atan2(b.y - p.y, b.x - p.x));
+
+    for (let i = 0; i < neighbors.length; i++) {
+      const a = neighbors[i];
+      const b = neighbors[(i + 1) % neighbors.length];
+      if (Math.abs(a.distanceTo(b) - spacing) > tolerance) continue; // a boundary gap - no 3rd corner on this side
+
+      const id = cellIdForCorners([p, a, b]);
+      if (seen.has(id)) continue;
+      seen.add(id);
+      cells.push(sortByAngleAroundCentroid([p, a, b]));
+    }
+  }
+
+  return cells;
+}
+
+/**
+ * Rotates `point` around `center` by `angleRadians` (standard math-positive,
+ * counterclockwise-in-a-Y-up frame - which axis actually points "up" on
+ * screen never matters here, only that every call uses the same convention
+ * consistently). A tiny local helper rather than pulling in a general
+ * vector/matrix utility just for this one use.
+ * @param {{x:number,y:number}} center
+ * @param {{x:number,y:number}} point
+ * @param {number} angleRadians
+ * @returns {{x:number,y:number}}
+ */
+function rotateAround(center, point, angleRadians) {
+  const dx = point.x - center.x;
+  const dy = point.y - center.y;
+  const cos = Math.cos(angleRadians);
+  const sin = Math.sin(angleRadians);
+  return { x: center.x + dx * cos - dy * sin, y: center.y + dx * sin + dy * cos };
+}
+
+/**
+ * The 2 points that would complete an equilateral triangle of side `spacing`
+ * on `p`/`q` (one on each side of segment `p`-`q`) - candidate honeycomb-hole
+ * centers for `enumerateHexagonalCells` below, found by offsetting the
+ * segment's midpoint along its perpendicular by the triangle's own height.
+ * @param {{x:number,y:number}} p
+ * @param {{x:number,y:number}} q
+ * @param {number} spacing
+ * @returns {{x:number,y:number}[]}
+ */
+function equilateralApexCandidates(p, q, spacing) {
+  const midX = (p.x + q.x) / 2;
+  const midY = (p.y + q.y) / 2;
+  const dx = q.x - p.x;
+  const dy = q.y - p.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const height = (spacing * Math.sqrt(3)) / 2;
+  const perpX = (-dy / len) * height;
+  const perpY = (dx / len) * height;
+  return [
+    { x: midX + perpX, y: midY + perpY },
+    { x: midX - perpX, y: midY - perpY },
+  ];
+}
+
+/**
+ * Every hexagon in a honeycomb lattice (Grid.js's `hexagon` layout - a
+ * triangular lattice with 1 of its 3 sublattices removed, see
+ * `Grid.js#buildHexagon`'s own doc) - exact geometry instead of nearest-
+ * neighbor guessing, the hexagon equivalent of `enumerateAxisAlignedSquareCells`/
+ * `enumerateTriangularCells`.
+ *
+ * The lattice fact this leans on: every remaining nail still has exactly 3
+ * neighbors at the *original* triangular lattice's spacing `s` (dropping one
+ * color class costs each survivor half its neighbors, not its own position).
+ * Each hexagonal "hole" left by a removed nail is bordered by exactly 6
+ * survivors, arranged around that hole's implied center at 60° increments
+ * and `s` apart from it - i.e. an equilateral triangle on any surviving edge
+ * `P`-`Q` has its apex sitting exactly on one of these implied centers. So
+ * for every edge `P`-`Q` (nails at distance `s`), build both candidate
+ * apexes (`equilateralApexCandidates`), then for each one check whether
+ * rotating `P` around it by 0/60/120/180/240/300° lands on 6 *real* nails -
+ * if so, that's a genuine hexagon, already wound in order by construction.
+ * Every real hexagon gets found from several of its own edges, so
+ * `cellIdForCorners` dedupes down to the true cell list, the same pattern
+ * `enumerateTriangularCells` uses.
+ * @param {{x:number,y:number, distanceTo: (p:{x:number,y:number}) => number}[]} points
+ * @returns {typeof points[]}
+ */
+function enumerateHexagonalCells(points) {
+  if (points.length < 6) return [];
+
+  const spacing = latticeSpacing(points);
+  const tolerance = spacing * 0.05;
+
+  const findNear = (x, y) => {
+    for (const p of points) {
+      if (Math.hypot(p.x - x, p.y - y) < tolerance) return p;
+    }
+    return null;
+  };
+
+  const seen = new Set();
+  const cells = [];
+
+  for (let i = 0; i < points.length; i++) {
+    for (let j = i + 1; j < points.length; j++) {
+      const p = points[i];
+      const q = points[j];
+      if (Math.abs(p.distanceTo(q) - spacing) > tolerance) continue;
+
+      for (const center of equilateralApexCandidates(p, q, spacing)) {
+        const corners = [];
+        for (let k = 0; k < 6; k++) {
+          const rotated = rotateAround(center, p, (k * Math.PI) / 3);
+          const match = findNear(rotated.x, rotated.y);
+          if (!match) break;
+          corners.push(match);
+        }
+        if (corners.length !== 6) continue;
+
+        const id = cellIdForCorners(corners);
+        if (seen.has(id)) continue;
+        seen.add(id);
+        cells.push(corners);
+      }
+    }
+  }
+
+  return cells;
+}
+
+/**
  * Every cell of the given shape across the whole grid, for Auto mode's
  * "populate everywhere at once" (and for building the population
- * `cellsWithinNeighborRadius` walks). `sides === 4` (Grid's `square`
- * layout, the only 4-sided shape this app has) goes through
- * `enumerateAxisAlignedSquareCells`'s exact index math, since that lattice
- * is a plain rectangular grid with no ambiguity to resolve. Everything else
- * (triangle/hexagon) uses a greedy pass instead: take each not-yet-used
- * nail in turn, pull its `sides - 1` nearest not-yet-used neighbors to
- * complete a cell, mark all `sides` of them used, and move on; a nail
- * without enough not-yet-used neighbors left (near the grid's boundary, or
- * already used up by an earlier cell) is skipped rather than forced into a
- * cell.
- *
- * That greedy path is an approximation, not a mathematically exact
- * non-overlapping tiling - two adjacent, equally-valid cells can compete for
- * the same nail (whichever nail happens earlier in `points` wins it), which
- * can occasionally chain into a visibly wrong shape a few cells over. It's
- * kept for triangle/hexagon since reconstructing their exact per-layout
- * lattice topology is real, layout-specific work (their nails have a
- * row-parity stagger a simple coordinate bucket can't untangle) - a
- * follow-up if it ever turns out to matter there too.
+ * `cellsWithinNeighborRadius` walks). Every shape the app's own `Grid` can
+ * produce now has an exact geometric construction, no guessing involved:
+ * `sides === 4` (`square`) goes through `enumerateAxisAlignedSquareCells`'s
+ * exact index math, `sides === 3` (`standard`/`rotated`) goes through
+ * `enumerateTriangularCells`'s exact angular-neighbor-pairing, and
+ * `sides === 6` (`hexagon`) goes through `enumerateHexagonalCells`'s exact
+ * honeycomb-hole reconstruction. Any *other* side count (there's no such
+ * `Grid` layout today, but a hand-edited `WeaveRecipe` could still name one -
+ * see that model's own doc) falls back to a greedy, approximate pass: take
+ * each not-yet-used nail in turn, pull its `sides - 1` nearest not-yet-used
+ * neighbors to complete a cell, mark all `sides` of them used, and move on;
+ * a nail without enough not-yet-used neighbors left (near the grid's
+ * boundary, or already used up by an earlier cell) is skipped rather than
+ * forced into a cell. That fallback isn't a mathematically exact tiling -
+ * two adjacent, equally-valid cells can compete for the same nail (whichever
+ * nail happens earlier in `points` wins it), which can occasionally chain
+ * into a visibly wrong shape a few cells over - the same class of bug
+ * square/triangle/hexagon each had before they got their own exact paths.
  * @param {{x:number,y:number, distanceTo: (p:{x:number,y:number}) => number}[]} points
  * @param {number} sides
  * @returns {typeof points[]}
  */
 export function enumerateCells(points, sides) {
   if (sides === 4) return enumerateAxisAlignedSquareCells(points);
+  if (sides === 3) return enumerateTriangularCells(points);
+  if (sides === 6) return enumerateHexagonalCells(points);
 
   const used = new Set();
   const cells = [];
