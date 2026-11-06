@@ -70,6 +70,10 @@
       <button id="undoAnchorBtn" class="menu-btn" style="width:auto; flex:1;">Undo Point</button>
       <button id="resetShapeBtn" class="menu-btn" style="width:auto; flex:1;">Reset Shape</button>
     </div>
+    <!-- Clears the whole canvas: the in-progress shape AND every dimmed
+         committed-shape reference, plus this browser's saved copy of both -
+         not just the current draft (see "Reset Shape" above for that). -->
+    <button id="clearSavedDataBtn" class="menu-btn" style="margin-top: 4px;">Clear Canvas</button>
 
     <!-- This shape's own weave settings - set per shape, before committing it to the library. -->
     <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">This Shape's Weave</div>
@@ -104,7 +108,10 @@
 
     <button id="openLibraryBtn" class="menu-btn" style="margin-top: 10px;">Library</button>
 
-    <!-- Library Submenu - saved, fully-configured shapes; export/import as JSON to move them to the Arrange board page. -->
+    <!-- Library Submenu - saved, fully-configured shapes. Auto-saved to this
+         browser (localStorage) and already available on the Arrange board
+         page with no export/import needed; Export/Import JSON still works,
+         for backups or moving a library to a different browser/device. -->
     <div id="librarySubmenu" class="panel hidden">
       <button id="closeLibrarySubmenuBtn" class="panel-close-btn">X</button>
       <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Shape Library</div>

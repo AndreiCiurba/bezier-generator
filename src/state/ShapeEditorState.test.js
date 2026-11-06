@@ -71,6 +71,32 @@ describe('ShapeEditorState', () => {
     expect(state.anchors[0].x).not.toBe(999);
   });
 
+  describe('hydrate', () => {
+    it('restores anchors and an explicit open (not-yet-closed) state', () => {
+      const state = new ShapeEditorState();
+      const saved = [
+        { x: 0, y: 0, handleIn: null, handleOut: null },
+        { x: 10, y: 0, handleIn: null, handleOut: null },
+      ];
+
+      state.hydrate({ anchors: saved, closed: false });
+
+      expect(state.closed).toBe(false);
+      expect(state.anchors).toEqual(saved);
+    });
+
+    it('restores a closed state and deep-copies the anchors', () => {
+      const state = new ShapeEditorState();
+      const saved = triangleAnchors({ x: 0, y: 0 }, 10);
+
+      state.hydrate({ anchors: saved, closed: true });
+
+      expect(state.closed).toBe(true);
+      saved[0].x = 999;
+      expect(state.anchors[0].x).not.toBe(999);
+    });
+  });
+
   describe('moveAnchor', () => {
     it('moves the anchor and carries its handles along by the same delta', () => {
       const state = new ShapeEditorState();

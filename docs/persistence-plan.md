@@ -1,8 +1,9 @@
-# Persistence plan (proposal — not implemented)
+# Persistence plan
 
-**Status:** plan only, written up on request. Nothing in this doc has been built yet; see the
-two phases below for what each would involve. Not paired with a progress tracker (unlike
-`epic-freestyle.md`/`epic-freeform-weave.md`) since no phase has been started.
+**Status:** Phase 1 implemented (branch `feat/persistence-phase-1-browser-storage`). Phase 2 is
+still just a proposal - see that section below for what it would involve. Not paired with a
+progress tracker (unlike `epic-freestyle.md`/`epic-freeform-weave.md`) since this is a small,
+single-PR-sized addition rather than a multi-step epic.
 
 ## Why
 
@@ -19,25 +20,34 @@ file on one page and importing it on the other every single time — even just s
 - All five pages (`/`, `/freestyle/`, `/3d/`, `/shapes/`, `/arrange/`) are served from the **same
   origin**, which is the key fact Phase 1 leans on.
 
-## Phase 1 — browser storage, no accounts (do this first)
+## Phase 1 — browser storage, no accounts (✅ implemented)
 
-Same-origin pages already share `localStorage`/`sessionStorage` automatically — set a key on
-`/shapes/`, read it on `/arrange/`, no file dialog involved.
+Same-origin pages already share `localStorage` automatically — set a key on `/shapes/`, read it on
+`/arrange/`, no file dialog involved.
 
-- New small module, e.g. `src/io/BrowserStorage.js`: versioned, namespaced keys
-  (`bezier:shapeLibrary:v1`, `bezier:arrangement:v1`), JSON serialize/parse, graceful fallback if
-  storage throws (quota exceeded / private-browsing mode).
-- `ShapeLibraryStore`/`ArrangedShapeStore` auto-save to that key on every `onChange`, and hydrate
-  from it on page load.
-- Existing Export/Import JSON buttons stay as-is — still useful as a manual backup or for moving a
-  design to a different browser/device, just no longer *required* for everyday same-browser use.
-- **`localStorage` vs `sessionStorage`:** `sessionStorage` clears the moment the tab closes;
-  `localStorage` persists until explicitly cleared. Defaulting to `localStorage` unless an
-  explicitly ephemeral "forget everything when I close the tab" behavior is wanted instead (a
-  one-line swap either way).
-- Storage budget: a shape/arrangement is a few KB of JSON each; the typical 5–10MB-per-origin cap
-  comfortably holds hundreds of them.
-- Zero new infrastructure, works today on GitHub Pages as-is, fully reversible.
+- `src/io/BrowserStorage.js` — `saveToStorage`/`loadFromStorage`/`clearFromStorage`, namespaced
+  (`bezier:<key>`) and JSON-serializing, every call wrapped in try/catch so an unavailable/throwing
+  `localStorage` (quota exceeded, private-browsing) degrades to "nothing was saved" rather than
+  crashing the page. Key names live once in `src/io/storageKeys.js`
+  (`shapeLibrary:v1`/`arrangement:v1`/`shapeDraft:v1`) so `/shapes/` and `/arrange/` can't drift
+  apart into two separately hand-typed strings for the shared library key.
+- `/shapes/` (`ShapeDesignerApp.js`): the committed library (`ShapeLibraryStore`) auto-saves on
+  every `onChange` and hydrates on load. The **in-progress draft** also persists — anchors, closed
+  state, nail count/leap/height/weight settings, draw mode, and the live palette — subscribed to
+  `ShapeEditorState#onChange`/`StrokePalette#onChange` (covers every anchor drag and color edit)
+  plus an explicit save from each plain settings field's own change handler. A top-level "Clear
+  Canvas" button wipes both keys and resets the in-memory library/editor (every dimmed committed
+  shape and the in-progress one, not just the draft - "Reset Shape" is the draft-only version).
+- `/arrange/` (`ArrangeApp.js`): hydrates its shape list from the *same* `shapeLibrary:v1` key
+  `/shapes/` writes (read-only — it never writes that key back) and auto-saves/hydrates its own
+  placed arrangement (`ArrangedShapeStore`) under `arrangement:v1`. A top-level "Clear Board"
+  button wipes just that board's own key and every placed instance.
+- Existing Export/Import JSON buttons were left untouched on both pages — still useful as a manual
+  backup or for moving a design to a different browser/device.
+- `ShapeEditorState#hydrate({anchors, closed})` (a sibling of the existing `loadPreset`, which
+  always forces `closed: true`) and `ShapeLibraryStore#clear()` were added to support this cleanly.
+- Went with `localStorage` (not `sessionStorage`) — persists across closing the browser, not just
+  the current tab session.
 
 ## Phase 2 — real accounts + a free/cheap DB
 
@@ -75,6 +85,6 @@ written to `localStorage`, upload it on login, pull it back down on load," with 
 
 ## Recommended sequencing
 
-Do Phase 1 now — it fully solves the immediate "stop re-importing every time I switch pages" pain
-point, today, for free, with no new service to sign up for. Only reach for Phase 2 once/if
-multi-device access or sharing designs with someone else actually becomes necessary.
+Phase 1 fully solves the immediate "stop re-importing every time I switch pages" pain point,
+today, for free, with no new service to sign up for. Only reach for Phase 2 once/if multi-device
+access or sharing designs with someone else actually becomes necessary.

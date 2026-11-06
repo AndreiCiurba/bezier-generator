@@ -64,19 +64,31 @@ export class ShapeEditorState {
   }
 
   /**
-   * Replaces the whole in-progress shape with a preset's anchor ring (deep
-   * copy, so later drags never alias the preset generator's own objects) -
+   * Replaces the whole in-progress shape with a preset's anchor ring -
    * presets are already-closed shapes, ready to reshape immediately.
    * @param {import('../core/bezierOutline.js').Anchor[]} presetAnchors
    */
   loadPreset(presetAnchors) {
-    this.#anchors = presetAnchors.map((a) => ({
+    this.hydrate({ anchors: presetAnchors, closed: true });
+  }
+
+  /**
+   * Replaces the whole in-progress shape with externally-supplied anchors
+   * (deep copy, so later drags never alias the source objects) *and* an
+   * explicit closed/open state - unlike `loadPreset` (always closed), this
+   * is for restoring a shape exactly as it was left, open or closed (e.g.
+   * resuming a browser-storage-persisted draft after a reload - see
+   * `ShapeDesignerApp#hydrateDraft`).
+   * @param {{anchors: import('../core/bezierOutline.js').Anchor[], closed: boolean}} saved
+   */
+  hydrate({ anchors, closed }) {
+    this.#anchors = anchors.map((a) => ({
       x: a.x,
       y: a.y,
       handleIn: a.handleIn ? { x: a.handleIn.x, y: a.handleIn.y } : null,
       handleOut: a.handleOut ? { x: a.handleOut.x, y: a.handleOut.y } : null,
     }));
-    this.#closed = true;
+    this.#closed = Boolean(closed);
     this.#selectedIndex = null;
     this.#notify();
   }
