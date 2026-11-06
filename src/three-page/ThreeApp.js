@@ -57,7 +57,14 @@ import { SidebarResize } from './SidebarResize.js';
 // points. The 3D page owns its own independent Grid/DeformableGrid instance
 // either way (see the progress doc's "stated assumption": not a live mirror
 // of whatever's open in the `/` tab).
-const GRID_SPACING = 60;
+// Scaled 10x (was 60) for the same reason as the Shapes/Arrange pages (see
+// ShapeDesignerApp.js's own doc) - at the app's lowered 0.01 stroke-weight
+// floor, a thin string needs real room between nails to read as thin. Safe
+// to take the full 10x here (unlike the 2D Grid page's 3x): this drives a
+// Three.js board/lattice, not a 2D canvas backing-buffer size, so there's no
+// memory-blowup risk - CAMERA_FAR below is bumped so the now-bigger board
+// (up to MAX_GRID_SIZE) still stays within the camera's far clipping plane.
+const GRID_SPACING = 600;
 function buildGridConfig(size, shape) {
   if (shape === 'square') return { layout: 'square', rows: size, cols: size, spacing: GRID_SPACING };
   if (shape === 'hexagon') {
@@ -68,19 +75,23 @@ function buildGridConfig(size, shape) {
 
 const CAMERA_FOV = 50;
 const CAMERA_NEAR = 1;
-const CAMERA_FAR = 10000;
+// Bumped from 10000 - GRID_SPACING's 10x increase means the board at
+// MAX_GRID_SIZE now needs a camera distance well past the old far plane
+// (defaultCameraPosition would otherwise place the camera beyond its own
+// clipping range, rendering nothing).
+const CAMERA_FAR = 300000;
 // The board is always centered at world X/Z = 0 (see SceneSync's origin
 // shift), so the orbit target never needs to move.
 const ORBIT_TARGET = { x: 0, y: 0, z: 0 };
 // Design-space pick tolerance for snapping a Drawing Mode click to the
 // nearest nail - same value and same reasoning as App.js's own
-// NEAREST_NAIL_RADIUS. World units here are numerically identical to the 2D
-// page's design-space pixels (axisMapping never rescales), so the same
-// constant applies unmodified.
-const NEAREST_NAIL_RADIUS = 10;
+// NEAREST_NAIL_RADIUS, scaled by the same 10x as GRID_SPACING above. World
+// units here are numerically identical to the 2D page's design-space pixels
+// (axisMapping never rescales), so the same constant applies unmodified.
+const NEAREST_NAIL_RADIUS = 100;
 // Same grab tolerance as App.js's own PIN_PICK_RADIUS - see that file for the
 // "bigger than a nail's own snap radius" rationale.
-const PIN_PICK_RADIUS = 15;
+const PIN_PICK_RADIUS = 150;
 // World-space pick radius for a Weave click landing "close enough" to a
 // cell - see App.js's own WEAVE_CELL_RADIUS for the sizing rationale
 // (GRID_SPACING here is the same fixed 60 App.js's GRID_CONFIG.spacing uses).

@@ -9,7 +9,10 @@
  * (state/colorCount.js).
  */
 
-export const MIN_STROKE_WEIGHT = 0.1;
+// Lowered from an earlier 0.1 floor - real string art sometimes uses thread
+// thin enough that 0.1px no longer reads as "thin enough," per direct
+// feedback from actual physical-board use.
+export const MIN_STROKE_WEIGHT = 0.01;
 export const MAX_STROKE_WEIGHT = 30;
 
 /**

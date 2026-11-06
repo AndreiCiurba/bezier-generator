@@ -18,6 +18,12 @@ mechanics on a blank, gridless, fixed-size canvas (click anywhere, no snapping),
 designing a nail layout for a real physical board rather than a screen-only pattern. See
 [epic-freestyle.md](epic-freestyle.md) for the in-progress feature set and design decisions.
 
+**As of 2026-11-06 there are two more pages, `/shapes/` and `/arrange/`** — a Paint-style editor
+for hand-drawn closed bezier shapes, each with its own nail count/leap/color layers/height, and a
+3D board for arranging multiple saved shapes together with real extruded weaves. See
+[epic-freeform-weave.md](epic-freeform-weave.md) for the design decisions and
+[freeform-weave-progress.md](freeform-weave-progress.md) for the done/not-done checklist.
+
 ## History / original intent
 
 The code itself only shows a generic drawing tool, but the full commit history (not just the

@@ -37,10 +37,20 @@ import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { ExportRenderer } from '../core/ExportRenderer.js';
 import { downloadCanvasPng } from '../io/PngFile.js';
 
-const GRID_CONFIG = { rows: 15, cols: 13, spacing: 60 };
+// Spacing tripled (was 60) - at the app's lowered 0.01 stroke-weight floor
+// (see strokeWeightSetting.js), a thin string needs real room between
+// adjacent nails to read as thin rather than crowded. Every other
+// world-space pick radius below scales with it by the same 3x, so the
+// "how close counts as a hit" feel stays proportional to the new spacing.
+// Kept to 3x rather than the 10x used on the newer pages (Shapes/Arrange/3D)
+// specifically because this page's canvas is sized to fit its *entire* grid
+// on screen (see the bounding-box math below) - a full 10x would mean a
+// ~9000x9500px canvas, a real browser memory/performance risk this page's
+// pan/zoom-independent sizing model doesn't absorb the way the other pages do.
+const GRID_CONFIG = { rows: 15, cols: 13, spacing: 180 };
 GRID_CONFIG.rowHeight = (GRID_CONFIG.spacing * Math.sqrt(3)) / 2;
 
-const NEAREST_NAIL_RADIUS = 10;
+const NEAREST_NAIL_RADIUS = 30;
 // World-space pick radius for a Weave click landing "close enough" to a
 // cell - a click roughly anywhere inside or near a cell should hit it, so
 // this needs to comfortably clear a cell's own circumradius (for this grid's
@@ -70,13 +80,16 @@ const WEAVE_DIMMED_BLUR_PX = 2.5;
 // NEAREST_NAIL_RADIUS already works in this file (a raw world-space
 // tolerance, not a screen-space one - see freestyle's point editor for the
 // zoom-adjusted alternative, used there instead for a different reason).
-const PIN_PICK_RADIUS = 15;
+const PIN_PICK_RADIUS = 45;
+// Screen-space (actual finger movement), not world-space - unaffected by the
+// GRID_CONFIG.spacing increase above, same reasoning CONTROL_POINT_PICK_RADIUS_PX
+// in FreestyleApp.js already documents for its own screen-space tolerance.
 const TAP_MAX_DURATION_MS = 200;
 const TAP_MAX_MOVEMENT_PX = 10;
 // Empty margin around the grid's own bounding box, on every side, when
 // sizing the canvas to it - so the outermost nails don't sit flush against
 // the canvas edge.
-const GRID_PADDING = 50;
+const GRID_PADDING = 150;
 
 /**
  * The whole app, wired together. Replaces main.js as the p5 sketch entry

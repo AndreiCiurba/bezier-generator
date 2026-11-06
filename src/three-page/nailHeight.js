@@ -5,9 +5,12 @@
  * of `boardControls.js`/`state/strokeWeightSetting.js`.
  */
 
-export const MIN_NAIL_HEIGHT = 1;
-export const MAX_NAIL_HEIGHT = 300;
-export const DEFAULT_NAIL_HEIGHT = 40;
+// Scaled 10x alongside ThreeApp.js's own GRID_SPACING/SceneSync.js's nail
+// radii - nails keep their old proportions relative to the new, more spread-
+// out lattice; only the woven strings themselves got a lower minimum weight.
+export const MIN_NAIL_HEIGHT = 10;
+export const MAX_NAIL_HEIGHT = 3000;
+export const DEFAULT_NAIL_HEIGHT = 400;
 
 /**
  * Parses a nail height. Returns null for anything non-numeric or outside

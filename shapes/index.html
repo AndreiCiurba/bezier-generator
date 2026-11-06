@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>String Art Shape Designer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+  <script type="module" src="../src/shapes/bootstrap.js"></script>
+
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/customPalette.css">
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/canvas-frame.css">
+  <style>
+    /* This page's #ui panel has more content than the grid/freestyle pages'
+       own menus (drawing tools, per-shape settings, a library list) and can
+       easily run taller than the viewport - shared styles.css's `.panel`/
+       `#ui` rules have no height cap or scroll of their own (only individual
+       lists like #savedShapesList do), so without this, anything past the
+       bottom of the screen is simply unreachable. Same fix the 3D page's own
+       `three-page.css` already applies to its own (much busier) `#ui`,
+       scoped here instead of editing the shared file so the grid/freestyle
+       pages' simpler menus stay exactly as they are. */
+    #ui {
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page-nav">
+    <a href="../" class="page-nav-link">&larr; Grid</a>
+    <a href="../freestyle/" class="page-nav-link">Freestyle</a>
+    <a href="../3d/" class="page-nav-link">3D</a>
+    <a href="../arrange/" class="page-nav-link">Arrange &rarr;</a>
+  </div>
+
+  <!-- Burger Menu Button -->
+  <div id="burger">&#9776;</div>
+
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="panel hidden">
+    <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Shape Designer</div>
+    <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+      <strong>Freehand (default):</strong> press and drag to trace a closed shape - release to finish it.<br />
+      <strong>Anchors:</strong> click to place anchors, click back on the first one (or press Enter) to close.<br />
+      Either mode: drag an existing anchor or its handles to reshape; Backspace undoes the last anchor
+      (Anchors mode only, while still open).
+    </div>
+
+    <button id="drawModeToggleBtn" class="menu-btn" style="margin-top: 6px;">Draw Mode: Freehand</button>
+
+    <!-- Preset shapes - ready-to-reshape starting points, not fixed curves. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Presets</div>
+    <div style="display:flex; gap:4px; flex-wrap:wrap;">
+      <button id="presetCircleBtn" class="menu-btn" style="width:auto; flex:1;">Circle</button>
+      <button id="presetOvalBtn" class="menu-btn" style="width:auto; flex:1;">Oval</button>
+      <button id="presetTriangleBtn" class="menu-btn" style="width:auto; flex:1;">Triangle</button>
+      <button id="presetRectBtn" class="menu-btn" style="width:auto; flex:1;">Rect</button>
+    </div>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Drawing</div>
+    <div style="display:flex; gap:4px;">
+      <button id="closeShapeBtn" class="menu-btn" style="width:auto; flex:1;">Close Shape</button>
+      <button id="undoAnchorBtn" class="menu-btn" style="width:auto; flex:1;">Undo Point</button>
+      <button id="resetShapeBtn" class="menu-btn" style="width:auto; flex:1;">Reset Shape</button>
+    </div>
+
+    <!-- This shape's own weave settings - set per shape, before committing it to the library. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">This Shape's Weave</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nails
+      <input id="shapeNailCountInput" type="number" min="3" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Leap
+      <input id="shapeLeapInput" type="number" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="shapeUseGlobalHeightCheckbox" type="checkbox" />
+      Use global height (Arrange board)
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Height override
+      <input id="shapeHeightInput" type="number" min="10" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Stroke weight
+      <input id="shapeStrokeWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+      <button id="applyShapeStrokeWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="shapeUseGlobalWeightCheckbox" type="checkbox" />
+      Use global stroke weight (Arrange board)
+    </label>
+
+    <input id="shapeNameInput" type="text" placeholder="name..." style="margin-top: 10px;" />
+    <button id="commitShapeBtn" class="menu-btn">Commit Shape to Library</button>
+
+    <button id="openLibraryBtn" class="menu-btn" style="margin-top: 10px;">Library</button>
+
+    <!-- Library Submenu - saved, fully-configured shapes; export/import as JSON to move them to the Arrange board page. -->
+    <div id="librarySubmenu" class="panel hidden">
+      <button id="closeLibrarySubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Shape Library</div>
+      <ul id="savedShapesList"
+        style="max-height: 250px; overflow-y: auto; padding-left: 0; margin-top: 8px; color: #EEEEEE; list-style:none;"></ul>
+      <button id="exportShapesBtn" class="menu-btn">Export Library</button>
+      <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
+      <button id="importShapesBtn" class="menu-btn">Import Library</button>
+    </div>
+
+    <!-- Number of colors for the shape currently being drawn -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 10px;">
+      <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
+      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Default/Custom picker-mode toggle - see PickerModeUI.js -->
+    <div id="colorPickerModeToggle">
+      <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
+      <button id="pickerModeCustomBtn" class="menu-btn">Custom</button>
+    </div>
+
+    <!-- Populated by ColorPickerUI from the palette -->
+    <div id="colorPickerContainer"></div>
+  </div>
+</body>
+
+</html>

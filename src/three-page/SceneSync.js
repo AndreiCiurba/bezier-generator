@@ -1,20 +1,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { to3D } from './axisMapping.js';
 import { DEFAULT_NAIL_HEIGHT } from './nailHeight.js';
-import { worldColorLayerHeight } from '../core/curveZLayers.js';
-import { computeWeaveSegments } from '../core/weaveMath.js';
-import { closedWeaveSegmentsForCurve } from '../core/closedWeaveMath.js';
 import { nailPositionsForCurve } from '../core/nailPositions.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
+import { buildWeaveLineObject, buildClosedWeaveLineObject } from './weaveLineBuilder.js';
 
 // Same margin-around-the-grid-bounding-box convention as App.js's own
 // GRID_PADDING - the board shouldn't hug the outermost nails flush against
-// its own edge.
-const BOARD_PADDING = 50;
+// its own edge. Scaled 10x (was 50) alongside ThreeApp.js's own GRID_SPACING.
+const BOARD_PADDING = 500;
 export const DEFAULT_BOARD_THICKNESS = 20;
 export const DEFAULT_BOARD_COLOR = '#8a784e'; // matches --panel-bg-main's wood-ish tone
 // The board's top surface sits at world Y = 0 - nails/curve layers live at
@@ -34,8 +29,14 @@ export const BOARD_TOP_Y = 0;
 // four independently-hand-edited radii drifting out of proportion with
 // each other.
 const NAIL_SLIMNESS_FACTOR = 0.6; // 40% slimmer than the original silhouette
-const SHAFT_RADIUS = 2 * NAIL_SLIMNESS_FACTOR;
-const HEAD_RADIUS = 5 * NAIL_SLIMNESS_FACTOR;
+// Matches ThreeApp.js's own GRID_SPACING 10x increase - nails are meant to
+// keep exactly their old *proportions* relative to nail spacing, only the
+// strings woven between them got a lower minimum stroke weight (see
+// strokeWeightSetting.js). Composes with NAIL_SLIMNESS_FACTOR above rather
+// than folding into it, so either can still be tuned independently.
+const NAIL_SPACING_SCALE = 10;
+const SHAFT_RADIUS = 2 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
+const HEAD_RADIUS = 5 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
 const SHAFT_FRACTION = 0.97; // the shaft is the bottom 97% of the nail; the head caps the top 3%
 const NAIL_RADIAL_SEGMENTS = 10;
 export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from the wood-toned board
@@ -49,29 +50,9 @@ export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from t
 // each weave path, not just at the main grid nails, and the same shape - a
 // visibly thinner shaft *and* head than the primary lattice nails - reads
 // unmistakably as "secondary/auxiliary," not more main nails.
-const INNER_NAIL_SHAFT_RADIUS = 1 * NAIL_SLIMNESS_FACTOR;
-const INNER_NAIL_HEAD_RADIUS = 2.5 * NAIL_SLIMNESS_FACTOR;
+const INNER_NAIL_SHAFT_RADIUS = 1 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
+const INNER_NAIL_HEAD_RADIUS = 2.5 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
 const INNER_NAIL_RADIAL_SEGMENTS = 8; // fewer facets than the main nails' 10 - there can be many of these, and each is small enough on screen that it barely matters
-
-// Screen-space pixel width for every woven string - native WebGL lines are
-// capped at ~1px on most desktop GPU/driver combos, too thin to read as
-// individual colored strands or show vertical layer separation from an
-// oblique angle (the epic's own stated goal), hence the "fat line" addon
-// (LineSegments2/LineMaterial) instead of plain THREE.LineSegments.
-//
-// A curve's own `renderWeight` (the p5 2D page's `strokeWeight()` unit -
-// BASELINE_STROKE_WEIGHT is 0.6 at the default 8 colors) isn't itself a
-// sensible `LineMaterial.linewidth` - both are screen-space pixels, but a
-// sub-1px value reads as barely-there on most GPUs, and the "fat line" addon
-// was adopted specifically *for* visibility (see above). Scaling by this
-// factor reproduces today's previous fixed 2px look at the baseline weight
-// (found this bug: `linewidth` used to just be this hardcoded `2` outright,
-// completely ignoring the actual "Stroke Weight" setting - see
-// #buildWeaveObject), while still scaling proportionally as the user changes
-// it, satisfying both "keep the default readable" and "make the setting do
-// something."
-const BASELINE_CURVE_LINE_WIDTH = 2;
-const STROKE_WEIGHT_TO_LINE_WIDTH_SCALE = BASELINE_CURVE_LINE_WIDTH / BASELINE_STROKE_WEIGHT;
 
 // Drawing Mode's in-progress selection guide - the app's own gold accent
 // color (matches the 2D pages' on-axis live-preview-line/control-point
@@ -122,23 +103,6 @@ const _matrix = new THREE.Matrix4();
 const _position = new THREE.Vector3();
 const _quaternion = new THREE.Quaternion();
 const _scale = new THREE.Vector3(1, 1, 1);
-const _color = new THREE.Color();
-const _hsl = { h: 0, s: 0, l: 0 }; // scratch object for THREE.Color#getHSL, reused like _color/_matrix/etc. above
-
-// Same "slightly greyed out" saturation cut as App.js's WEAVE_DIMMED_SATURATION
-// (45%, i.e. multiply saturation by 0.45) - see that constant's own doc.
-// There's no equivalent blur here: a real one would need a selective
-// render-to-texture post-process pass (blur everything except the live
-// selection, composite), which this page's renderer doesn't have set up -
-// left as a known gap rather than faked with something that isn't blur.
-const WEAVE_DIMMED_SATURATION_FACTOR = 0.45;
-
-/** Desaturates `threeColor` in place toward WEAVE_DIMMED_SATURATION_FACTOR of its own saturation - a no-op at alpha >= 1 (nothing dimmed). @param {THREE.Color} threeColor @param {number} alpha */
-function desaturateForDimming(threeColor, alpha) {
-  if (alpha >= 1) return;
-  threeColor.getHSL(_hsl);
-  threeColor.setHSL(_hsl.h, _hsl.s * WEAVE_DIMMED_SATURATION_FACTOR, _hsl.l);
-}
 
 /**
  * Builds a nail's shared geometry: a slim shaft (local Y in
@@ -675,30 +639,18 @@ export class SceneSync {
    * @param {number} alpha 0-1 - see `Curve#renderAlpha`'s own doc (dimming
    *   everything outside a Weave live selection). 1 for anything untouched
    *   by that feature.
-   * @returns {LineSegments2 | null} null if there are fewer than 3 points (no weave segments to draw)
+   * @returns {import('three/addons/lines/LineSegments2.js').LineSegments2 | null} null if there are fewer than 3 points (no weave segments to draw)
    */
   #buildWeaveObject(points, colors, weight, alpha = 1) {
-    if (points.length < 3) return null;
-    const colorCount = colors.length;
-
-    const positions = [];
-    const vertexColors = [];
-    for (let i = 0; i < points.length - 2; i++) {
-      const [p1, p2, p3] = [points[i], points[i + 1], points[i + 2]];
-      colors.forEach((layer, layerIndex) => {
-        if (!layer.enabled) return;
-        const y = worldColorLayerHeight(layerIndex, colorCount, 0, this.nailHeight);
-        _color.set(layer.color);
-        desaturateForDimming(_color, alpha);
-        for (const { from, to } of computeWeaveSegments(p1, p2, p3, layerIndex, colorCount)) {
-          const worldFrom = this.toWorldPosition(from, y);
-          const worldTo = this.toWorldPosition(to, y);
-          positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
-          vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
-        }
-      });
-    }
-    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution, alpha);
+    return buildWeaveLineObject({
+      points,
+      colors,
+      weight,
+      alpha,
+      maxHeight: this.nailHeight,
+      toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
+      lineResolution: this.lineResolution,
+    });
   }
 
   /**
@@ -715,51 +667,20 @@ export class SceneSync {
    * @param {{color:string,enabled:boolean}[]} colors
    * @param {number} weight
    * @param {number} alpha 0-1 - see `#buildWeaveObject`'s own doc.
-   * @returns {LineSegments2 | null}
+   * @returns {import('three/addons/lines/LineSegments2.js').LineSegments2 | null}
    */
   #buildClosedWeaveObject(cellCorners, n, leap, colors, weight, alpha = 1) {
-    const colorCount = colors.length;
-    const positions = [];
-    const vertexColors = [];
-
-    for (const { from, to, color, layerIndex } of closedWeaveSegmentsForCurve(cellCorners, n, leap, colors)) {
-      const y = worldColorLayerHeight(layerIndex, colorCount, 0, this.nailHeight);
-      _color.set(color);
-      desaturateForDimming(_color, alpha);
-      const worldFrom = this.toWorldPosition(from, y);
-      const worldTo = this.toWorldPosition(to, y);
-      positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
-      vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
-    }
-    return SceneSync.#assembleWeaveObject(positions, vertexColors, weight, this.lineResolution, alpha);
-  }
-
-  /**
-   * Shared `LineSegments2` assembly for `#buildWeaveObject`/
-   * `#buildClosedWeaveObject` - everything past "here are the world-space
-   * vertex positions/colors" is identical for both. `alpha < 1` is only ever
-   * true while a Weave live selection is isolating a working set (see
-   * `Curve#renderAlpha`); `transparent` is set to match so three.js actually
-   * honors a non-1 opacity instead of silently ignoring it.
-   */
-  static #assembleWeaveObject(positions, vertexColors, weight, lineResolution, alpha = 1) {
-    if (positions.length === 0) return null;
-
-    const geometry = new LineSegmentsGeometry();
-    geometry.setPositions(positions);
-    geometry.setColors(vertexColors);
-
-    const material = new LineMaterial({
-      vertexColors: true,
-      linewidth: weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
-      resolution: lineResolution,
-      transparent: alpha < 1,
-      opacity: alpha,
+    return buildClosedWeaveLineObject({
+      cellCorners,
+      n,
+      leap,
+      colors,
+      weight,
+      alpha,
+      maxHeight: this.nailHeight,
+      toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
+      lineResolution: this.lineResolution,
     });
-
-    const object = new LineSegments2(geometry, material);
-    object.computeLineDistances();
-    return object;
   }
 
   /**

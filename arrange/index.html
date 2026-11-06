@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>String Art Arrange Board</title>
+
+  <!-- No bundler in this repo (see package.json) - Three.js loaded straight
+       from a version-pinned CDN build via an import map, same convention as
+       3d/index.html. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="../src/arrange/bootstrap.js"></script>
+
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/customPalette.css">
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    /* This page's own canvas fills the viewport (no grid/board to size a
+       centered element around, unlike the p5 pages) - same two rules
+       3d/index.html's own three-page.css uses for #three-canvas, kept
+       inline here rather than pulling in that whole stylesheet (which
+       assumes its own icon-toolbar sidebar markup this page doesn't use). */
+    body {
+      margin: 0;
+      background: var(--canvas-page-bg);
+      overflow: hidden;
+    }
+
+    #arrange-canvas {
+      display: block;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Same scroll fix as shapes/index.html - this page's #ui panel (library
+       list, placed-shapes list, instance edit fields, arrangement export/
+       import) can easily run taller than the viewport, and shared
+       styles.css's `.panel`/`#ui` rules have no height cap or scroll of
+       their own. */
+    #ui {
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="arrange-canvas"></canvas>
+
+  <div class="page-nav">
+    <a href="../shapes/" class="page-nav-link">&larr; Shapes</a>
+    <a href="../" class="page-nav-link">Grid</a>
+    <a href="../freestyle/" class="page-nav-link">Freestyle</a>
+    <a href="../3d/" class="page-nav-link">3D</a>
+  </div>
+
+  <!-- Burger Menu Button -->
+  <div id="burger">&#9776;</div>
+
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="panel hidden">
+    <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Arrange Board</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="placementModeToggle" type="checkbox" />
+      Placement Mode (disables orbit; click a library shape then the board to place it, or click/drag a placed shape)
+    </label>
+
+    <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
+
+    <!-- Imported shape library - read-only reference shapes brought in from the Shape Designer page. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Shape Library</div>
+    <button id="importShapesBtn" class="menu-btn">Import Library</button>
+    <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
+    <ul id="shapeLibraryList"
+      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+
+    <!-- Global height default - used by any placed instance without its own override. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Global Height</div>
+    <div style="display:flex; align-items:center; gap:4px;">
+      <input id="globalHeightInput" type="number" min="10" max="3000" step="1" style="width: 100%;" />
+      <button id="applyGlobalHeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Global stroke weight default - used by any placed instance without its own override. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Global Stroke Weight</div>
+    <div style="display:flex; align-items:center; gap:4px;">
+      <input id="globalWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+      <button id="applyGlobalWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+
+    <!-- Placed shapes - instances actually on the board. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Placed Shapes</div>
+    <ul id="placedShapesList"
+      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+
+    <!-- Selected instance's own edit panel - rotation/scale/height override. -->
+    <div id="instanceEditPanel" style="display:none; margin-top: 8px; border-top: 1px solid #444; padding-top: 8px;">
+      <div style="font-size: 11px; color: #EEEEEE;">Selected Shape</div>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Rotation (deg)
+        <input id="instanceRotationInput" type="number" step="1" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Scale
+        <input id="instanceScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        <input id="instanceUseGlobalHeightCheckbox" type="checkbox" />
+        Use global height
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Height override
+        <input id="instanceHeightInput" type="number" min="10" step="1" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        <input id="instanceUseGlobalWeightCheckbox" type="checkbox" />
+        Use global stroke weight
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Stroke weight override
+        <input id="instanceWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+      </label>
+      <button id="deleteInstanceBtn" class="menu-btn" style="margin-top: 6px;">Delete Shape</button>
+    </div>
+
+    <!-- Whole-board arrangement - instances + their own frozen shape snapshots. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Arrangement</div>
+    <button id="exportArrangementBtn" class="menu-btn">Export Arrangement</button>
+    <button id="importArrangementBtn" class="menu-btn">Import Arrangement</button>
+    <input type="file" id="importArrangementInput" accept=".json,.txt" style="display:none;" />
+  </div>
+</body>
+
+</html>
