@@ -15,6 +15,8 @@ import { defaultCameraPosition } from '../three-page/cameraFraming.js';
 import { fromWorld3 } from '../three-page/axisMapping.js';
 import { downloadJson, readJsonFile } from '../io/JsonFile.js';
 import { generateId } from '../utils/id.js';
+import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
+import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -49,6 +51,15 @@ const MIN_INSTANCE_PICK_RADIUS = 200;
  * proven Drawing Mode pattern" solution to the same underlying conflict
  * (left-drag can't mean both "orbit the camera" and "place/drag a shape" at
  * once).
+ *
+ * Phase 1 of `docs/persistence-plan.md`: `this.library` hydrates from the
+ * *same* `localStorage` key `/shapes/` writes its committed library to (see
+ * `#hydrateLibrary`) - same-origin pages already share `localStorage`, so a
+ * shape committed there is already here with no file import needed. This
+ * page never writes that key back (it only ever reads/places from the
+ * library, never edits it) - importing a JSON file still works too, as a
+ * secondary way to load shapes. `this.instances` (the placed arrangement)
+ * auto-persists to its own key the same way `/shapes/`'s draft does.
  */
 export class ArrangeApp {
   constructor() {
@@ -76,6 +87,11 @@ export class ArrangeApp {
   }
 
   init() {
+    // Must run before any UI wiring reads this.library/this.instances for
+    // their initial render.
+    this.#hydrateLibrary();
+    this.#hydrateInstances();
+
     this.canvas = document.getElementById('arrange-canvas');
     this.#createScene();
     this.arrangeSceneSync = new ArrangeSceneSync(this.scene, BOARD_SIZE);
@@ -94,11 +110,13 @@ export class ArrangeApp {
     this.#initArrangementExportImport();
     this.#initInstanceEditPanel();
     this.#initCameraReset();
+    this.#initPersistenceControls();
 
     this.library.onChange(() => this.#renderLibraryList());
     this.instances.onChange(() => {
       this.#renderInstanceList();
       this.#syncScene();
+      saveToStorage(ARRANGEMENT_STORAGE_KEY, this.instances.toJSON());
     });
     this.#renderLibraryList();
     this.#renderInstanceList();
@@ -107,6 +125,27 @@ export class ArrangeApp {
     window.addEventListener('resize', this.#handleResize);
     this.#handleResize();
     this.#animate();
+  }
+
+  /** Restores the shape library from the same `localStorage` key `/shapes/` writes to - see this class's own doc. Read-only: never writes this key back. */
+  #hydrateLibrary() {
+    const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
+    if (Array.isArray(raw)) this.library.importShapes(raw, FreeformShape);
+  }
+
+  /** Restores this board's own placed arrangement, if anything was saved for it. */
+  #hydrateInstances() {
+    const raw = loadFromStorage(ARRANGEMENT_STORAGE_KEY);
+    if (Array.isArray(raw)) this.instances.importInstances(raw, FreeformShape);
+  }
+
+  /** "Clear Board" - wipes every placed instance (and this board's own persisted copy of them). Never touches the shared library key - that's owned by `/shapes/`. */
+  #initPersistenceControls() {
+    document.getElementById('clearSavedDataBtn').addEventListener('click', () => {
+      clearFromStorage(ARRANGEMENT_STORAGE_KEY);
+      this.instances.clear();
+      this.#selectInstance(null);
+    });
   }
 
   #initPlacementModeToggle() {

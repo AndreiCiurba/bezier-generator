@@ -76,6 +76,19 @@ describe('ShapeLibraryStore', () => {
     expect(store.findById('s1').name).toBe('New Name');
   });
 
+  it('clear drops every shape and notifies', () => {
+    const store = new ShapeLibraryStore();
+    store.add(makeShape('s1'));
+    store.add(makeShape('s2'));
+    let calls = 0;
+    store.onChange(() => calls++);
+
+    store.clear();
+
+    expect(store.count).toBe(0);
+    expect(calls).toBe(1);
+  });
+
   describe('importShapes', () => {
     it('reconstructs FreeformShape instances from raw JSON and notifies once', () => {
       const store = new ShapeLibraryStore();

@@ -41,6 +41,12 @@ export class ShapeLibraryStore {
     this.#notify();
   }
 
+  /** Drops every saved shape at once - e.g. "Clear Saved Library" wiping this browser's persisted copy. Mirrors `CurveStore#clear`/`ArrangedShapeStore#clear`. */
+  clear() {
+    this.#shapes.length = 0;
+    this.#notify();
+  }
+
   /**
    * Replaces the whole saved-shapes list, e.g. after importing a JSON file
    * exported from this same page - mirrors `PatternStore#importPatterns`/
@@ -58,8 +64,8 @@ export class ShapeLibraryStore {
   }
 
   /**
-   * Subscribes to any add/remove/rename/importShapes change. Returns an
-   * unsubscribe function - same shape as `CurveStore#onChange`.
+   * Subscribes to any add/remove/rename/clear/importShapes change. Returns
+   * an unsubscribe function - same shape as `CurveStore#onChange`.
    * @param {() => void} listener
    * @returns {() => void}
    */

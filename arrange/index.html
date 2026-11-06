@@ -79,8 +79,13 @@
     </label>
 
     <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
+    <!-- Clears every placed instance from the board (and this browser's saved copy of the arrangement). -->
+    <button id="clearSavedDataBtn" class="menu-btn" style="margin-top: 4px;">Clear Board</button>
 
-    <!-- Imported shape library - read-only reference shapes brought in from the Shape Designer page. -->
+    <!-- Imported shape library - read-only reference shapes brought in from
+         the Shape Designer page. Auto-loaded from this browser's saved
+         library (the same one /shapes/ saves to) - Import Library still
+         works too, for a library exported from a different browser/device. -->
     <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Shape Library</div>
     <button id="importShapesBtn" class="menu-btn">Import Library</button>
     <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
@@ -136,7 +141,10 @@
       <button id="deleteInstanceBtn" class="menu-btn" style="margin-top: 6px;">Delete Shape</button>
     </div>
 
-    <!-- Whole-board arrangement - instances + their own frozen shape snapshots. -->
+    <!-- Whole-board arrangement - instances + their own frozen shape
+         snapshots. Auto-saved to this browser; reloading the page restores
+         it. Export/Import JSON still works, for backups or moving an
+         arrangement to a different browser/device. -->
     <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Arrangement</div>
     <button id="exportArrangementBtn" class="menu-btn">Export Arrangement</button>
     <button id="importArrangementBtn" class="menu-btn">Import Arrangement</button>

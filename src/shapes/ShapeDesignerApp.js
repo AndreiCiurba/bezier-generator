@@ -18,6 +18,8 @@ import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
 import { generateId } from '../utils/id.js';
+import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
+import { SHAPE_LIBRARY_STORAGE_KEY, SHAPE_DRAFT_STORAGE_KEY } from '../io/storageKeys.js';
 
 // Fixed, centered canvas (no grid to size around) - same idea as freestyle's
 // own fixed-size board, just plain pixels since there's no physical-unit
@@ -70,6 +72,14 @@ const FREEHAND_MIN_POINT_SPACING = 60;
  * reproduce. Either tool can still grab/drag an existing anchor or handle
  * first (checked before either tool's own "start something new" behavior),
  * so a freehand trace can always be fine-tuned afterward with precise drags.
+ *
+ * Phase 1 of `docs/persistence-plan.md`: the committed library and the
+ * in-progress draft (anchors/settings/palette - everything
+ * `handleCommitShape` would otherwise need) both auto-persist to
+ * `localStorage` via `io/BrowserStorage.js`, and both hydrate back on load -
+ * see `#hydrateLibrary`/`#hydrateDraft`. Same-origin pages share
+ * `localStorage`, so a committed shape is already available on `/arrange/`
+ * without ever exporting/importing a file.
  */
 export class ShapeDesignerApp {
   constructor() {
@@ -111,6 +121,22 @@ export class ShapeDesignerApp {
   }
 
   setup = () => {
+    // Must run before any UI class below is constructed - they all read
+    // their *initial* state straight off this.library/this.palette/
+    // this.nailCount/etc. at construction time.
+    this.#hydrateLibrary();
+    this.#hydrateDraft();
+
+    // From here on, any change to the committed library or the in-progress
+    // draft re-persists automatically - see #saveDraft's own doc for why
+    // hooking these two onChange subscriptions covers every anchor/handle
+    // drag and every palette edit without a separate call at each site.
+    this.library.onChange(() => {
+      saveToStorage(SHAPE_LIBRARY_STORAGE_KEY, this.library.shapes.map((s) => s.toJSON()));
+    });
+    this.editor.onChange(() => this.#saveDraft());
+    this.palette.onChange(() => this.#saveDraft());
+
     const colorPickerContainer = document.getElementById('colorPickerContainer');
     this.colorPickerUI = new ColorPickerUI(colorPickerContainer, this.palette);
     this.colorPickerUI.init();
@@ -153,6 +179,7 @@ export class ShapeDesignerApp {
     this.#wirePresetButtons();
     this.#wireEditingButtons();
     this.#wireDrawModeToggle();
+    this.#wirePersistenceControls();
     this.#createCanvas();
 
     window.addEventListener('keydown', (e) => {
@@ -321,6 +348,67 @@ export class ShapeDesignerApp {
     nameInput.value = '';
   };
 
+  /** Restores the committed library from `localStorage`, if anything was saved there - see this class's own doc. */
+  #hydrateLibrary() {
+    const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
+    if (Array.isArray(raw)) this.library.importShapes(raw, FreeformShape);
+  }
+
+  /**
+   * Restores the in-progress draft (anchors/closed state, this shape's own
+   * nails/leap/height/weight settings, and its palette) from `localStorage`,
+   * if anything was saved there. Each field is independently validated
+   * before being applied, so a partially-corrupt or hand-edited draft still
+   * restores whatever of it *is* usable rather than being thrown out whole.
+   */
+  #hydrateDraft() {
+    const draft = loadFromStorage(SHAPE_DRAFT_STORAGE_KEY);
+    if (!draft) return;
+
+    if (Number.isInteger(draft.nailCount) && draft.nailCount >= MIN_NAIL_COUNT) this.nailCount = draft.nailCount;
+    if (Number.isInteger(draft.leap)) this.leap = draft.leap;
+    if (typeof draft.useGlobalHeight === 'boolean') this.useGlobalHeight = draft.useGlobalHeight;
+    if (draft.heightOverride === null || Number.isFinite(draft.heightOverride)) this.heightOverride = draft.heightOverride;
+    if (Number.isFinite(draft.strokeWeight) && draft.strokeWeight > 0) this.strokeWeight = draft.strokeWeight;
+    if (typeof draft.useGlobalWeight === 'boolean') this.useGlobalWeight = draft.useGlobalWeight;
+    if (draft.drawMode === 'freehand' || draft.drawMode === 'anchor') this.drawMode = draft.drawMode;
+    if (Array.isArray(draft.colors)) this.#applyPaletteColors(draft.colors);
+    if (Array.isArray(draft.anchors)) this.editor.hydrate({ anchors: draft.anchors, closed: Boolean(draft.closed) });
+  }
+
+  /** Resizes/recolors `this.palette` to match a saved color snapshot - same resize-then-recolor sequence `WeaveUI#applyRecipeColors`/`FavoritesUI#applyBundle` already use. */
+  #applyPaletteColors(colors) {
+    if (colors.length === 0) return;
+    this.palette.resize(colors.length);
+    colors.forEach((c, i) => {
+      this.palette.setColor(i, c.color);
+      if (this.palette.getSlot(i).enabled !== Boolean(c.enabled)) this.palette.toggleEnabled(i);
+    });
+  }
+
+  /**
+   * Persists the in-progress draft - every field `handleCommitShape` would
+   * otherwise read, so reloading mid-shape resumes exactly where you left
+   * off. Subscribed to both `this.editor.onChange` and `this.palette.onChange`
+   * (see `setup()`), so this fires on every anchor/handle drag frame and
+   * every color edit; also called explicitly from each settings field's own
+   * change handler, since those plain fields have no `onChange` of their own.
+   */
+  #saveDraft() {
+    saveToStorage(SHAPE_DRAFT_STORAGE_KEY, {
+      anchors: this.editor.anchors,
+      closed: this.editor.closed,
+      nailCount: this.nailCount,
+      leap: this.leap,
+      useGlobalHeight: this.useGlobalHeight,
+      heightOverride: this.heightOverride,
+      strokeWeight: this.strokeWeight,
+      useGlobalWeight: this.useGlobalWeight,
+      drawMode: this.drawMode,
+      colors: this.palette.snapshot(),
+    });
+  }
+
   #distanceTo(a, b) {
     return Math.hypot(a.x - b.x, a.y - b.y);
   }
@@ -360,6 +448,7 @@ export class ShapeDesignerApp {
       const value = parseInt(nailCountInput.value, 10);
       if (Number.isInteger(value) && value >= MIN_NAIL_COUNT) this.nailCount = value;
       else nailCountInput.value = String(this.nailCount);
+      this.#saveDraft();
     });
 
     const leapInput = document.getElementById('shapeLeapInput');
@@ -368,6 +457,7 @@ export class ShapeDesignerApp {
       const value = parseInt(leapInput.value, 10);
       if (Number.isInteger(value)) this.leap = value;
       else leapInput.value = String(this.leap);
+      this.#saveDraft();
     });
 
     const heightInput = document.getElementById('shapeHeightInput');
@@ -377,10 +467,12 @@ export class ShapeDesignerApp {
     useGlobalHeightCheckbox.addEventListener('change', () => {
       this.useGlobalHeight = useGlobalHeightCheckbox.checked;
       heightInput.disabled = this.useGlobalHeight;
+      this.#saveDraft();
     });
     heightInput.addEventListener('change', () => {
       const value = parseFloat(heightInput.value);
       this.heightOverride = Number.isFinite(value) ? value : null;
+      this.#saveDraft();
     });
 
     new StrokeWeightUI(
@@ -388,6 +480,7 @@ export class ShapeDesignerApp {
       this.strokeWeight,
       (weight) => {
         this.strokeWeight = weight;
+        this.#saveDraft();
       }
     ).init();
 
@@ -395,6 +488,7 @@ export class ShapeDesignerApp {
     useGlobalWeightCheckbox.checked = this.useGlobalWeight;
     useGlobalWeightCheckbox.addEventListener('change', () => {
       this.useGlobalWeight = useGlobalWeightCheckbox.checked;
+      this.#saveDraft();
     });
 
     document.getElementById('commitShapeBtn').addEventListener('click', this.handleCommitShape);
@@ -406,6 +500,16 @@ export class ShapeDesignerApp {
     document.getElementById('resetShapeBtn').addEventListener('click', this.handleResetShape);
   }
 
+  /** "Clear Canvas" - wipes this browser's persisted library + draft, and the in-memory library/editor to match (so every dimmed committed-shape reference and the in-progress shape both disappear, not just the draft - see "Reset Shape" for a draft-only clear). Settings fields (nails/leap/height/weight/palette) are left as-is, same reasoning `handleResetShape` already follows: only the shape/library data itself is "saved data," not the live session's current tool settings. */
+  #wirePersistenceControls() {
+    document.getElementById('clearSavedDataBtn').addEventListener('click', () => {
+      clearFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
+      clearFromStorage(SHAPE_DRAFT_STORAGE_KEY);
+      this.library.clear();
+      this.handleResetShape();
+    });
+  }
+
   #wireDrawModeToggle() {
     const btn = document.getElementById('drawModeToggleBtn');
     const setLabel = () => {
@@ -415,6 +519,7 @@ export class ShapeDesignerApp {
     btn.addEventListener('click', () => {
       this.drawMode = this.drawMode === 'freehand' ? 'anchor' : 'freehand';
       setLabel();
+      this.#saveDraft();
     });
   }
 
