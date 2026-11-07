@@ -129,13 +129,17 @@ export function buildWeaveLineObject({ points, colors, weight, maxHeight, toWorl
  * }} params
  * @returns {LineSegments2 | null}
  */
-export function buildClosedWeaveLineObject({ cellCorners, n, leap, colors, weight, maxHeight, toWorldPosition, lineResolution, alpha = 1 }) {
+export function buildClosedWeaveLineObject({ cellCorners, n, leap, colors, weight, maxHeight, toWorldPosition, lineResolution, alpha = 1, reverseLayers = false }) {
   const colorCount = colors.length;
   const positions = [];
   const vertexColors = [];
 
   for (const { from, to, color, layerIndex } of closedWeaveSegmentsForCurve(cellCorners, n, leap, colors)) {
-    const y = worldColorLayerHeight(layerIndex, colorCount, 0, maxHeight);
+    // `reverseLayers` flips the vertical stacking only (first layer on top,
+    // last on the bottom) - the Arrange board wants its widest-spanning
+    // layer at the bottom; the segments themselves are unaffected.
+    const heightIndex = reverseLayers ? colorCount - 1 - layerIndex : layerIndex;
+    const y = worldColorLayerHeight(heightIndex, colorCount, 0, maxHeight);
     _color.set(color);
     desaturateForDimming(_color, alpha);
     const worldFrom = toWorldPosition(from, y);

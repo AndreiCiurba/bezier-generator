@@ -86,6 +86,7 @@ export class ArrangeSceneSync {
       maxHeight,
       toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
       lineResolution: this.lineResolution,
+      reverseLayers: true,
     });
   }
 
