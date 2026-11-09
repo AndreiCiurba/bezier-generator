@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>String Art Cardioid Board</title>
+
+  <!-- No bundler in this repo (see package.json) - Three.js loaded straight
+       from a version-pinned CDN build via an import map, same convention as
+       arrange/index.html and 3d/index.html. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="../src/cardioid/bootstrap.js"></script>
+
+  <link rel="stylesheet" href="../css/tokens.css">
+  <link rel="stylesheet" href="../css/colors.css">
+  <link rel="stylesheet" href="../css/customPalette.css">
+  <link rel="stylesheet" href="../css/styles.css">
+  <style>
+    /* Same page chrome as arrange/index.html: a full-viewport canvas, and a
+       main menu that scrolls instead of running off the bottom. */
+    body {
+      margin: 0;
+      background: var(--canvas-page-bg);
+      overflow: hidden;
+    }
+
+    #cardioid-canvas {
+      display: block;
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    #ui {
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+
+    /* Color schemes open as a flyout right of the main menu; `fixed` keeps the
+       menu's scrolling from clipping it (left/top are set in CardioidApp). */
+    #colorFavoritesSubmenu {
+      position: fixed;
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="cardioid-canvas"></canvas>
+
+  <div class="page-nav">
+    <a href="../" class="page-nav-link">&larr; Grid</a>
+    <a href="../shapes/" class="page-nav-link">Shapes</a>
+    <a href="../arrange/" class="page-nav-link">Arrange</a>
+    <a href="../3d/" class="page-nav-link">3D</a>
+  </div>
+
+  <!-- Burger Menu Button -->
+  <div id="burger">&#9776;</div>
+
+  <!-- Hidden UI Panel -->
+  <div id="ui" class="panel hidden">
+    <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Cardioid Board</div>
+    <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+      One circle of nails. Nail j is joined to nail (multiplier &times; j); each layer is that pattern rotated
+      by leap nails, thick string at the bottom, thin at the top.
+    </div>
+
+    <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Weave</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nails
+      <input id="nailCountInput" type="number" min="3" max="1000" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Layers
+      <input id="layerCountInput" type="number" min="1" max="60" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;"
+      title="How many nails each layer is rotated from the one below. 0 = every layer identical.">
+      Leap
+      <input id="leapInput" type="number" min="0" step="1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;"
+      title="Nail j is joined to nail multiplier x j. 2 = cardioid, 3 = nephroid, ...">
+      Multiplier
+      <input id="multiplierInput" type="number" min="1" step="1" style="width: 100%;" />
+    </label>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Size</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Circle radius
+      <input id="radiusInput" type="number" min="100" step="100" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Height
+      <input id="heightInput" type="number" min="10" step="10" style="width: 100%;" />
+    </label>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">String weight</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Bottom layer (thickest)
+      <input id="bottomWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Top layer (thinnest)
+      <input id="topWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+    </label>
+
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Nails</div>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="showNailsCheckbox" type="checkbox" />
+      Show nails
+    </label>
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nail scale
+      <input id="nailScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+    </label>
+
+    <!-- Each layer is split into this many equal arcs of the circle, one color per arc. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Colors per layer</div>
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
+    <div id="colorPickerModeToggle">
+      <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
+      <button id="pickerModeCustomBtn" class="menu-btn">Custom</button>
+    </div>
+    <div id="colorPickerContainer"></div>
+    <button id="openFavoritesBtn" class="menu-btn" style="margin-top: 4px;">Color Schemes</button>
+
+    <div id="colorFavoritesSubmenu" class="panel hidden">
+      <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div id="favoriteBundlesContainer"></div>
+      <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+      <button id="exportColorsBtn" class="menu-btn">Export</button>
+      <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
+      <button id="importColorsBtn" class="menu-btn">Import</button>
+    </div>
+  </div>
+</body>
+
+</html>

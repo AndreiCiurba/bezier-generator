@@ -51,7 +51,7 @@ function desaturateForDimming(threeColor, alpha) {
 }
 
 /** Shared `LineSegments2` assembly once "here are the world-space vertex positions/colors" is known - identical for the open and closed weave builders below. */
-function assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha = 1) {
+export function assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha = 1) {
   if (positions.length === 0) return null;
 
   const geometry = new LineSegmentsGeometry();
