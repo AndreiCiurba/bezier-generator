@@ -46,19 +46,20 @@ const FIELDS = [
 export class CardioidApp {
   constructor() {
     this.settings = {
-      nailCount: 120,
-      layerCount: 6,
+      nailCount: 48,
+      layerCount: 48,
       leap: 1,
       multiplier: 2,
       radius: 3000,
-      height: 1000,
-      bottomWeight: 0.9,
+      height: 2000,
+      bottomWeight: 0.2,
       topWeight: 0.2,
-      nailsVisible: true,
+      nailsVisible: false,
       nailScale: 1,
     };
     this.palette = new StrokePalette(); // one slot per color group a layer is split into
     this.palette.resize(2);
+    this.palette.setColor(1, '#ffffff'); // second color defaults to white
   }
 
   init() {

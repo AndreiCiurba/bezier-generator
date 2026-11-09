@@ -30,15 +30,18 @@ import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storag
 // it's a `THREE.BoxGeometry` size, not a 2D canvas backing-buffer dimension,
 // so there's no memory-blowup risk the way a literal 10x would have on the
 // Grid page - `defaultCameraPosition` below re-frames to fit automatically.
-const BOARD_SIZE = 12000;
+const DEFAULT_BOARD_WIDTH = 12000;
+const DEFAULT_BOARD_DEPTH = 12000;
+const MIN_BOARD_SIDE = 100;
+const MAX_BOARD_SIDE = 200000;
 const CAMERA_FOV = 50;
 const CAMERA_NEAR = 1;
-const CAMERA_FAR = 100000;
+const CAMERA_FAR = 1000000;
 const ORBIT_TARGET = { x: 0, y: 0, z: 0 };
 // An instance too small to have any own-radius worth clicking precisely
 // (e.g. a brand-new, un-scaled tiny shape) still needs a minimum pick
 // tolerance - same reasoning as the 2D pages' own NEAREST_NAIL_RADIUS, scaled
-// 10x alongside BOARD_SIZE.
+// 10x alongside the default board size.
 const MIN_INSTANCE_PICK_RADIUS = 200;
 // This board's own defaults (the 3D page's 400 / baseline weight don't suit
 // the big freeform shapes placed here).
@@ -92,6 +95,8 @@ export class ArrangeApp {
     this.globalHeight = DEFAULT_ARRANGE_HEIGHT;
     this.globalWeight = DEFAULT_ARRANGE_WEIGHT;
     this.globalNailsVisible = true;
+    this.boardWidth = DEFAULT_BOARD_WIDTH;
+    this.boardDepth = DEFAULT_BOARD_DEPTH;
     this.armedShapeId = null; // library shape id selected for the next placement click
     this.selectedInstanceId = null; // placed instance id currently shown in the edit panel
     this.dragState = null; // { id } while a placed instance is being dragged
@@ -110,7 +115,7 @@ export class ArrangeApp {
 
     this.canvas = document.getElementById('arrange-canvas');
     this.#createScene();
-    this.arrangeSceneSync = new ArrangeSceneSync(this.scene, BOARD_SIZE);
+    this.arrangeSceneSync = new ArrangeSceneSync(this.scene, this.boardWidth, this.boardDepth);
     this.#createCamera();
     this.#createRenderer();
     this.#createControls();
@@ -124,6 +129,7 @@ export class ArrangeApp {
     this.#initGlobalHeight();
     this.#initGlobalWeight();
     this.#initGlobalNails();
+    this.#initBoardSize();
     this.#initArrangementExportImport();
     this.#initPngExport();
     this.#initInstanceEditPanel();
@@ -236,6 +242,45 @@ export class ArrangeApp {
         this.#syncScene();
       }
     ).init();
+  }
+
+  /** The collapsible "Board" submenu: the board's width and height (world X and Z). Applying re-frames the camera so the whole board stays in view. */
+  #initBoardSize() {
+    const toggleBtn = document.getElementById('boardSubmenuToggleBtn');
+    const body = document.getElementById('boardSubmenuBody');
+    const widthInput = document.getElementById('boardWidthInput');
+    const heightInput = document.getElementById('boardHeightInput');
+    widthInput.value = String(this.boardWidth);
+    heightInput.value = String(this.boardDepth);
+
+    toggleBtn.addEventListener('click', () => {
+      body.hidden = !body.hidden;
+      toggleBtn.textContent = `${body.hidden ? '▸' : '▾'} Board`;
+    });
+
+    const parseSide = (input) => {
+      const value = Number(input.value);
+      return input.value.trim() !== '' && Number.isFinite(value) && value >= MIN_BOARD_SIDE && value <= MAX_BOARD_SIDE ? value : null;
+    };
+    document.getElementById('applyBoardSizeBtn').addEventListener('click', () => {
+      const width = parseSide(widthInput);
+      const depth = parseSide(heightInput);
+      if (width === null || depth === null) {
+        alert(`Board width and height must each be between ${MIN_BOARD_SIDE} and ${MAX_BOARD_SIDE}.`);
+        widthInput.value = String(this.boardWidth);
+        heightInput.value = String(this.boardDepth);
+        return;
+      }
+      this.boardWidth = width;
+      this.boardDepth = depth;
+      this.arrangeSceneSync.setBoardSize(width, depth);
+      this.#applyDefaultCameraView();
+    });
+    document.getElementById('resetBoardSizeBtn').addEventListener('click', () => {
+      widthInput.value = String(DEFAULT_BOARD_WIDTH);
+      heightInput.value = String(DEFAULT_BOARD_DEPTH);
+      document.getElementById('applyBoardSizeBtn').click();
+    });
   }
 
   #initGlobalNails() {
@@ -569,7 +614,7 @@ export class ArrangeApp {
   }
 
   #applyDefaultCameraView() {
-    const position = defaultCameraPosition(BOARD_SIZE, BOARD_SIZE, CAMERA_FOV);
+    const position = defaultCameraPosition(this.boardWidth, this.boardDepth, CAMERA_FOV);
     this.camera.position.set(position.x, position.y, position.z);
     this.camera.lookAt(ORBIT_TARGET.x, ORBIT_TARGET.y, ORBIT_TARGET.z);
     if (this.controls) {

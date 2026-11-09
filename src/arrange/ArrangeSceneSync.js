@@ -22,9 +22,10 @@ import { transformAnchors } from '../core/shapeTransform.js';
  * at this scale; worth revisiting only if that assumption stops holding.
  */
 export class ArrangeSceneSync {
-  constructor(scene, boardSize) {
+  constructor(scene, boardWidth, boardDepth = boardWidth) {
     this.scene = scene;
-    this.boardSize = boardSize;
+    this.boardWidth = boardWidth;
+    this.boardDepth = boardDepth;
     this.lineResolution = new THREE.Vector2(1, 1);
     this.instanceLines = new Map(); // instance id -> LineSegments2
     this.instanceNails = new Map(); // instance id -> InstancedMesh (one nail per resampled outline point)
@@ -136,8 +137,18 @@ export class ArrangeSceneSync {
     this.instanceLines.delete(id);
   }
 
+  /** Resizes the board (world X = width, world Z = depth/"height" in the menu) - rebuilds just the board mesh, not the placed shapes. */
+  setBoardSize(width, depth) {
+    this.boardWidth = width;
+    this.boardDepth = depth;
+    this.scene.remove(this.boardMesh);
+    this.boardMesh.geometry.dispose();
+    this.boardMesh.material.dispose();
+    this.#buildBoard();
+  }
+
   #buildBoard() {
-    const geometry = new THREE.BoxGeometry(this.boardSize, DEFAULT_BOARD_THICKNESS, this.boardSize);
+    const geometry = new THREE.BoxGeometry(this.boardWidth, DEFAULT_BOARD_THICKNESS, this.boardDepth);
     const material = new THREE.MeshStandardMaterial({ color: DEFAULT_BOARD_COLOR });
     this.boardMesh = new THREE.Mesh(geometry, material);
     this.boardMesh.position.set(0, BOARD_TOP_Y - DEFAULT_BOARD_THICKNESS / 2, 0);

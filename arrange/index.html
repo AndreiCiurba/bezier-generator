@@ -94,6 +94,23 @@
     <!-- Clears every placed instance from the board (and this browser's saved copy of the arrangement). -->
     <button id="clearSavedDataBtn" class="menu-btn" style="margin-top: 4px;">Clear Board</button>
 
+    <!-- Board size - collapsed by default; the header button expands/collapses it. -->
+    <button id="boardSubmenuToggleBtn" class="menu-btn" style="margin-top: 10px; text-align: left;">&#9656; Board</button>
+    <div id="boardSubmenuBody" hidden style="border-left: 2px solid var(--accent-500, #ffcc00); padding-left: 8px; margin-left: 4px;">
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Width
+        <input id="boardWidthInput" type="number" min="100" step="100" style="width: 100%;" />
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Height
+        <input id="boardHeightInput" type="number" min="100" step="100" style="width: 100%;" />
+      </label>
+      <div style="display:flex; gap:4px; margin-top: 6px;">
+        <button id="applyBoardSizeBtn" class="menu-btn" style="width:auto; flex:1;">Apply</button>
+        <button id="resetBoardSizeBtn" class="menu-btn" style="width:auto; flex:1;">Reset</button>
+      </div>
+    </div>
+
     <!-- Imported shape library - read-only reference shapes brought in from
          the Shape Designer page. Auto-loaded from this browser's saved
          library (the same one /shapes/ saves to) - Import Library still
