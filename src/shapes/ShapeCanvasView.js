@@ -11,13 +11,14 @@ import { sampleClosedOutline } from '../core/bezierOutline.js';
 
 const ANCHOR_COLOR = '#ffcc0090';
 const ANCHOR_SELECTED_COLOR = '#ffcc00';
-const ANCHOR_DIAMETER = 9;
-const ANCHOR_SELECTED_DIAMETER = 13;
+// World units, 2x the original sizes - 10x was far too big.
+const ANCHOR_DIAMETER = 18;
+const ANCHOR_SELECTED_DIAMETER = 26;
 // Unmistakably different from an anchor - a small square, the standard
 // vector-editor convention for a bezier handle tip.
 const HANDLE_COLOR = '#00e5ffcc';
 const HANDLE_LINE_COLOR = '#00e5ff60';
-const HANDLE_SIZE = 7;
+const HANDLE_SIZE = 14;
 // The first anchor gets a highlighted ring while the shape is still open, to
 // hint "click here to close the loop" (see ShapeDesignerApp's own close-pick
 // logic).
@@ -69,8 +70,8 @@ export class ShapeCanvasView {
       const first = anchors[0];
       noFill();
       stroke(CLOSE_HINT_COLOR);
-      strokeWeight(1.5);
-      ellipse(first.x, first.y, ANCHOR_DIAMETER + 8, ANCHOR_DIAMETER + 8);
+      strokeWeight(3);
+      ellipse(first.x, first.y, ANCHOR_DIAMETER + 16, ANCHOR_DIAMETER + 16);
     }
   }
 
@@ -90,7 +91,7 @@ export class ShapeCanvasView {
     for (const handle of [anchor.handleIn, anchor.handleOut]) {
       if (!handle) continue;
       stroke(HANDLE_LINE_COLOR);
-      strokeWeight(1);
+      strokeWeight(2);
       line(anchor.x, anchor.y, handle.x, handle.y);
 
       noStroke();

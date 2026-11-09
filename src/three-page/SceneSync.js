@@ -35,8 +35,8 @@ const NAIL_SLIMNESS_FACTOR = 0.6; // 40% slimmer than the original silhouette
 // strokeWeightSetting.js). Composes with NAIL_SLIMNESS_FACTOR above rather
 // than folding into it, so either can still be tuned independently.
 const NAIL_SPACING_SCALE = 10;
-const SHAFT_RADIUS = 2 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
-const HEAD_RADIUS = 5 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
+export const SHAFT_RADIUS = 2 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
+export const HEAD_RADIUS = 5 * NAIL_SLIMNESS_FACTOR * NAIL_SPACING_SCALE;
 const SHAFT_FRACTION = 0.97; // the shaft is the bottom 97% of the nail; the head caps the top 3%
 const NAIL_RADIAL_SEGMENTS = 10;
 export const DEFAULT_NAIL_COLOR = '#cfcfcf'; // silvery, reads distinctly from the wood-toned board
@@ -113,7 +113,7 @@ const _scale = new THREE.Vector3(1, 1, 1);
  * lattice nail's own constants, so the same builder produces the slimmer
  * "inner" nail shape too (see INNER_NAIL_*).
  */
-function buildNailGeometry(shaftRadius, headRadius, radialSegments = NAIL_RADIAL_SEGMENTS) {
+export function buildNailGeometry(shaftRadius, headRadius, radialSegments = NAIL_RADIAL_SEGMENTS) {
   const shaftHeight = SHAFT_FRACTION;
   const headHeight = 1 - SHAFT_FRACTION;
 

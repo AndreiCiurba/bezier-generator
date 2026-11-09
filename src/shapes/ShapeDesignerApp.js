@@ -90,6 +90,10 @@ export class ShapeDesignerApp {
     this.palette = new StrokePalette();
     this.editor = new ShapeEditorState();
     this.library = new ShapeLibraryStore();
+    // Set by "Clear Canvas": hides the dimmed committed-shape references
+    // without touching the library itself (which /arrange/ depends on).
+    // Session-only; the next commit shows them again.
+    this.referencesHidden = false;
 
     // The shape-in-progress's own weave settings - plain fields (not a
     // dedicated state class), mirroring how App.js keeps `strokeWeight` as a
@@ -198,11 +202,13 @@ export class ShapeDesignerApp {
     background(12);
     this.viewport.applyTransform();
 
-    ShapeCanvasView.withCommittedShapeAlpha(() => {
-      for (const shape of this.library.shapes) {
-        StringArtRenderer.drawClosedWeave(shape.resampledOutline(), 0, shape.leap, shape.colors, BASELINE_STROKE_WEIGHT);
-      }
-    });
+    if (!this.referencesHidden) {
+      ShapeCanvasView.withCommittedShapeAlpha(() => {
+        for (const shape of this.library.shapes) {
+          StringArtRenderer.drawClosedWeave(shape.resampledOutline(), 0, shape.leap, shape.colors, BASELINE_STROKE_WEIGHT);
+        }
+      });
+    }
 
     const anchors = this.editor.anchors;
     if (anchors.length > 0) {
@@ -326,6 +332,7 @@ export class ShapeDesignerApp {
   };
 
   handleCommitShape = () => {
+    this.referencesHidden = false;
     if (!this.editor.closed) {
       alert('Close the shape first - click back on its first point, or press Enter.');
       return;
@@ -500,13 +507,12 @@ export class ShapeDesignerApp {
     document.getElementById('resetShapeBtn').addEventListener('click', this.handleResetShape);
   }
 
-  /** "Clear Canvas" - wipes this browser's persisted library + draft, and the in-memory library/editor to match (so every dimmed committed-shape reference and the in-progress shape both disappear, not just the draft - see "Reset Shape" for a draft-only clear). Settings fields (nails/leap/height/weight/palette) are left as-is, same reasoning `handleResetShape` already follows: only the shape/library data itself is "saved data," not the live session's current tool settings. */
+  /** "Clear Canvas" - empties the *canvas*: wipes the in-progress draft (and its saved copy) and hides the dimmed committed-shape references. Deliberately leaves the committed library (in memory and in storage) alone - it's the data /arrange/ places shapes from, so deleting it here silently emptied the Arrange board's palette; remove individual shapes with the library list's own delete button instead. Settings fields (nails/leap/height/weight/palette) are left as-is, same reasoning `handleResetShape` already follows. */
   #wirePersistenceControls() {
     document.getElementById('clearSavedDataBtn').addEventListener('click', () => {
-      clearFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
       clearFromStorage(SHAPE_DRAFT_STORAGE_KEY);
-      this.library.clear();
       this.handleResetShape();
+      this.referencesHidden = true;
     });
   }
 

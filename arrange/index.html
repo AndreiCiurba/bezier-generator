@@ -52,6 +52,17 @@
       max-height: calc(100vh - 20px);
       overflow-y: auto;
     }
+
+    /* Color schemes open as a flyout to the right of the main menu, like the
+       other pages. styles.css's own rule (position: absolute) gets clipped by
+       #ui's scrolling, which is what forced a horizontal scroll to reach it -
+       `fixed` escapes that clipping. Its left/top are set from #ui's actual
+       box when it opens (see ArrangeApp#initInstanceColors). */
+    #colorFavoritesSubmenu {
+      position: fixed;
+      max-height: calc(100vh - 20px);
+      overflow-y: auto;
+    }
   </style>
 </head>
 
@@ -106,6 +117,12 @@
       <button id="applyGlobalWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
+    <!-- Global nail visibility - used by any placed instance without its own override. -->
+    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 10px;">
+      <input id="globalNailsVisibleCheckbox" type="checkbox" />
+      Show nails
+    </label>
+
     <!-- Placed shapes - instances actually on the board. -->
     <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Placed Shapes</div>
     <ul id="placedShapesList"
@@ -113,7 +130,10 @@
 
     <!-- Selected instance's own edit panel - rotation/scale/height override. -->
     <div id="instanceEditPanel" style="display:none; margin-top: 8px; border-top: 1px solid #444; padding-top: 8px;">
-      <div style="font-size: 11px; color: #EEEEEE;">Selected Shape</div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="font-size: 11px; color: #EEEEEE;">Selected Shape</div>
+        <button id="closeInstancePanelBtn" class="panel-close-btn" style="position: static;" title="Close" aria-label="Close selected shape menu">&times;</button>
+      </div>
       <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Rotation (deg)
         <input id="instanceRotationInput" type="number" step="1" style="width: 100%;" />
@@ -138,6 +158,38 @@
         Stroke weight override
         <input id="instanceWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
       </label>
+      <!-- This instance's own color layers - same swatches/picker modes as the other pages. Left-click changes a layer's color, right-click toggles it. -->
+      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Colors</div>
+      <div id="colorPickerModeToggle">
+        <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
+        <button id="pickerModeCustomBtn" class="menu-btn">Custom</button>
+      </div>
+      <div id="colorPickerContainer"></div>
+      <button id="openFavoritesBtn" class="menu-btn" style="margin-top: 4px;">Color Schemes</button>
+      <!-- Saved color schemes - save the selected shape's colors, export/import them as JSON,
+           and click one to apply it to the selected shape. -->
+      <div id="colorFavoritesSubmenu" class="panel hidden">
+        <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
+        <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+        <div id="favoriteBundlesContainer"></div>
+        <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+        <button id="exportColorsBtn" class="menu-btn">Export</button>
+        <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
+        <button id="importColorsBtn" class="menu-btn">Import</button>
+      </div>
+
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        <input id="instanceUseGlobalNailsCheckbox" type="checkbox" />
+        Use global nail visibility
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        <input id="instanceShowNailsCheckbox" type="checkbox" />
+        Show nails
+      </label>
+      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        Nail scale
+        <input id="instanceNailScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+      </label>
       <button id="deleteInstanceBtn" class="menu-btn" style="margin-top: 6px;">Delete Shape</button>
     </div>
 
@@ -149,6 +201,11 @@
     <button id="exportArrangementBtn" class="menu-btn">Export Arrangement</button>
     <button id="importArrangementBtn" class="menu-btn">Import Arrangement</button>
     <input type="file" id="importArrangementInput" accept=".json,.txt" style="display:none;" />
+
+    <!-- Top-down PNG of the placed shapes: just the nails (a setup template), or the nails plus the woven strings. -->
+    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Export PNG</div>
+    <button id="exportNailsPngBtn" class="menu-btn">Nails Only</button>
+    <button id="exportNailsStringsPngBtn" class="menu-btn">Nails + Strings</button>
   </div>
 </body>
 

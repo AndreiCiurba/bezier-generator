@@ -70,9 +70,9 @@
       <button id="undoAnchorBtn" class="menu-btn" style="width:auto; flex:1;">Undo Point</button>
       <button id="resetShapeBtn" class="menu-btn" style="width:auto; flex:1;">Reset Shape</button>
     </div>
-    <!-- Clears the whole canvas: the in-progress shape AND every dimmed
-         committed-shape reference, plus this browser's saved copy of both -
-         not just the current draft (see "Reset Shape" above for that). -->
+    <!-- Clears the canvas: the in-progress shape AND the dimmed committed-shape
+         references. The saved shape library itself is kept (Arrange places
+         shapes from it) - delete shapes from the library list instead. -->
     <button id="clearSavedDataBtn" class="menu-btn" style="margin-top: 4px;">Clear Canvas</button>
 
     <!-- This shape's own weave settings - set per shape, before committing it to the library. -->

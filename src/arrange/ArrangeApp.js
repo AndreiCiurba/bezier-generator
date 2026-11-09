@@ -7,13 +7,19 @@ import { anchorsCentroid } from '../core/shapeTransform.js';
 import { ArrangeSceneSync } from './ArrangeSceneSync.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { NailHeightUI } from '../three-page/NailHeightUI.js';
-import { DEFAULT_NAIL_HEIGHT } from '../three-page/nailHeight.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
-import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
+import { StrokePalette } from '../state/StrokePalette.js';
+import { FavoritesStore } from '../state/FavoritesStore.js';
+import { ColorPickerUI } from '../ui/ColorPickerUI.js';
+import { PickerModeUI } from '../ui/PickerModeUI.js';
+import { FavoritesUI } from '../ui/FavoritesUI.js';
+import { PanelGroup } from '../ui/PanelGroup.js';
 import { OrientationGizmo } from '../three-page/OrientationGizmo.js';
 import { defaultCameraPosition } from '../three-page/cameraFraming.js';
 import { fromWorld3 } from '../three-page/axisMapping.js';
 import { downloadJson, readJsonFile } from '../io/JsonFile.js';
+import { downloadCanvasPng } from '../io/PngFile.js';
+import { arrangeExportGeometry, renderArrangeExport } from './arrangeExport.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
 import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
@@ -34,6 +40,15 @@ const ORBIT_TARGET = { x: 0, y: 0, z: 0 };
 // tolerance - same reasoning as the 2D pages' own NEAREST_NAIL_RADIUS, scaled
 // 10x alongside BOARD_SIZE.
 const MIN_INSTANCE_PICK_RADIUS = 200;
+// This board's own defaults (the 3D page's 400 / baseline weight don't suit
+// the big freeform shapes placed here).
+const DEFAULT_ARRANGE_HEIGHT = 1000;
+const DEFAULT_ARRANGE_WEIGHT = 0.3;
+// A shape drawn on /shapes is sized against that page's ~900x650 canvas, but
+// this board is 12000 units across, so at scale 1 it lands much smaller than
+// it looked there. Newly placed instances start at this scale to compensate
+// (still freely editable per instance afterwards).
+const DEFAULT_PLACEMENT_SCALE = 7;
 
 /**
  * The Arrange board page, wired together: a flat Three.js board (no nail
@@ -74,8 +89,9 @@ export class ArrangeApp {
     this.library = new ShapeLibraryStore(); // shapes imported from the Shape Designer, available to place
     this.instances = new ArrangedShapeStore(); // shapes actually placed on this board
 
-    this.globalHeight = DEFAULT_NAIL_HEIGHT;
-    this.globalWeight = BASELINE_STROKE_WEIGHT;
+    this.globalHeight = DEFAULT_ARRANGE_HEIGHT;
+    this.globalWeight = DEFAULT_ARRANGE_WEIGHT;
+    this.globalNailsVisible = true;
     this.armedShapeId = null; // library shape id selected for the next placement click
     this.selectedInstanceId = null; // placed instance id currently shown in the edit panel
     this.dragState = null; // { id } while a placed instance is being dragged
@@ -107,8 +123,11 @@ export class ArrangeApp {
     this.#initLibraryImportExport();
     this.#initGlobalHeight();
     this.#initGlobalWeight();
+    this.#initGlobalNails();
     this.#initArrangementExportImport();
+    this.#initPngExport();
     this.#initInstanceEditPanel();
+    this.#initInstanceColors();
     this.#initCameraReset();
     this.#initPersistenceControls();
 
@@ -219,6 +238,15 @@ export class ArrangeApp {
     ).init();
   }
 
+  #initGlobalNails() {
+    const checkbox = document.getElementById('globalNailsVisibleCheckbox');
+    checkbox.checked = this.globalNailsVisible;
+    checkbox.addEventListener('change', () => {
+      this.globalNailsVisible = checkbox.checked;
+      this.#syncScene();
+    });
+  }
+
   #initGlobalWeight() {
     new StrokeWeightUI(
       { input: document.getElementById('globalWeightInput'), applyBtn: document.getElementById('applyGlobalWeightBtn') },
@@ -228,6 +256,20 @@ export class ArrangeApp {
         this.#syncScene();
       }
     ).init();
+  }
+
+  #initPngExport() {
+    const exportPng = (filename, withStrings) => {
+      const geometry = arrangeExportGeometry(this.instances.instances, this.globalWeight);
+      const canvas = renderArrangeExport(geometry, { withStrings });
+      if (!canvas) {
+        alert('Nothing to export yet - place a shape first.');
+        return;
+      }
+      downloadCanvasPng(canvas, filename);
+    };
+    document.getElementById('exportNailsPngBtn').addEventListener('click', () => exportPng('arrange-nails.png', false));
+    document.getElementById('exportNailsStringsPngBtn').addEventListener('click', () => exportPng('arrange-nails-strings.png', true));
   }
 
   #initArrangementExportImport() {
@@ -260,6 +302,24 @@ export class ArrangeApp {
     const weightInput = document.getElementById('instanceWeightInput');
     const useGlobalWeightCheckbox = document.getElementById('instanceUseGlobalWeightCheckbox');
     const deleteBtn = document.getElementById('deleteInstanceBtn');
+    const useGlobalNailsCheckbox = document.getElementById('instanceUseGlobalNailsCheckbox');
+    const showNailsCheckbox = document.getElementById('instanceShowNailsCheckbox');
+    const nailScaleInput = document.getElementById('instanceNailScaleInput');
+
+    useGlobalNailsCheckbox.addEventListener('change', () => {
+      if (!this.selectedInstanceId) return;
+      showNailsCheckbox.disabled = useGlobalNailsCheckbox.checked;
+      this.instances.setNailsVisible(this.selectedInstanceId, useGlobalNailsCheckbox.checked ? null : showNailsCheckbox.checked);
+    });
+    showNailsCheckbox.addEventListener('change', () => {
+      if (!this.selectedInstanceId || useGlobalNailsCheckbox.checked) return;
+      this.instances.setNailsVisible(this.selectedInstanceId, showNailsCheckbox.checked);
+    });
+    nailScaleInput.addEventListener('change', () => {
+      if (!this.selectedInstanceId) return;
+      const nailScale = parseFloat(nailScaleInput.value);
+      if (Number.isFinite(nailScale) && nailScale > 0) this.instances.setNailScale(this.selectedInstanceId, nailScale);
+    });
 
     rotationInput.addEventListener('change', () => {
       if (!this.selectedInstanceId) return;
@@ -271,6 +331,7 @@ export class ArrangeApp {
       const scale = parseFloat(scaleInput.value);
       if (Number.isFinite(scale) && scale > 0) this.instances.setScale(this.selectedInstanceId, scale);
     });
+    document.getElementById('closeInstancePanelBtn').addEventListener('click', () => this.#selectInstance(null));
     useGlobalHeightCheckbox.addEventListener('change', () => {
       if (!this.selectedInstanceId) return;
       heightInput.disabled = useGlobalHeightCheckbox.checked;
@@ -298,6 +359,73 @@ export class ArrangeApp {
     });
   }
 
+  /**
+   * The selected shape's color layers, edited with the same classes the other
+   * pages use. `this.instancePalette` is one reusable `StrokePalette` that
+   * mirrors whichever instance is selected: loading an instance fills it
+   * (guarded, so that doesn't write back), and any edit afterwards writes the
+   * palette back onto just that instance.
+   */
+  #initInstanceColors() {
+    this.instancePalette = new StrokePalette();
+    this.isLoadingInstancePalette = false;
+
+    this.colorPickerUI = new ColorPickerUI(document.getElementById('colorPickerContainer'), this.instancePalette);
+    this.colorPickerUI.init();
+    new PickerModeUI(
+      { defaultBtn: document.getElementById('pickerModeDefaultBtn'), customBtn: document.getElementById('pickerModeCustomBtn') },
+      this.colorPickerUI
+    ).init();
+
+    this.instancePalette.onChange(() => {
+      if (this.isLoadingInstancePalette || !this.selectedInstanceId) return;
+      this.instances.setColors(this.selectedInstanceId, this.instancePalette.snapshot());
+    });
+
+    // The schemes flyout is `position: fixed` (see arrange/index.html) so the
+    // scrolling main menu can't clip it - line it up just right of that menu
+    // each time it's opened.
+    const schemesPanel = document.getElementById('colorFavoritesSubmenu');
+    document.getElementById('openFavoritesBtn').addEventListener('click', () => {
+      const menu = document.getElementById('ui').getBoundingClientRect();
+      schemesPanel.style.top = `${menu.top}px`;
+      schemesPanel.style.left = `${menu.right + 10}px`;
+    });
+
+    new FavoritesUI(
+      {
+        panelEl: schemesPanel,
+        openBtn: document.getElementById('openFavoritesBtn'),
+        closeBtn: document.getElementById('closeColorSubmenuBtn'),
+        saveBtn: document.getElementById('saveCurrentColorBtn'),
+        exportBtn: document.getElementById('exportColorsBtn'),
+        importBtn: document.getElementById('importColorsBtn'),
+        importInput: document.getElementById('importColorsInput'),
+        bundlesContainer: document.getElementById('favoriteBundlesContainer'),
+      },
+      new FavoritesStore(),
+      this.instancePalette,
+      this.colorPickerUI,
+      new PanelGroup()
+    ).init();
+  }
+
+  /** Fills `this.instancePalette` (and its swatches) from `colors` without writing anything back to the instance. */
+  #loadInstancePalette(colors) {
+    if (colors.length === 0) return;
+    this.isLoadingInstancePalette = true;
+    try {
+      this.instancePalette.resize(colors.length);
+      colors.forEach((c, i) => {
+        this.instancePalette.setColor(i, c.color);
+        if (this.instancePalette.getSlot(i).enabled !== Boolean(c.enabled)) this.instancePalette.toggleEnabled(i);
+      });
+    } finally {
+      this.isLoadingInstancePalette = false;
+    }
+    this.colorPickerUI.rebuild();
+  }
+
   #renderInstanceList() {
     const list = document.getElementById('placedShapesList');
     list.innerHTML = '';
@@ -306,7 +434,7 @@ export class ArrangeApp {
       const li = document.createElement('li');
       li.style.cursor = 'pointer';
       li.style.marginBottom = '4px';
-      li.textContent = `${instance.shapeSnapshot.name || `Shape ${index + 1}`}`;
+      li.textContent = instance.name || `Shape_${index + 1}`;
       li.style.border = instance.id === this.selectedInstanceId ? '1px solid #ffcc00' : '1px solid transparent';
       li.addEventListener('click', () => this.#selectInstance(instance.id));
       list.appendChild(li);
@@ -342,6 +470,15 @@ export class ArrangeApp {
     const weightInput = document.getElementById('instanceWeightInput');
     weightInput.disabled = useGlobalWeight;
     weightInput.value = String(instance.shapeSnapshot.weight ?? this.globalWeight);
+
+    const useGlobalNails = instance.nailsVisible === null;
+    document.getElementById('instanceUseGlobalNailsCheckbox').checked = useGlobalNails;
+    const showNailsCheckbox = document.getElementById('instanceShowNailsCheckbox');
+    showNailsCheckbox.disabled = useGlobalNails;
+    showNailsCheckbox.checked = instance.nailsVisible ?? this.globalNailsVisible;
+    document.getElementById('instanceNailScaleInput').value = String(instance.nailScale);
+
+    this.#loadInstancePalette(instance.shapeSnapshot.colors);
   }
 
   #initCameraReset() {
@@ -349,7 +486,7 @@ export class ArrangeApp {
   }
 
   #syncScene() {
-    this.arrangeSceneSync.syncAll(this.instances.instances, this.globalHeight, this.globalWeight);
+    this.arrangeSceneSync.syncAll(this.instances.instances, this.globalHeight, this.globalWeight, this.globalNailsVisible);
   }
 
   #raycastToBoard(clientX, clientY) {
@@ -398,6 +535,7 @@ export class ArrangeApp {
           shapeId: shape.id,
           shapeSnapshot: FreeformShape.fromJSON(shape.toJSON()),
           position: hit,
+          scale: DEFAULT_PLACEMENT_SCALE,
         });
       }
       return;

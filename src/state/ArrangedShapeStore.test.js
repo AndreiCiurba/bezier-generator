@@ -98,4 +98,87 @@ describe('ArrangedShapeStore', () => {
       expect(store.count).toBe(0);
     });
   });
+
+  describe('instance names', () => {
+    const place = (store, id) => store.add({ id, shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+
+    it('names placed shapes <shape name>_<n> counting up from 1', () => {
+      const store = new ArrangedShapeStore();
+      place(store, 'a');
+      place(store, 'b');
+      expect(store.instances.map((i) => i.name)).toEqual(['Triangle_1', 'Triangle_2']);
+    });
+
+    it('never reuses a number still in use after a delete, so two shapes cannot share a name', () => {
+      const store = new ArrangedShapeStore();
+      place(store, 'a');
+      place(store, 'b');
+      store.remove('a');
+      place(store, 'c');
+      expect(store.instances.map((i) => i.name)).toEqual(['Triangle_2', 'Triangle_3']);
+    });
+
+    it('keeps names through a JSON round trip and names legacy entries that have none', () => {
+      const store = new ArrangedShapeStore();
+      place(store, 'a');
+      const legacy = store.toJSON().map(({ name, ...rest }) => rest);
+
+      const restored = new ArrangedShapeStore();
+      restored.importInstances(store.toJSON(), FreeformShape);
+      expect(restored.instances[0].name).toBe('Triangle_1');
+
+      const fromLegacy = new ArrangedShapeStore();
+      fromLegacy.importInstances(legacy, FreeformShape);
+      expect(fromLegacy.instances[0].name).toBe('Triangle_1');
+    });
+  });
+
+  describe('nail settings', () => {
+    it('defaults to following the global nail visibility at scale 1', () => {
+      const store = new ArrangedShapeStore();
+      store.add({ id: 'a', shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+      expect(store.findById('a').nailsVisible).toBeNull();
+      expect(store.findById('a').nailScale).toBe(1);
+    });
+
+    it('stores per-instance visibility and scale, and persists them', () => {
+      const store = new ArrangedShapeStore();
+      store.add({ id: 'a', shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+      store.setNailsVisible('a', false);
+      store.setNailScale('a', 2.5);
+
+      const restored = new ArrangedShapeStore();
+      restored.importInstances(store.toJSON(), FreeformShape);
+      expect(restored.findById('a').nailsVisible).toBe(false);
+      expect(restored.findById('a').nailScale).toBe(2.5);
+    });
+  });
+
+  describe('setColors', () => {
+    it('recolors just that instance, leaving the library shape and other instances alone', () => {
+      const source = makeSnapshot();
+      const store = new ArrangedShapeStore();
+      store.add({ id: 'a', shapeId: 's1', shapeSnapshot: FreeformShape.fromJSON(source.toJSON()), position: { x: 0, y: 0 } });
+      store.add({ id: 'b', shapeId: 's1', shapeSnapshot: FreeformShape.fromJSON(source.toJSON()), position: { x: 0, y: 0 } });
+
+      store.setColors('a', [{ color: '#123456', enabled: false }, { color: '#654321', enabled: true }]);
+
+      expect(store.findById('a').shapeSnapshot.colors).toEqual([
+        { color: '#123456', enabled: false },
+        { color: '#654321', enabled: true },
+      ]);
+      expect(store.findById('b').shapeSnapshot.colors).toEqual(colors);
+      expect(source.colors).toEqual(colors);
+    });
+
+    it('survives a JSON round trip so a recolor is saved with the arrangement', () => {
+      const store = new ArrangedShapeStore();
+      store.add({ id: 'a', shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+      store.setColors('a', [{ color: '#abcdef', enabled: true }]);
+
+      const restored = new ArrangedShapeStore();
+      restored.importInstances(store.toJSON(), FreeformShape);
+      expect(restored.findById('a').shapeSnapshot.colors).toEqual([{ color: '#abcdef', enabled: true }]);
+    });
+  });
 });
