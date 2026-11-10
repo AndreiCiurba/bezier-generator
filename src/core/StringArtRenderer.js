@@ -41,9 +41,10 @@ export class StringArtRenderer {
    * @param {{color:string,enabled:boolean}[]} strokes
    * @param {number} weight
    * @param {object} renderer see `drawCurve`'s own doc.
+   * @param {'legacy'|'center'} rule see `closedWeaveStep`
    */
-  static drawClosedWeave(cellCorners, n, leap, strokes, weight = DEFAULT_STROKE_WEIGHT, renderer = window) {
-    StringArtRenderer.#drawSegments(closedWeaveSegmentsForCurve(cellCorners, n, leap, strokes), weight, renderer);
+  static drawClosedWeave(cellCorners, n, leap, strokes, weight = DEFAULT_STROKE_WEIGHT, renderer = window, rule = 'legacy') {
+    StringArtRenderer.#drawSegments(closedWeaveSegmentsForCurve(cellCorners, n, leap, strokes, rule), weight, renderer);
   }
 
   static #drawSegments(segments, weight, renderer = window) {

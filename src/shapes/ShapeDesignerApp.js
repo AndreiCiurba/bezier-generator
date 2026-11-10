@@ -31,7 +31,8 @@ const CANVAS_WIDTH = 900;
 const CANVAS_HEIGHT = 650;
 
 const DEFAULT_NAIL_COUNT = 24;
-const DEFAULT_LEAP = 3;
+// 0 = layer 0 is the chord straight across (nails / 2 round the ring); each later layer steps closer to the rim.
+const DEFAULT_LEAP = 0;
 const MIN_NAIL_COUNT = 3;
 // Scaled 10x (was 120) - at the app's lowered 0.01 stroke-weight floor (see
 // strokeWeightSetting.js), shapes need real world-space room for a thin
@@ -222,7 +223,7 @@ export class ShapeDesignerApp {
       // reference; earlier library shapes are not piled back onto the canvas.
       ShapeCanvasView.withCommittedShapeAlpha(() => {
         for (const shape of this.library.shapes.filter((s) => s.id === this.lastCommittedId)) {
-          StringArtRenderer.drawClosedWeave(shape.resampledOutline(), 0, shape.leap, shape.colors, BASELINE_STROKE_WEIGHT);
+          StringArtRenderer.drawClosedWeave(shape.resampledOutline(), 0, shape.leap, shape.colors, BASELINE_STROKE_WEIGHT, undefined, shape.weaveRule);
         }
       });
     }
@@ -233,7 +234,7 @@ export class ShapeDesignerApp {
 
       if (this.editor.closed) {
         const nails = resampleClosedOutline(anchors, this.nailCount);
-        StringArtRenderer.drawClosedWeave(nails, 0, this.leap, this.palette.getAll(), this.strokeWeight);
+        StringArtRenderer.drawClosedWeave(nails, 0, this.leap, this.palette.getAll(), this.strokeWeight, undefined, 'center');
       }
 
       ShapeCanvasView.drawAnchors(anchors, this.editor.selectedIndex, this.editor.closed);
@@ -365,6 +366,7 @@ export class ShapeDesignerApp {
       colors: this.palette.snapshot(),
       height: this.useGlobalHeight ? null : this.heightOverride,
       weight: this.useGlobalWeight ? null : this.strokeWeight,
+      weaveRule: 'center',
     });
     this.library.add(shape);
     this.lastCommittedId = shape.id;
@@ -467,7 +469,7 @@ export class ShapeDesignerApp {
   }
 
   #leapCheckInput() {
-    return { nailCount: this.nailCount, leap: this.leap, enabled: this.palette.getAll().map((c) => c.enabled) };
+    return { nailCount: this.nailCount, leap: this.leap, enabled: this.palette.getAll().map((c) => c.enabled), rule: 'center' };
   }
 
   /** Shows which color layers will come out empty or as a copy of another, with a one-click leap fix (or what's needed when no leap can work). */

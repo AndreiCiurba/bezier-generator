@@ -23,12 +23,17 @@ export class FreeformShape {
    *   nailCount: number, leap: number,
    *   colors: {color:string, enabled:boolean}[],
    *   height?: number|null, weight?: number|null,
+   *   weaveRule?: 'legacy'|'center',
    * }} config `height`/`weight` are `null` (the default) when this shape
    *   should use the Arrange board's global height/stroke-weight instead of
    *   its own override - same convention for both.
    */
-  constructor({ id, name, anchors, nailCount, leap, colors, height = null, weight = null }) {
+  constructor({ id, name, anchors, nailCount, leap, colors, height = null, weight = null, weaveRule = 'legacy' }) {
     this.id = id;
+    // Which step rule `leap` means (see `closedWeaveMath.js#closedWeaveStep`).
+    // Shapes saved before the center-out rule existed have no such field and
+    // keep drawing exactly as they did ('legacy'); new Shape Designer shapes pass 'center'.
+    this.weaveRule = weaveRule === 'center' ? 'center' : 'legacy';
     this.name = name;
     this.anchors = anchors.map((a) => ({
       x: a.x,
@@ -66,6 +71,7 @@ export class FreeformShape {
       colors: this.colors,
       height: this.height,
       weight: this.weight,
+      weaveRule: this.weaveRule,
     };
   }
 
@@ -87,6 +93,7 @@ export class FreeformShape {
       colors: raw.colors,
       height: raw.height ?? null,
       weight: raw.weight ?? null,
+      weaveRule: raw.weaveRule,
     });
   }
 }

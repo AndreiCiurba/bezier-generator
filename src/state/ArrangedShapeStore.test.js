@@ -154,6 +154,26 @@ describe('ArrangedShapeStore', () => {
     });
   });
 
+  describe('fit layers to nails', () => {
+    it('is on for center-out shapes and off for old-rule shapes, so saved arrangements keep their look', () => {
+      const store = new ArrangedShapeStore();
+      const center = FreeformShape.fromJSON({ ...makeSnapshot().toJSON(), weaveRule: 'center' });
+      store.add({ id: 'c', shapeId: 's1', shapeSnapshot: center, position: { x: 0, y: 0 } });
+      store.add({ id: 'l', shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+      expect(store.findById('c').fitLayersToNails).toBe(true);
+      expect(store.findById('l').fitLayersToNails).toBe(false);
+    });
+
+    it('can be switched per instance and survives export/import', () => {
+      const store = new ArrangedShapeStore();
+      store.add({ id: 'a', shapeId: 's1', shapeSnapshot: makeSnapshot(), position: { x: 0, y: 0 } });
+      store.setFitLayersToNails('a', true);
+      const restored = new ArrangedShapeStore();
+      restored.importInstances(store.toJSON(), FreeformShape);
+      expect(restored.findById('a').fitLayersToNails).toBe(true);
+    });
+  });
+
   describe('setColors', () => {
     it('recolors just that instance, leaving the library shape and other instances alone', () => {
       const source = makeSnapshot();

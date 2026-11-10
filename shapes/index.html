@@ -88,6 +88,12 @@
       Leap
       <input id="shapeLeapInput" type="number" step="1" style="width: 100%;" />
     </label>
+    <!-- Number of colors for the shape currently being drawn - kept beside Nails/Leap since the three together decide which layers show -->
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label for="colorCountInput" style="font-size: 11px; color: var(--panel-text);">Colors</label>
+      <input id="colorCountInput" type="number" min="1" max="100" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
+    </div>
     <!-- Warns when nails/leap/colors make a layer empty or a copy of another (see core/leapCheck.js). -->
     <div id="leapWarning" hidden style="font-size: 10px; color: var(--danger-500, #ff3b30); margin-top: 4px; line-height: 1.4;"></div>
     <button id="autoLeapBtn" class="menu-btn" hidden style="margin-top: 4px;">Fix leap automatically</button>
@@ -126,13 +132,6 @@
       <button id="exportShapesBtn" class="menu-btn">Export Library</button>
       <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
       <button id="importShapesBtn" class="menu-btn">Import Library</button>
-    </div>
-
-    <!-- Number of colors for the shape currently being drawn -->
-    <div style="display:flex; align-items:center; gap:4px; margin-top: 10px;">
-      <label for="colorCountInput" style="font-size: 11px; color: var(--panel-text);">Colors</label>
-      <input id="colorCountInput" type="number" min="1" max="100" step="1" style="width: 100%;" />
-      <button id="applyColorCountBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
     <!-- Default/Custom picker-mode toggle - see PickerModeUI.js -->

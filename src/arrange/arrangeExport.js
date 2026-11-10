@@ -45,7 +45,7 @@ export function arrangeExportGeometry(instances, globalWeight) {
     const nails = resampleClosedOutline(anchors, shape.nailCount);
     return {
       nails,
-      segments: closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors),
+      segments: closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors, shape.weaveRule),
       weight: shape.weight ?? globalWeight,
       colorCount: shape.colors.length,
     };

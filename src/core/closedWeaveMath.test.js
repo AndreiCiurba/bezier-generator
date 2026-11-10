@@ -10,6 +10,28 @@ describe('closedWeaveSegmentsForCurve', () => {
     expect(closedWeaveSegmentsForCurve([triangle[0], triangle[1]], 4, 2, [{ color: '#fff', enabled: true }])).toEqual([]);
   });
 
+  it("center rule: layer 0 jumps half the ring and each later layer one further, so the board layer is the long chord", () => {
+    const ring = Array.from({ length: 12 }, (_, i) => new Point(i, 0));
+    const strokes = [
+      { color: '#a', enabled: true },
+      { color: '#b', enabled: true },
+    ];
+    const segments = closedWeaveSegmentsForCurve(ring, 0, 0, strokes, 'center');
+    const jump = (layer) => {
+      const s = segments.find((seg) => seg.layerIndex === layer);
+      return (s.to.x - s.from.x + 12) % 12;
+    };
+    expect(jump(0)).toBe(6);
+    expect(jump(1)).toBe(7);
+  });
+
+  it('defaults to the legacy rule so older callers and saved shapes draw unchanged', () => {
+    const ring = Array.from({ length: 12 }, (_, i) => new Point(i, 0));
+    const strokes = [{ color: '#a', enabled: true }];
+    expect(closedWeaveSegmentsForCurve(ring, 0, 3, strokes)).toEqual(closedWeaveSegmentsForCurve(ring, 0, 3, strokes, 'legacy'));
+    expect(closedWeaveSegmentsForCurve(ring, 0, 3, strokes)[0].to.x).toBe(4);
+  });
+
   it('skips disabled color layers entirely', () => {
     const strokes = [
       { color: '#fff', enabled: true },

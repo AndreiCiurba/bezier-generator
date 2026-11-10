@@ -31,12 +31,14 @@ export class ArrangedShapeStore {
    * or reshape an already-placed instance.
    * @param {{id: string, shapeId: string, shapeSnapshot: import('../models/FreeformShape.js').FreeformShape, position: {x:number,y:number}, rotationRadians?: number, scale?: number}} config
    */
-  add({ id, shapeId, shapeSnapshot, position, rotationRadians = 0, scale = 1, name, nailsVisible = null, nailScale = 1 }) {
+  add({ id, shapeId, shapeSnapshot, position, rotationRadians = 0, scale = 1, name, nailsVisible = null, nailScale = 1, fitLayersToNails }) {
     this.#instances.push({
       id, shapeId, shapeSnapshot, position, rotationRadians, scale,
       name: name || this.#nextName(shapeSnapshot.name),
       nailsVisible,
       nailScale,
+      // Center-out shapes default to "natural" layer heights (see `setFitLayersToNails`); old-rule shapes keep spreading evenly.
+      fitLayersToNails: typeof fitLayersToNails === 'boolean' ? fitLayersToNails : shapeSnapshot.weaveRule === 'center',
     });
     this.#notify();
   }
@@ -127,6 +129,20 @@ export class ArrangedShapeStore {
     this.#notify();
   }
 
+  /**
+   * `true`: the shape's layers sit at the heights they'd have if it had
+   * exactly `nails / 2` colors (the most a ring of nails can show), so a shape
+   * with fewer colors uses only the lower part of the nail instead of
+   * stretching its few layers over the full height. `false`: spread the
+   * colors evenly over the whole height.
+   */
+  setFitLayersToNails(id, fit) {
+    const instance = this.findById(id);
+    if (!instance) return;
+    instance.fitLayersToNails = fit;
+    this.#notify();
+  }
+
   clear() {
     this.#instances.length = 0;
     this.#notify();
@@ -153,6 +169,7 @@ export class ArrangedShapeStore {
           name: raw.name || this.#nextName(shapeSnapshot.name),
           nailsVisible: typeof raw.nailsVisible === 'boolean' ? raw.nailsVisible : null,
           nailScale: Number.isFinite(raw.nailScale) && raw.nailScale > 0 ? raw.nailScale : 1,
+          fitLayersToNails: typeof raw.fitLayersToNails === 'boolean' ? raw.fitLayersToNails : shapeSnapshot.weaveRule === 'center',
         });
       }
     }
@@ -170,6 +187,7 @@ export class ArrangedShapeStore {
       name: i.name,
       nailsVisible: i.nailsVisible,
       nailScale: i.nailScale,
+      fitLayersToNails: i.fitLayersToNails,
     }));
   }
 

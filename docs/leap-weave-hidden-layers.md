@@ -1,5 +1,16 @@
 # Why some layers of a shape disappear or repeat
 
+> **Update: Shapes and Arrange now use a center-out rule.** New shapes get
+> `step of layer k = floor(nails / 2) + leap + k` (`closedWeaveStep` in
+> `src/core/closedWeaveMath.js`, `weaveRule: 'center'`): layer 0, on the board,
+> is the chord nearest the center, and each layer above it is a little shorter,
+> so the stack nests like an amphitheatre. With leap 0 (the new default) every
+> layer shows on an even nail count with `nails >= 2 x colors`; on an odd count
+> use leap 1. Shapes saved before this keep the original rule below
+> (`weaveRule: 'legacy'`, the default for saved files without the field), so
+> they draw exactly as before. The rest of this page explains the underlying
+> arithmetic, which is the same for both rules.
+
 You draw a closed figure on `/shapes`, give it some nails and some colors, and
 in the weave one layer is missing, or two layers look identical. This is not a
 bug in the drawing: it is arithmetic on a loop of nails. This page explains it

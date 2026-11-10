@@ -475,6 +475,10 @@ export class ArrangeApp {
     const showNailsCheckbox = document.getElementById('instanceShowNailsCheckbox');
     const nailScaleInput = document.getElementById('instanceNailScaleInput');
 
+    document.getElementById('instanceFitLayersCheckbox').addEventListener('change', (e) => {
+      if (!this.selectedInstanceId) return;
+      this.instances.setFitLayersToNails(this.selectedInstanceId, e.target.checked);
+    });
     useGlobalNailsCheckbox.addEventListener('change', () => {
       if (!this.selectedInstanceId) return;
       showNailsCheckbox.disabled = useGlobalNailsCheckbox.checked;
@@ -639,6 +643,8 @@ export class ArrangeApp {
     const weightInput = document.getElementById('instanceWeightInput');
     weightInput.disabled = useGlobalWeight;
     weightInput.value = String(instance.shapeSnapshot.weight ?? this.globalWeight);
+
+    document.getElementById('instanceFitLayersCheckbox').checked = instance.fitLayersToNails;
 
     const useGlobalNails = instance.nailsVisible === null;
     document.getElementById('instanceUseGlobalNailsCheckbox').checked = useGlobalNails;

@@ -98,7 +98,11 @@ export class ArrangeSceneSync {
       maxHeight,
       toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
       lineResolution: this.lineResolution,
-      reverseLayers: true,
+      // Old-rule shapes put their widest layer first, so they stack reversed; center-out shapes already start at the board.
+      rule: instance.shapeSnapshot.weaveRule,
+      // With the "fit layers to nails" option, a layer's height is where it would be if the shape had nails / 2 colors.
+      layerSlots: instance.fitLayersToNails ? Math.floor(instance.shapeSnapshot.nailCount / 2) : null,
+      reverseLayers: instance.shapeSnapshot.weaveRule === 'legacy',
     });
     const nailMesh = this.#buildNailMesh(nails, maxHeight, instance.nailScale ?? 1);
     nailMesh.visible = instance.nailsVisible ?? globalNailsVisible;

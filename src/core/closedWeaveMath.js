@@ -51,6 +51,21 @@ function mod(value, modulus) {
 }
 
 /**
+ * How many points round the ring layer `layerIndex` jumps.
+ *  - `'legacy'`: `perEdge + leap - layerIndex`, the original rule (layer 0
+ *    jumps furthest, later layers fewer).
+ *  - `'center'`: `floor(total / 2) + leap + layerIndex`, built from the board
+ *    up - layer 0 is the chord nearest the shape's center, and every later
+ *    layer is a little shorter, so the stack nests like an amphitheatre.
+ *    Jumps past half the ring just mirror shorter ones, so with a small leap
+ *    every layer is a different, non-empty chord (see `leapCheck.js`).
+ */
+export function closedWeaveStep(rule, total, perEdge, leap, layerIndex) {
+  if (rule === 'center') return Math.floor(total / 2) + leap + layerIndex;
+  return perEdge + (leap - layerIndex);
+}
+
+/**
  * Flattens one closed leap-weave curve (a cell's corners + `n` inner nails
  * per edge, one color layer per enabled stroke) into the same flat
  * `{from, to, color}[]` shape `weaveSegmentsForCurve` already returns for
@@ -64,6 +79,7 @@ function mod(value, modulus) {
  * @param {number} leap color 0's leap; each subsequent enabled color layer
  *   uses one less (see class doc)
  * @param {{color:string, enabled:boolean}[]} colors
+ * @param {'legacy'|'center'} [rule] see `closedWeaveStep`; defaults to the original rule
  * @returns {{from: import('./Point.js').Point, to: import('./Point.js').Point, color: string, layerIndex: number}[]}
  *   `layerIndex` is included alongside the `{from, to, color}` shape
  *   `weaveSegmentsForCurve` already returns - 2D consumers can destructure
@@ -71,7 +87,7 @@ function mod(value, modulus) {
  *   height baking (`SceneSync#buildWeaveObject`'s closed-weave branch) needs
  *   it to know which layer a given segment belongs to.
  */
-export function closedWeaveSegmentsForCurve(cellCorners, n, leap, colors) {
+export function closedWeaveSegmentsForCurve(cellCorners, n, leap, colors, rule = 'legacy') {
   const sides = cellCorners.length;
   if (sides < 3) return [];
 
@@ -87,7 +103,7 @@ export function closedWeaveSegmentsForCurve(cellCorners, n, leap, colors) {
   const result = [];
   colors.forEach((layer, layerIndex) => {
     if (!layer.enabled) return;
-    const step = perEdge + (leap - layerIndex);
+    const step = closedWeaveStep(rule, total, perEdge, leap, layerIndex);
     for (let g = 0; g < total; g++) {
       result.push({ from: pointAt(g), to: pointAt(g + step), color: layer.color, layerIndex });
     }
