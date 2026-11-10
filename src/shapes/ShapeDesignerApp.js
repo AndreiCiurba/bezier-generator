@@ -15,6 +15,7 @@ import { PanelGroup } from '../ui/PanelGroup.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
+import { findLeapProblems, suggestLeap } from '../core/leapCheck.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { touchesMenus } from '../ui/menuHitTest.js';
 import { isTypingTarget } from '../ui/keyboardFocus.js';
@@ -148,7 +149,10 @@ export class ShapeDesignerApp {
       }
     });
     this.editor.onChange(() => this.#saveDraft());
-    this.palette.onChange(() => this.#saveDraft());
+    this.palette.onChange(() => {
+      this.#saveDraft();
+      this.#updateLeapWarning();
+    });
 
     const colorPickerContainer = document.getElementById('colorPickerContainer');
     this.colorPickerUI = new ColorPickerUI(colorPickerContainer, this.palette);
@@ -462,6 +466,34 @@ export class ShapeDesignerApp {
     return null;
   }
 
+  #leapCheckInput() {
+    return { nailCount: this.nailCount, leap: this.leap, enabled: this.palette.getAll().map((c) => c.enabled) };
+  }
+
+  /** Shows which color layers will come out empty or as a copy of another, with a one-click leap fix (or what's needed when no leap can work). */
+  #updateLeapWarning() {
+    const warning = document.getElementById('leapWarning');
+    const fixBtn = document.getElementById('autoLeapBtn');
+    const input = this.#leapCheckInput();
+    const problems = findLeapProblems(input);
+    if (problems.length === 0) {
+      warning.hidden = true;
+      fixBtn.hidden = true;
+      return;
+    }
+    // Colors are numbered from 1 in the picker order.
+    const parts = problems.map((p) =>
+      p.kind === 'empty' ? `color ${p.layer + 1} draws nothing` : `color ${p.layer + 1} repeats color ${p.of + 1}`
+    );
+    const layers = input.enabled.filter(Boolean).length;
+    const fixable = suggestLeap(input) !== null;
+    warning.textContent = fixable
+      ? `Some layers are hidden: ${parts.join('; ')}.`
+      : `${parts.join('; ')}. ${this.nailCount} nails only make ${Math.floor(this.nailCount / 2)} different layers - use at least ${2 * layers} nails for ${layers} colors.`;
+    warning.hidden = false;
+    fixBtn.hidden = !fixable;
+  }
+
   #wireShapeSettings() {
     const nailCountInput = document.getElementById('shapeNailCountInput');
     nailCountInput.value = String(this.nailCount);
@@ -470,6 +502,7 @@ export class ShapeDesignerApp {
       if (Number.isInteger(value) && value >= MIN_NAIL_COUNT) this.nailCount = value;
       else nailCountInput.value = String(this.nailCount);
       this.#saveDraft();
+      this.#updateLeapWarning();
     });
 
     const leapInput = document.getElementById('shapeLeapInput');
@@ -479,7 +512,18 @@ export class ShapeDesignerApp {
       if (Number.isInteger(value)) this.leap = value;
       else leapInput.value = String(this.leap);
       this.#saveDraft();
+      this.#updateLeapWarning();
     });
+
+    document.getElementById('autoLeapBtn').addEventListener('click', () => {
+      const suggested = suggestLeap(this.#leapCheckInput());
+      if (suggested === null) return;
+      this.leap = suggested;
+      leapInput.value = String(suggested);
+      this.#saveDraft();
+      this.#updateLeapWarning();
+    });
+    this.#updateLeapWarning();
 
     const heightInput = document.getElementById('shapeHeightInput');
     const useGlobalHeightCheckbox = document.getElementById('shapeUseGlobalHeightCheckbox');

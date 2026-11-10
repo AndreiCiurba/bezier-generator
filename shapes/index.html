@@ -88,6 +88,9 @@
       Leap
       <input id="shapeLeapInput" type="number" step="1" style="width: 100%;" />
     </label>
+    <!-- Warns when nails/leap/colors make a layer empty or a copy of another (see core/leapCheck.js). -->
+    <div id="leapWarning" hidden style="font-size: 10px; color: var(--danger-500, #ff3b30); margin-top: 4px; line-height: 1.4;"></div>
+    <button id="autoLeapBtn" class="menu-btn" hidden style="margin-top: 4px;">Fix leap automatically</button>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       <input id="shapeUseGlobalHeightCheckbox" type="checkbox" />
       Use global height (Arrange board)
