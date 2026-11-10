@@ -46,6 +46,14 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* #ui is a flex column with a max-height (pages that scroll it set overflow-y). Without this,
+   the browser squashes children that have their own overflow - the library and placed-shape
+   lists - down to zero height instead of letting the menu scroll, so they vanish. */
+#ui > *,
+#ui .panel > * {
+  flex-shrink: 0;
+}
+
 #colorFavoritesSubmenu,
 #patternSubmenu,
 #canvasSizeSubmenu,

@@ -120,12 +120,20 @@
          the Shape Designer page. Auto-loaded from this browser's saved
          library (the same one /shapes/ saves to) - Import Library still
          works too, for a library exported from a different browser/device. -->
-    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Shape Library</div>
-    <button id="loadSavedLibraryBtn" class="menu-btn" title="Re-read the library committed on the Shapes page from this browser's storage">Load Saved Library</button>
-    <button id="importShapesBtn" class="menu-btn">Import Library</button>
-    <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
-    <ul id="shapeLibraryList"
-      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
+    <button id="librarySubmenuToggleBtn" class="menu-btn" style="margin-top: 10px; text-align: left;">&#9662; Shape Library</button>
+    <div id="librarySubmenuBody" style="border-left: 2px solid var(--accent-500, #ffcc00); padding-left: 8px; margin-left: 4px;">
+      <ul id="shapeLibraryList"
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
+
+      <!-- How big the next placed shape will be. Every library shape is sized to this
+           (longest side, board units) regardless of how big it was drawn on /shapes. -->
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Placement Size</div>
+      <input id="placementSizeSlider" type="range" min="200" max="8000" step="50" value="1500" style="width: 100%;" />
+      <div id="placementSizeLabel" style="font-size: 10px; color: var(--panel-text-muted);"></div>
+
+      <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
+      <button id="importShapesBtn" class="menu-btn" style="margin-top: 10px;">Import Library</button>
+    </div>
 
     <!-- Global height default - used by any placed instance without its own override. -->
     <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Global Height</div>

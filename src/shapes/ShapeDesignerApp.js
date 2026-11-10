@@ -140,6 +140,12 @@ export class ShapeDesignerApp {
     // drag and every palette edit without a separate call at each site.
     this.library.onChange(() => {
       saveToStorage(SHAPE_LIBRARY_STORAGE_KEY, this.library.shapes.map((s) => s.toJSON()));
+      // Read it straight back: if the browser refused the write (full or blocked storage) Arrange
+      // would never see the shape, so say so here instead of failing silently.
+      const saved = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
+      if (!Array.isArray(saved) || saved.length !== this.library.count) {
+        console.error('Shapes: the library could not be saved to this browser, so /arrange/ will not see it.');
+      }
     });
     this.editor.onChange(() => this.#saveDraft());
     this.palette.onChange(() => this.#saveDraft());

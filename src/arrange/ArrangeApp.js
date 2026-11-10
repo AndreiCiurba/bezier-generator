@@ -22,6 +22,9 @@ import { fromWorld3 } from '../three-page/axisMapping.js';
 import { downloadJson, readJsonFile } from '../io/JsonFile.js';
 import { downloadCanvasPng } from '../io/PngFile.js';
 import { arrangeExportGeometry, renderArrangeExport } from './arrangeExport.js';
+import { shapeExtent, scaleForTargetSize } from './placementSize.js';
+import { transformAnchors } from '../core/shapeTransform.js';
+import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
 import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
@@ -49,11 +52,11 @@ const MIN_INSTANCE_PICK_RADIUS = 200;
 // the big freeform shapes placed here).
 const DEFAULT_ARRANGE_HEIGHT = 1000;
 const DEFAULT_ARRANGE_WEIGHT = 0.3;
-// A shape drawn on /shapes is sized against that page's ~900x650 canvas, but
-// this board is 12000 units across, so at scale 1 it lands much smaller than
-// it looked there. Newly placed instances start at this scale to compensate
-// (still freely editable per instance afterwards).
-const DEFAULT_PLACEMENT_SCALE = 7;
+// A shape's drawing size on /shapes (its pixel canvas) says nothing about how
+// big it should be on this board, so every placement is sized to a target
+// length for its longest side instead (see placementSize.js) - chosen with the
+// "Placement Size" slider, still freely editable per instance afterwards.
+const DEFAULT_PLACEMENT_SIZE = 1500;
 
 /**
  * The Arrange board page, wired together: a flat Three.js board (no nail
@@ -130,6 +133,8 @@ export class ArrangeApp {
 
     this.#initPlacementModeToggle();
     this.#initLibraryImportExport();
+    this.#initLibrarySync();
+    this.#initPlacementSize();
     this.#initGlobalHeight();
     this.#initGlobalWeight();
     this.#initGlobalNails();
@@ -158,22 +163,44 @@ export class ArrangeApp {
 
   /** Restores the shape library from the same `localStorage` key `/shapes/` writes to - see this class's own doc. Read-only: never writes this key back. */
   #hydrateLibrary() {
-    const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
-    if (Array.isArray(raw)) this.library.importShapes(raw, FreeformShape);
+    this.storedLibraryIds = new Set();
+    this.#syncLibraryFromStorage();
   }
 
   /**
-   * Replaces the in-memory library with what /shapes/ last saved. Used by the
-   * "Load Saved Library" button, and automatically when /shapes/ saves in
-   * another tab (`storage` event) or this page is restored from the browser's
-   * back/forward cache - cases where the page-load hydrate is stale.
+   * Brings the library in line with what /shapes/ last saved: shapes it saved
+   * since are added, shapes it deleted are removed, and anything imported from
+   * a file (never in storage) is left alone. Runs on load and then whenever
+   * this page could have gone stale - the tab regains focus or becomes
+   * visible, /shapes/ saves in another tab (`storage` event), or the page is
+   * restored from the back/forward cache - so committed shapes simply appear,
+   * with no button to press.
    */
-  #reloadLibraryFromStorage() {
+  #syncLibraryFromStorage() {
     const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
-    if (!Array.isArray(raw)) return;
-    this.library.clear();
-    this.library.importShapes(raw, FreeformShape);
+    const stored = Array.isArray(raw) ? raw : [];
+    const storedIds = new Set(stored.map((s) => s?.id));
+
+    for (const id of this.storedLibraryIds) {
+      if (!storedIds.has(id)) this.library.remove(id);
+    }
+    const fresh = stored.filter((s) => s?.id && !this.library.findById(s.id));
+    if (fresh.length > 0) this.library.importShapes(fresh, FreeformShape);
+
+    this.storedLibraryIds = storedIds;
     if (this.armedShapeId && !this.library.findById(this.armedShapeId)) this.armedShapeId = null;
+  }
+
+  #initLibrarySync() {
+    const sync = () => this.#syncLibraryFromStorage();
+    window.addEventListener('storage', (event) => {
+      if (event.key === null || event.key.endsWith(SHAPE_LIBRARY_STORAGE_KEY)) sync();
+    });
+    window.addEventListener('focus', sync);
+    window.addEventListener('pageshow', sync);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') sync();
+    });
   }
 
   /** Restores this board's own placed arrangement, if anything was saved for it. */
@@ -204,20 +231,21 @@ export class ArrangeApp {
         this.canvas.removeEventListener('pointermove', this.#handlePointerMove);
         window.removeEventListener('pointerup', this.#handlePointerUp);
         this.dragState = null;
+        this.#updateGhost(null);
       }
     });
   }
 
   #initLibraryImportExport() {
+    // The "Shape Library" header button expands/collapses everything about the library (open by default).
+    const libraryToggle = document.getElementById('librarySubmenuToggleBtn');
+    const libraryBody = document.getElementById('librarySubmenuBody');
+    libraryToggle.addEventListener('click', () => {
+      libraryBody.hidden = !libraryBody.hidden;
+      libraryToggle.textContent = `${libraryBody.hidden ? '▸' : '▾'} Shape Library`;
+    });
     const importBtn = document.getElementById('importShapesBtn');
     const importInput = document.getElementById('importShapesInput');
-    document.getElementById('loadSavedLibraryBtn').addEventListener('click', () => this.#reloadLibraryFromStorage());
-    window.addEventListener('storage', (event) => {
-      if (event.key === null || event.key.endsWith(SHAPE_LIBRARY_STORAGE_KEY)) this.#reloadLibraryFromStorage();
-    });
-    window.addEventListener('pageshow', (event) => {
-      if (event.persisted) this.#reloadLibraryFromStorage();
-    });
     importBtn.addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -233,9 +261,79 @@ export class ArrangeApp {
     });
   }
 
+  /** The "Placement Size" slider: how long the next placed shape's longest side will be, with a ghost outline at the cursor showing it. */
+  #initPlacementSize() {
+    this.placementSize = DEFAULT_PLACEMENT_SIZE;
+    this.ghostLine = null;
+    this.lastHit = null;
+    const slider = document.getElementById('placementSizeSlider');
+    slider.value = String(this.placementSize);
+    slider.addEventListener('input', () => {
+      this.placementSize = Number(slider.value);
+      this.#updatePlacementSizeLabel();
+      this.#updateGhost(this.lastHit);
+    });
+    this.#updatePlacementSizeLabel();
+
+    // Ctrl + wheel over the board, in placement mode, resizes the shape about to
+    // be placed (and its ghost outline) instead of zooming the camera or the
+    // browser. Capture phase on the window so it runs before OrbitControls'
+    // own wheel handler on the canvas and can stop it.
+    window.addEventListener(
+      'wheel',
+      (event) => {
+        if (!event.ctrlKey || !this.isPlacementMode || event.target !== this.canvas) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const min = Number(slider.min);
+        const max = Number(slider.max);
+        this.placementSize = Math.min(max, Math.max(min, this.placementSize * factor));
+        slider.value = String(this.placementSize);
+        this.#updatePlacementSizeLabel();
+        this.#updateGhost(this.lastHit);
+      },
+      { capture: true, passive: false }
+    );
+  }
+
+  #updatePlacementSizeLabel() {
+    document.getElementById('placementSizeLabel').textContent =
+      `Next shape: ${Math.round(this.placementSize)} units long (board is ${this.boardWidth} x ${this.boardDepth})`;
+  }
+
+  /** Scale that makes `shape` come out `placementSize` long on its longest side. */
+  #scaleForPlacement(shape) {
+    return scaleForTargetSize(shapeExtent(shape.resampledOutline()), this.placementSize);
+  }
+
+  /** Draws (or hides, when `hit` is null / nothing is armed) the outline the armed shape would have if placed at `hit`. */
+  #updateGhost(hit) {
+    const shape = this.armedShapeId ? this.library.findById(this.armedShapeId) : null;
+    if (!hit || !shape || !this.isPlacementMode) {
+      if (this.ghostLine) this.ghostLine.visible = false;
+      return;
+    }
+    const anchors = transformAnchors(shape.anchors, { position: hit, rotationRadians: 0, scale: this.#scaleForPlacement(shape) });
+    const outline = resampleClosedOutline(anchors, Math.max(shape.nailCount, 24));
+    const points = outline.map((p) => {
+      const w = this.arrangeSceneSync.toWorldPosition(p, 2);
+      return new THREE.Vector3(w.x, w.y, w.z);
+    });
+    if (this.ghostLine) {
+      this.scene.remove(this.ghostLine);
+      this.ghostLine.geometry.dispose();
+    } else {
+      this.ghostMaterial = new THREE.LineBasicMaterial({ color: 0xc9a13c });
+    }
+    this.ghostLine = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(points), this.ghostMaterial);
+    this.scene.add(this.ghostLine);
+  }
+
   #renderLibraryList() {
     const list = document.getElementById('shapeLibraryList');
     list.innerHTML = '';
+    if (!this.armedShapeId) this.#updateGhost(null);
 
     for (const shape of this.library.shapes) {
       const li = document.createElement('li');
@@ -252,7 +350,7 @@ export class ArrangeApp {
 
     if (this.library.count === 0) {
       const li = document.createElement('li');
-      li.textContent = 'No shapes yet - commit some on the Shapes page (then Load Saved Library), or import a file.';
+      li.textContent = 'No shapes yet - commit some on the Shapes page and they will appear here, or import a file.';
       li.style.color = 'var(--panel-text-muted, #888)';
       list.appendChild(li);
     }
@@ -300,6 +398,7 @@ export class ArrangeApp {
       this.boardDepth = depth;
       this.arrangeSceneSync.setBoardSize(width, depth);
       this.#applyDefaultCameraView();
+      this.#updatePlacementSizeLabel();
     });
     document.getElementById('resetBoardSizeBtn').addEventListener('click', () => {
       widthInput.value = String(DEFAULT_BOARD_WIDTH);
@@ -605,7 +704,7 @@ export class ArrangeApp {
           shapeId: shape.id,
           shapeSnapshot: FreeformShape.fromJSON(shape.toJSON()),
           position: hit,
-          scale: DEFAULT_PLACEMENT_SCALE,
+          scale: this.#scaleForPlacement(shape),
         });
       }
       return;
@@ -617,8 +716,12 @@ export class ArrangeApp {
   };
 
   #handlePointerMove = (event) => {
-    if (!this.dragState) return;
     const hit = this.#raycastToBoard(event.clientX, event.clientY);
+    if (!this.dragState) {
+      this.lastHit = hit;
+      this.#updateGhost(hit);
+      return;
+    }
     if (!hit) return;
     this.instances.move(this.dragState.id, hit);
   };
