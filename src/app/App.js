@@ -14,6 +14,8 @@ import { FavoritesStore } from '../state/FavoritesStore.js';
 import { WeaveState } from '../state/WeaveState.js';
 import { PatternStamper } from './PatternStamper.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { initPanelResizers } from '../ui/PanelResizer.js';
+import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
@@ -306,6 +308,8 @@ export class App {
       document.getElementById('ui'),
       document.getElementById('closeUiBtn')
     ).init();
+    initPanelResizers();
+    initThemeToggle();
 
     this.#createCanvas();
 

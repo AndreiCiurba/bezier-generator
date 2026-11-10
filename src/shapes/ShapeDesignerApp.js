@@ -9,6 +9,8 @@ import { circleAnchors, ovalAnchors, triangleAnchors, rectAnchors } from '../cor
 import { ShapeCanvasView } from './ShapeCanvasView.js';
 import { ShapeLibraryUI } from '../ui/ShapeLibraryUI.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { initPanelResizers } from '../ui/PanelResizer.js';
+import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { PickerModeUI } from '../ui/PickerModeUI.js';
@@ -94,6 +96,7 @@ export class ShapeDesignerApp {
     // without touching the library itself (which /arrange/ depends on).
     // Session-only; the next commit shows them again.
     this.referencesHidden = false;
+    this.lastCommittedId = null; // the one committed shape still shown as a dimmed reference
 
     // The shape-in-progress's own weave settings - plain fields (not a
     // dedicated state class), mirroring how App.js keeps `strokeWeight` as a
@@ -178,6 +181,8 @@ export class ShapeDesignerApp {
     this.colorCountUI.init();
 
     new MenuUI(document.getElementById('burger'), document.getElementById('ui'), document.getElementById('closeUiBtn')).init();
+    initPanelResizers();
+    initThemeToggle();
 
     this.#wireShapeSettings();
     this.#wirePresetButtons();
@@ -202,9 +207,11 @@ export class ShapeDesignerApp {
     background(12);
     this.viewport.applyTransform();
 
-    if (!this.referencesHidden) {
+    if (!this.referencesHidden && this.lastCommittedId) {
+      // Only the shape that was just committed stays on screen as a dimmed
+      // reference; earlier library shapes are not piled back onto the canvas.
       ShapeCanvasView.withCommittedShapeAlpha(() => {
-        for (const shape of this.library.shapes) {
+        for (const shape of this.library.shapes.filter((s) => s.id === this.lastCommittedId)) {
           StringArtRenderer.drawClosedWeave(shape.resampledOutline(), 0, shape.leap, shape.colors, BASELINE_STROKE_WEIGHT);
         }
       });
@@ -332,7 +339,6 @@ export class ShapeDesignerApp {
   };
 
   handleCommitShape = () => {
-    this.referencesHidden = false;
     if (!this.editor.closed) {
       alert('Close the shape first - click back on its first point, or press Enter.');
       return;
@@ -351,6 +357,8 @@ export class ShapeDesignerApp {
       weight: this.useGlobalWeight ? null : this.strokeWeight,
     });
     this.library.add(shape);
+    this.lastCommittedId = shape.id;
+    this.referencesHidden = false;
     this.editor.reset();
     nameInput.value = '';
   };

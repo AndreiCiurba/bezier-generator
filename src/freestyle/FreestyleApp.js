@@ -12,6 +12,8 @@ import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { initPanelResizers } from '../ui/PanelResizer.js';
+import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
 import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
@@ -200,6 +202,8 @@ export class FreestyleApp {
       document.getElementById('ui'),
       document.getElementById('closeUiBtn')
     ).init();
+    initPanelResizers();
+    initThemeToggle();
 
     this.#createCanvas();
 

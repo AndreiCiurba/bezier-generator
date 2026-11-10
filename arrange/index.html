@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="../css/colors.css">
   <link rel="stylesheet" href="../css/customPalette.css">
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/pro-theme.css">
   <style>
     /* This page's own canvas fills the viewport (no grid/board to size a
        centered element around, unlike the p5 pages) - same two rules
@@ -49,8 +50,10 @@
        styles.css's `.panel`/`#ui` rules have no height cap or scroll of
        their own. */
     #ui {
-      max-height: calc(100vh - 20px);
+      width: clamp(280px, 22vw, 480px); /* wider by default; drag its right edge to go further (PanelResizer) */
+      max-height: calc(100vh - 60px); /* leaves room so the last buttons aren't cut off */
       overflow-y: auto;
+      padding-bottom: 40px;
     }
 
     /* Color schemes open as a flyout to the right of the main menu, like the
@@ -60,8 +63,10 @@
        box when it opens (see ArrangeApp#initInstanceColors). */
     #colorFavoritesSubmenu {
       position: fixed;
-      max-height: calc(100vh - 20px);
+      width: clamp(260px, 20vw, 420px);
+      max-height: calc(100vh - 60px);
       overflow-y: auto;
+      padding-bottom: 40px;
     }
   </style>
 </head>
@@ -84,29 +89,29 @@
   <div id="ui" class="panel hidden">
     <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Arrange Board</div>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Arrange Board</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       <input id="placementModeToggle" type="checkbox" />
       Placement Mode (disables orbit; click a library shape then the board to place it, or click/drag a placed shape)
     </label>
 
     <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
     <!-- Clears every placed instance from the board (and this browser's saved copy of the arrangement). -->
-    <button id="clearSavedDataBtn" class="menu-btn" style="margin-top: 4px;">Clear Board</button>
+    <button id="clearSavedDataBtn" class="menu-btn menu-btn--danger" style="margin-top: 4px;">Clear Board</button>
 
     <!-- Board size - collapsed by default; the header button expands/collapses it. -->
     <button id="boardSubmenuToggleBtn" class="menu-btn" style="margin-top: 10px; text-align: left;">&#9656; Board</button>
     <div id="boardSubmenuBody" hidden style="border-left: 2px solid var(--accent-500, #ffcc00); padding-left: 8px; margin-left: 4px;">
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Width
         <input id="boardWidthInput" type="number" min="100" step="100" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Height
         <input id="boardHeightInput" type="number" min="100" step="100" style="width: 100%;" />
       </label>
       <div style="display:flex; gap:4px; margin-top: 6px;">
-        <button id="applyBoardSizeBtn" class="menu-btn" style="width:auto; flex:1;">Apply</button>
+        <button id="applyBoardSizeBtn" class="menu-btn menu-btn--primary" style="width:auto; flex:1;">Apply</button>
         <button id="resetBoardSizeBtn" class="menu-btn" style="width:auto; flex:1;">Reset</button>
       </div>
     </div>
@@ -115,69 +120,70 @@
          the Shape Designer page. Auto-loaded from this browser's saved
          library (the same one /shapes/ saves to) - Import Library still
          works too, for a library exported from a different browser/device. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Shape Library</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Shape Library</div>
+    <button id="loadSavedLibraryBtn" class="menu-btn" title="Re-read the library committed on the Shapes page from this browser's storage">Load Saved Library</button>
     <button id="importShapesBtn" class="menu-btn">Import Library</button>
     <input type="file" id="importShapesInput" accept=".json,.txt" style="display:none;" />
     <ul id="shapeLibraryList"
-      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
 
     <!-- Global height default - used by any placed instance without its own override. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Global Height</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Global Height</div>
     <div style="display:flex; align-items:center; gap:4px;">
       <input id="globalHeightInput" type="number" min="10" max="3000" step="1" style="width: 100%;" />
-      <button id="applyGlobalHeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+      <button id="applyGlobalHeightBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
     <!-- Global stroke weight default - used by any placed instance without its own override. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Global Stroke Weight</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Global Stroke Weight</div>
     <div style="display:flex; align-items:center; gap:4px;">
       <input id="globalWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
-      <button id="applyGlobalWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+      <button id="applyGlobalWeightBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
     <!-- Global nail visibility - used by any placed instance without its own override. -->
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 10px;">
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 10px;">
       <input id="globalNailsVisibleCheckbox" type="checkbox" />
       Show nails
     </label>
 
     <!-- Placed shapes - instances actually on the board. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Placed Shapes</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Placed Shapes</div>
     <ul id="placedShapesList"
-      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
 
     <!-- Selected instance's own edit panel - rotation/scale/height override. -->
-    <div id="instanceEditPanel" style="display:none; margin-top: 8px; border-top: 1px solid #444; padding-top: 8px;">
+    <div id="instanceEditPanel" style="display:none; margin-top: 8px; border-top: 1px solid var(--n-border); padding-top: 8px;">
       <div style="display:flex; align-items:center; justify-content:space-between;">
-        <div style="font-size: 11px; color: #EEEEEE;">Selected Shape</div>
+        <div style="font-size: 11px; color: var(--panel-text);">Selected Shape</div>
         <button id="closeInstancePanelBtn" class="panel-close-btn" style="position: static;" title="Close" aria-label="Close selected shape menu">&times;</button>
       </div>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Rotation (deg)
         <input id="instanceRotationInput" type="number" step="1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Scale
         <input id="instanceScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         <input id="instanceUseGlobalHeightCheckbox" type="checkbox" />
         Use global height
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Height override
         <input id="instanceHeightInput" type="number" min="10" step="1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         <input id="instanceUseGlobalWeightCheckbox" type="checkbox" />
         Use global stroke weight
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Stroke weight override
         <input id="instanceWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
       </label>
       <!-- This instance's own color layers - same swatches/picker modes as the other pages. Left-click changes a layer's color, right-click toggles it. -->
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Colors</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Colors</div>
       <div id="colorPickerModeToggle">
         <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
         <button id="pickerModeCustomBtn" class="menu-btn">Custom</button>
@@ -188,40 +194,40 @@
            and click one to apply it to the selected shape. -->
       <div id="colorFavoritesSubmenu" class="panel hidden">
         <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
-        <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+        <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Your Colors</div>
         <div id="favoriteBundlesContainer"></div>
-        <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+        <button id="saveCurrentColorBtn" class="menu-btn menu-btn--primary">Save</button>
         <button id="exportColorsBtn" class="menu-btn">Export</button>
         <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
         <button id="importColorsBtn" class="menu-btn">Import</button>
       </div>
 
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         <input id="instanceUseGlobalNailsCheckbox" type="checkbox" />
         Use global nail visibility
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         <input id="instanceShowNailsCheckbox" type="checkbox" />
         Show nails
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Nail scale
         <input id="instanceNailScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
       </label>
-      <button id="deleteInstanceBtn" class="menu-btn" style="margin-top: 6px;">Delete Shape</button>
+      <button id="deleteInstanceBtn" class="menu-btn menu-btn--danger" style="margin-top: 6px;">Delete Shape</button>
     </div>
 
     <!-- Whole-board arrangement - instances + their own frozen shape
          snapshots. Auto-saved to this browser; reloading the page restores
          it. Export/Import JSON still works, for backups or moving an
          arrangement to a different browser/device. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Arrangement</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Arrangement</div>
     <button id="exportArrangementBtn" class="menu-btn">Export Arrangement</button>
     <button id="importArrangementBtn" class="menu-btn">Import Arrangement</button>
     <input type="file" id="importArrangementInput" accept=".json,.txt" style="display:none;" />
 
     <!-- Top-down PNG of the placed shapes: just the nails (a setup template), or the nails plus the woven strings. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Export PNG</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Export PNG</div>
     <button id="exportNailsPngBtn" class="menu-btn">Nails Only</button>
     <button id="exportNailsStringsPngBtn" class="menu-btn">Nails + Strings</button>
   </div>

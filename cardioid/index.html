@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="../css/colors.css">
   <link rel="stylesheet" href="../css/customPalette.css">
   <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/pro-theme.css">
   <style>
     /* Same page chrome as arrange/index.html: a full-viewport canvas, and a
        main menu that scrolls instead of running off the bottom. */
@@ -41,16 +42,20 @@
     }
 
     #ui {
-      max-height: calc(100vh - 20px);
+      width: clamp(280px, 22vw, 480px); /* wider by default; drag its right edge to go further (PanelResizer) */
+      max-height: calc(100vh - 60px); /* leaves room so the last buttons aren't cut off */
       overflow-y: auto;
+      padding-bottom: 40px;
     }
 
     /* Color schemes open as a flyout right of the main menu; `fixed` keeps the
        menu's scrolling from clipping it (left/top are set in CardioidApp). */
     #colorFavoritesSubmenu {
       position: fixed;
-      max-height: calc(100vh - 20px);
+      width: clamp(260px, 20vw, 420px);
+      max-height: calc(100vh - 60px);
       overflow-y: auto;
+      padding-bottom: 40px;
     }
   </style>
 </head>
@@ -72,69 +77,70 @@
   <div id="ui" class="panel hidden">
     <button id="closeUiBtn" class="panel-close-btn" title="Close Menu" aria-label="Close Menu">&times;</button>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Cardioid Board</div>
-    <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Cardioid Board</div>
+    <div style="font-size: 10px; color: var(--panel-text-muted); margin-top: 4px;">
       One circle of nails. Nail j is joined to nail (multiplier &times; j); each layer is that pattern rotated
-      by leap nails, thick string at the bottom, thin at the top.
+      by leap nails and stacked up the board.
     </div>
 
     <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Weave</div>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Weave</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Nails
       <input id="nailCountInput" type="number" min="3" max="1000" step="1" style="width: 100%;" />
     </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Layers
       <input id="layerCountInput" type="number" min="1" max="60" step="1" style="width: 100%;" />
     </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;"
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
       title="How many nails each layer is rotated from the one below. 0 = every layer identical.">
       Leap
       <input id="leapInput" type="number" min="0" step="1" style="width: 100%;" />
     </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;"
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
       title="Nail j is joined to nail multiplier x j. 2 = cardioid, 3 = nephroid, ...">
       Multiplier
       <input id="multiplierInput" type="number" min="1" step="1" style="width: 100%;" />
     </label>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Size</div>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Size</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Circle radius
       <input id="radiusInput" type="number" min="100" step="100" style="width: 100%;" />
     </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Height
       <input id="heightInput" type="number" min="10" step="10" style="width: 100%;" />
     </label>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">String weight</div>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      Bottom layer (thickest)
-      <input id="bottomWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
-    </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      Top layer (thinnest)
-      <input id="topWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">String weight</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Weight (all layers)
+      <input id="weightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
     </label>
 
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Nails</div>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Nails</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       <input id="showNailsCheckbox" type="checkbox" />
       Show nails
     </label>
-    <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      Nail scale
-      <input id="nailScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
+      title="Draw the arc where each thread turns around its nail, joining the pair of parallel strings.">
+      <input id="showWrapCheckbox" type="checkbox" />
+      Show thread wrap
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nail thickness
+      <input id="nailThicknessInput" type="number" min="1" max="500" step="1" style="width: 100%;" />
     </label>
 
     <!-- Each layer is split into this many equal arcs of the circle, one color per arc. -->
-    <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Colors per layer</div>
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Colors per layer</div>
     <div style="display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
-      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+      <input id="colorCountInput" type="number" min="1" max="100" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
     <div id="colorPickerModeToggle">
       <button id="pickerModeDefaultBtn" class="menu-btn">Default</button>
@@ -145,9 +151,9 @@
 
     <div id="colorFavoritesSubmenu" class="panel hidden">
       <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Your Colors</div>
       <div id="favoriteBundlesContainer"></div>
-      <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+      <button id="saveCurrentColorBtn" class="menu-btn menu-btn--primary">Save</button>
       <button id="exportColorsBtn" class="menu-btn">Export</button>
       <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
       <button id="importColorsBtn" class="menu-btn">Import</button>

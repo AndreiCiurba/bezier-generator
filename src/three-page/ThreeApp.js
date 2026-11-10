@@ -747,6 +747,12 @@ export class ThreeApp {
   };
 
   #handleClearAll = () => {
+    // Also disarm any pattern and release the Weave menu's live cells (as the
+    // 2D page's Clear All does) - otherwise the next clicks on the empty board
+    // stamp the old pattern / weave cells instead of building a fresh shape.
+    this.patterns.clearSelection();
+    this.patternUI.resetSelectionVisual();
+    this.weaveState.reset();
     this.selection.reset();
     this.curves.clear();
     this.sceneSync.clearSelectionGuide();

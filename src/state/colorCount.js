@@ -5,7 +5,7 @@
  */
 
 export const MIN_COLORS = 1;
-export const MAX_COLORS = 25;
+export const MAX_COLORS = 100;
 
 /**
  * Parses and validates a color-count input. Returns null for anything

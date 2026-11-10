@@ -6,6 +6,8 @@ import { FreeformShape } from '../models/FreeformShape.js';
 import { anchorsCentroid } from '../core/shapeTransform.js';
 import { ArrangeSceneSync } from './ArrangeSceneSync.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { initPanelResizers } from '../ui/PanelResizer.js';
+import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { NailHeightUI } from '../three-page/NailHeightUI.js';
 import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
 import { StrokePalette } from '../state/StrokePalette.js';
@@ -123,6 +125,8 @@ export class ArrangeApp {
     this.gizmo = new OrientationGizmo();
 
     new MenuUI(document.getElementById('burger'), document.getElementById('ui'), document.getElementById('closeUiBtn')).init();
+    initPanelResizers();
+    initThemeToggle();
 
     this.#initPlacementModeToggle();
     this.#initLibraryImportExport();
@@ -156,6 +160,20 @@ export class ArrangeApp {
   #hydrateLibrary() {
     const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
     if (Array.isArray(raw)) this.library.importShapes(raw, FreeformShape);
+  }
+
+  /**
+   * Replaces the in-memory library with what /shapes/ last saved. Used by the
+   * "Load Saved Library" button, and automatically when /shapes/ saves in
+   * another tab (`storage` event) or this page is restored from the browser's
+   * back/forward cache - cases where the page-load hydrate is stale.
+   */
+  #reloadLibraryFromStorage() {
+    const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
+    if (!Array.isArray(raw)) return;
+    this.library.clear();
+    this.library.importShapes(raw, FreeformShape);
+    if (this.armedShapeId && !this.library.findById(this.armedShapeId)) this.armedShapeId = null;
   }
 
   /** Restores this board's own placed arrangement, if anything was saved for it. */
@@ -193,6 +211,13 @@ export class ArrangeApp {
   #initLibraryImportExport() {
     const importBtn = document.getElementById('importShapesBtn');
     const importInput = document.getElementById('importShapesInput');
+    document.getElementById('loadSavedLibraryBtn').addEventListener('click', () => this.#reloadLibraryFromStorage());
+    window.addEventListener('storage', (event) => {
+      if (event.key === null || event.key.endsWith(SHAPE_LIBRARY_STORAGE_KEY)) this.#reloadLibraryFromStorage();
+    });
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) this.#reloadLibraryFromStorage();
+    });
     importBtn.addEventListener('click', () => importInput.click());
     importInput.addEventListener('change', async (e) => {
       const file = e.target.files[0];
@@ -217,7 +242,7 @@ export class ArrangeApp {
       li.style.cursor = 'pointer';
       li.style.marginBottom = '4px';
       li.textContent = `${shape.name} (nails=${shape.nailCount}, leap=${shape.leap})`;
-      li.style.border = shape.id === this.armedShapeId ? '1px solid #ffcc00' : '1px solid transparent';
+      li.style.border = shape.id === this.armedShapeId ? '1px solid var(--accent-500)' : '1px solid transparent';
       li.addEventListener('click', () => {
         this.armedShapeId = this.armedShapeId === shape.id ? null : shape.id;
         this.#renderLibraryList();
@@ -227,7 +252,7 @@ export class ArrangeApp {
 
     if (this.library.count === 0) {
       const li = document.createElement('li');
-      li.textContent = 'Import a shape library to place shapes.';
+      li.textContent = 'No shapes yet - commit some on the Shapes page (then Load Saved Library), or import a file.';
       li.style.color = 'var(--panel-text-muted, #888)';
       list.appendChild(li);
     }
@@ -480,7 +505,7 @@ export class ArrangeApp {
       li.style.cursor = 'pointer';
       li.style.marginBottom = '4px';
       li.textContent = instance.name || `Shape_${index + 1}`;
-      li.style.border = instance.id === this.selectedInstanceId ? '1px solid #ffcc00' : '1px solid transparent';
+      li.style.border = instance.id === this.selectedInstanceId ? '1px solid var(--accent-500)' : '1px solid transparent';
       li.addEventListener('click', () => this.#selectInstance(instance.id));
       list.appendChild(li);
     });

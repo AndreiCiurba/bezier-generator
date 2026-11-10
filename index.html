@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/customPalette.css">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/canvas-frame.css">
+  <link rel="stylesheet" href="css/pro-theme.css">
 </head>
 
 <body>
@@ -33,9 +34,9 @@
 
     <div id="colorFavoritesSubmenu" class="panel hidden">
       <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Your Colors</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Your Colors</div>
       <div id="favoriteBundlesContainer"></div>
-      <button id="saveCurrentColorBtn" class="menu-btn">Save</button>
+      <button id="saveCurrentColorBtn" class="menu-btn menu-btn--primary">Save</button>
       <button id="exportColorsBtn" class="menu-btn">Export</button>
       <input type="file" id="importColorsInput" accept=".json,.txt" style="display:none;" />
       <button id="importColorsBtn" class="menu-btn">Import</button>
@@ -44,20 +45,20 @@
     <!-- Pattern Submenu -->
     <div id="patternSubmenu" class="panel hidden">
       <button id="closePatternSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern Tools</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Pattern Tools</div>
 
       <!-- Save Pattern UI -->
       <input id="patternNameInput" type="text" placeholder="name..." />
-      <button id="saveCurrentPatternBtn" class="menu-btn">Save Current</button>
+      <button id="saveCurrentPatternBtn" class="menu-btn menu-btn--primary">Save Current</button>
 
       <!-- List of Saved Patterns -->
       <ul id="savedPatternsList"
-        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
 
       <button id="exportPatternBtn" class="menu-btn">Export Pattern</button>
       <input type="file" id="importPatternInput" accept=".json,.txt" style="display:none;" />
       <button id="importPatternBtn" class="menu-btn">Import Pattern</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Pattern type</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Pattern type</div>
       <button id="toggleBtn" class="menu-btn">Manual</button>
     </div>
 
@@ -65,35 +66,35 @@
     <!-- Deformation Submenu (Puppet Warp) - Ctrl+Click a nail to place a pin, Ctrl+Drag to move it, Alt+Click to remove it -->
     <div id="deformationSubmenu" class="panel hidden">
       <button id="closeDeformationSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Grid Deformation</div>
-      <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Grid Deformation</div>
+      <div style="font-size: 10px; color: var(--panel-text-muted); margin-top: 4px;">
         Ctrl+Click a nail: add pin &middot; Ctrl+Drag: move it &middot; Alt+Click: remove it
       </div>
 
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">New pin defaults</div>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">New pin defaults</div>
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Radius
         <input id="deformationDefaultRadiusInput" type="number" min="1" step="1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Falloff
         <input id="deformationDefaultFalloffInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
       </label>
-      <button id="applyDeformationDefaultsBtn" class="menu-btn">Apply</button>
+      <button id="applyDeformationDefaultsBtn" class="menu-btn menu-btn--primary">Apply</button>
 
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Selected pin</div>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Selected pin</div>
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Radius
         <input id="deformationSelectedRadiusInput" type="number" min="1" step="1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Falloff
         <input id="deformationSelectedFalloffInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
       </label>
-      <button id="applyDeformationSelectedBtn" class="menu-btn">Apply</button>
+      <button id="applyDeformationSelectedBtn" class="menu-btn menu-btn--primary">Apply</button>
       <button id="removeDeformationPinBtn" class="menu-btn">Remove Pin</button>
 
-      <div id="deformationPinCount" style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">0 pins</div>
+      <div id="deformationPinCount" style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">0 pins</div>
       <button id="resetDeformationBtn" class="menu-btn">Reset Deformation</button>
     </div>
 
@@ -102,27 +103,27 @@
          live selection (keeps tracking N/leap/palette until Reset). -->
     <div id="weaveSubmenu" class="panel hidden">
       <button id="closeWeaveSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Weave</div>
-      <div style="font-size: 10px; color: #AAAAAA; margin-top: 4px;">
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Weave</div>
+      <div style="font-size: 10px; color: var(--panel-text-muted); margin-top: 4px;">
         Click a cell: place/select it &middot; Ctrl+Click: toggle live editing
       </div>
 
       <div style="display:flex; align-items:center; gap:4px; margin-top: 10px;">
-        <label style="font-size: 11px; color: #EEEEEE;">Shape</label>
-        <span id="weaveShapeLabel" style="font-size: 11px; color: #EEEEEE;"></span>
+        <label style="font-size: 11px; color: var(--panel-text);">Shape</label>
+        <span id="weaveShapeLabel" style="font-size: 11px; color: var(--panel-text);"></span>
       </div>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Inner Nails (N)
         <input id="weaveNInput" type="number" min="0" step="1" style="width: 100%;" />
       </label>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Leap
         <input id="weaveLeapInput" type="number" step="1" style="width: 100%;" />
       </label>
 
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Placement</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Placement</div>
       <button id="weaveToggleModeBtn" class="menu-btn">Manual</button>
-      <label style="font-size: 11px; color: #EEEEEE; display:flex; align-items:center; gap:4px; margin-top: 4px;" title="Manual mode only: also places/selects this many rings of neighboring cells around the one you click - 0 = just that cell, 1 = +8 neighbors, 2 = +24, and so on.">
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;" title="Manual mode only: also places/selects this many rings of neighboring cells around the one you click - 0 = just that cell, 1 = +8 neighbors, 2 = +24, and so on.">
         Neighborhood
         <input id="weaveNeighborRadiusInput" type="number" min="0" step="1" style="width: 100%;" />
       </label>
@@ -133,11 +134,11 @@
       <!-- Saved Weaves - name the current N/leap, save it, export/import the
            whole list as JSON. Designs come from the standalone playground
            (tools/leap-weave-playground.html), which exports the same shape. -->
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 10px;">Saved Weaves</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Saved Weaves</div>
       <input id="weaveNameInput" type="text" placeholder="name..." />
-      <button id="saveCurrentWeaveBtn" class="menu-btn">Save Current</button>
+      <button id="saveCurrentWeaveBtn" class="menu-btn menu-btn--primary">Save Current</button>
       <ul id="savedWeavesList"
-        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+        style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
       <button id="exportWeaveBtn" class="menu-btn">Export</button>
       <input type="file" id="importWeaveInput" accept=".json,.txt" style="display:none;" />
       <button id="importWeaveBtn" class="menu-btn">Import</button>
@@ -148,23 +149,23 @@
          from both this 2D canvas and the 3D visualizer. -->
     <div id="curvesSubmenu" class="panel hidden">
       <button id="closeCurvesSubmenuBtn" class="panel-close-btn">X</button>
-      <div style="font-size: 11px; color: #EEEEEE; margin-top: 8px;">Curves</div>
+      <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Curves</div>
       <ul id="curvesList"
-        style="max-height: 200px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: #EEEEEE;"></ul>
+        style="max-height: 200px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
     </div>
 
     <!-- Number of colors: also sets the weave's subdivision fineness and line weight 1:1 -->
     <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
-      <label for="colorCountInput" style="font-size: 11px; color: #EEEEEE;">Colors</label>
-      <input id="colorCountInput" type="number" min="1" max="25" step="1" style="width: 100%;" />
-      <button id="applyColorCountBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+      <label for="colorCountInput" style="font-size: 11px; color: var(--panel-text);">Colors</label>
+      <input id="colorCountInput" type="number" min="1" max="100" step="1" style="width: 100%;" />
+      <button id="applyColorCountBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
     <!-- Stroke weight: set directly (independent of color count) to match the artist's actual thread thickness -->
     <div style="display:flex; align-items:center; gap:4px; margin-top: 6px;">
-      <label for="strokeWeightInput" style="font-size: 11px; color: #EEEEEE;">Stroke Weight</label>
+      <label for="strokeWeightInput" style="font-size: 11px; color: var(--panel-text);">Stroke Weight</label>
       <input id="strokeWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
-      <button id="applyStrokeWeightBtn" class="menu-btn" style="width:auto; padding: 5px 10px;">Apply</button>
+      <button id="applyStrokeWeightBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
     <!-- Default/Custom picker-mode toggle - see PickerModeUI.js -->
@@ -182,7 +183,7 @@
     <button id="openWeaveBtn" class="menu-btn">Weave</button>
     <button id="openFavoritesBtn" class="menu-btn">Colors</button>
     <button id="resetBtn" class="menu-btn">Reset</button>
-    <button id="clearAllBtn" class="menu-btn">Clear All Points</button>
+    <button id="clearAllBtn" class="menu-btn menu-btn--danger">Clear All Points</button>
     <button id="undoBtn" class="menu-btn">Undo</button>
     <button id="undoLineBtn" class="menu-btn">Undo Line</button>
     <button id="exportNailsBtn" class="menu-btn">Export Nails (PNG)</button>

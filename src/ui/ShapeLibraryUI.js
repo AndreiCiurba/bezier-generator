@@ -75,7 +75,7 @@ export class ShapeLibraryUI {
 
       const summary = document.createElement('span');
       summary.style.fontSize = '10px';
-      summary.style.color = '#AAAAAA';
+      summary.style.color = 'var(--panel-text-muted)';
       const heightNote = shape.height === null ? 'global height' : `h=${shape.height}`;
       const weightNote = shape.weight === null ? 'global weight' : `w=${shape.weight}`;
       summary.textContent = `nails=${shape.nailCount}, leap=${shape.leap}, colors=${shape.colors.length}, ${heightNote}, ${weightNote}`;

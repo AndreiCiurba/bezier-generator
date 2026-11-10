@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { circleNailPositions, layerChords, layerWeight } from './cardioidWeave.js';
+import { circleNailPositions, layerChords, parallelStrings, wrapArc } from './cardioidWeave.js';
 
 const base = { nailCount: 12, multiplier: 2, leap: 1, layerIndex: 0, colorCount: 2 };
 
@@ -53,14 +53,45 @@ describe('layerChords', () => {
   });
 });
 
-describe('layerWeight', () => {
-  it('is thickest on the bottom layer and tapers linearly to the thinnest on the top one', () => {
-    expect(layerWeight(0, 5, 1, 0.2)).toBeCloseTo(1);
-    expect(layerWeight(2, 5, 1, 0.2)).toBeCloseTo(0.6);
-    expect(layerWeight(4, 5, 1, 0.2)).toBeCloseTo(0.2);
+describe('parallelStrings', () => {
+  it('returns two parallel strings whose gap is exactly the nail thickness', () => {
+    const [a, b] = parallelStrings({ x: 0, y: 0 }, { x: 100, y: 0 }, 10);
+    expect(a.from.y - b.from.y).toBeCloseTo(10);
+    expect(a.to.y - b.to.y).toBeCloseTo(10);
+    expect(a.from.x).toBeCloseTo(0);
+    expect(a.to.x).toBeCloseTo(100);
   });
 
-  it('uses the bottom weight when there is only one layer', () => {
-    expect(layerWeight(0, 1, 0.9, 0.1)).toBe(0.9);
+  it('keeps the gap equal to the thickness on a diagonal chord, not just an axis-aligned one', () => {
+    const [a, b] = parallelStrings({ x: 0, y: 0 }, { x: 30, y: 40 }, 10);
+    expect(Math.hypot(a.from.x - b.from.x, a.from.y - b.from.y)).toBeCloseTo(10);
+    expect(Math.hypot(a.to.x - b.to.x, a.to.y - b.to.y)).toBeCloseTo(10);
+  });
+
+  it('falls back to the single center line when there is no thickness to wrap around', () => {
+    expect(parallelStrings({ x: 0, y: 0 }, { x: 5, y: 5 }, 0)).toHaveLength(1);
+  });
+});
+
+describe('wrapArc', () => {
+  const center = { x: 10, y: 20 };
+
+  it('keeps every point on the circle of the nail', () => {
+    const arc = wrapArc(center, 5, [{ x: 1, y: 0 }, { x: 0, y: 1 }]);
+    for (const p of arc) expect(Math.hypot(p.x - center.x, p.y - center.y)).toBeCloseTo(5);
+  });
+
+  it('wraps the back of a nail with a single string: a half turn on the side away from the string', () => {
+    const arc = wrapArc(center, 5, [{ x: 1, y: 0 }]); // string leaves to the right
+    expect(arc.length).toBeGreaterThan(2);
+    for (const p of arc) expect(p.x).toBeLessThanOrEqual(center.x + 1e-9); // never the string's side
+    const first = arc[0];
+    const last = arc[arc.length - 1];
+    expect(Math.hypot(first.x - last.x, first.y - last.y)).toBeCloseTo(10); // ends are diametrically opposite
+  });
+
+  it('has nothing to draw for a zero radius or no strings', () => {
+    expect(wrapArc(center, 0, [{ x: 1, y: 0 }])).toEqual([]);
+    expect(wrapArc(center, 5, [])).toEqual([]);
   });
 });

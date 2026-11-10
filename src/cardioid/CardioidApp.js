@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CardioidSceneSync } from './CardioidSceneSync.js';
+import { SHAFT_RADIUS } from '../three-page/SceneSync.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -9,9 +10,13 @@ import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { ColorCountUI } from '../ui/ColorCountUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { MenuUI } from '../ui/MenuUI.js';
+import { initPanelResizers } from '../ui/PanelResizer.js';
+import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { OrientationGizmo } from '../three-page/OrientationGizmo.js';
 import { defaultCameraPosition } from '../three-page/cameraFraming.js';
 
+// The nail model's own shaft diameter - the starting thickness, so nails look as before.
+const DEFAULT_NAIL_THICKNESS = 2 * SHAFT_RADIUS;
 const CAMERA_FOV = 50;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 100000;
@@ -27,16 +32,15 @@ const FIELDS = [
   { id: 'multiplierInput', key: 'multiplier', integer: true, min: 1, max: 100 },
   { id: 'radiusInput', key: 'radius', min: 100, max: 20000, refit: true },
   { id: 'heightInput', key: 'height', min: 10, max: 5000 },
-  { id: 'bottomWeightInput', key: 'bottomWeight', min: 0.01, max: 30 },
-  { id: 'topWeightInput', key: 'topWeight', min: 0.01, max: 30 },
-  { id: 'nailScaleInput', key: 'nailScale', min: 0.1, max: 20 },
+  { id: 'weightInput', key: 'weight', min: 0.01, max: 30 },
+  { id: 'nailThicknessInput', key: 'nailThickness', min: 1, max: 500 },
 ];
 
 /**
  * The Cardioid board page: one circle of nails, woven as a times table
  * (nail j to nail multiplier*j - cardioid at 2) and stacked into layers that
- * are each the same pattern rotated by `leap` nails, thick string at the
- * bottom tapering to thin at the top. Every number in the weave is a field
+ * are each the same pattern rotated by `leap` nails, all with one string
+ * weight. Every number in the weave is a field
  * in the menu; the layer's colors are split into equal arcs of the circle
  * (see `core/cardioidWeave.js`).
  *
@@ -52,10 +56,10 @@ export class CardioidApp {
       multiplier: 2,
       radius: 3000,
       height: 2000,
-      bottomWeight: 0.2,
-      topWeight: 0.2,
+      weight: 0.2,
       nailsVisible: false,
-      nailScale: 1,
+      showWrap: true,
+      nailThickness: DEFAULT_NAIL_THICKNESS,
     };
     this.palette = new StrokePalette(); // one slot per color group a layer is split into
     this.palette.resize(2);
@@ -82,9 +86,12 @@ export class CardioidApp {
     this.gizmo = new OrientationGizmo();
 
     new MenuUI(document.getElementById('burger'), document.getElementById('ui'), document.getElementById('closeUiBtn')).init();
+    initPanelResizers();
+    initThemeToggle();
 
     this.#initFields();
     this.#initNailsToggle();
+    this.#initWrapToggle();
     this.#initColors();
     document.getElementById('resetCameraBtn').addEventListener('click', () => this.#applyDefaultCameraView());
 
@@ -117,6 +124,16 @@ export class CardioidApp {
     checkbox.checked = this.settings.nailsVisible;
     checkbox.addEventListener('change', () => {
       this.settings.nailsVisible = checkbox.checked;
+      this.#rebuild();
+    });
+  }
+
+  /** "Show thread wrap": draws the arc where each thread turns around its nail. */
+  #initWrapToggle() {
+    const checkbox = document.getElementById('showWrapCheckbox');
+    checkbox.checked = this.settings.showWrap;
+    checkbox.addEventListener('change', () => {
+      this.settings.showWrap = checkbox.checked;
       this.#rebuild();
     });
   }

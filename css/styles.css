@@ -26,9 +26,24 @@
   left: 10px;
   z-index: var(--z-panel-main);
   background: var(--panel-bg-main);
+  width: clamp(280px, 22vw, 480px); /* wider default; drag-resizable via src/ui/PanelResizer.js */
   padding: 30px 10px 10px 10px; /* extra top padding clears the close button */
   box-shadow: var(--panel-shadow-main);
   opacity: 0.9;
+}
+
+/* Drag strip for panels made resizable by src/ui/PanelResizer.js (positioned by JS). */
+.panel-resize-handle {
+  position: fixed;
+  width: 8px;
+  z-index: calc(var(--z-panel-submenu) + 1);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.panel-resize-handle:hover,
+.panel-resize-handle.resizing {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 #colorFavoritesSubmenu,
@@ -40,6 +55,7 @@
   position: absolute;
   top: 0;
   left: calc(100% + 10px); /* anchored just to the right of #ui */
+  width: clamp(260px, 20vw, 420px);
   z-index: var(--z-panel-submenu);
   background-color: var(--panel-bg-submenu);
   box-shadow: var(--panel-shadow-submenu);
