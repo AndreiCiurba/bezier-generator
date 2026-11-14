@@ -26,8 +26,30 @@ Deployed as-is to GitHub Pages.
 - `npx vitest run <path>` — run a single test file, e.g. `npx vitest run src/state/StrokePalette.test.js`.
 - No lint/format config and no CI workflow exist in this repo.
 - `tools/reel-pipeline/` is a separate Node project (own `package.json`, Puppeteer + ffmpeg-static)
-  for headlessly rendering the `/3d` page into vertical MP4 clips — not part of the zero-build app.
-  See `tools/reel-pipeline/README.md` for its own commands.
+  for headlessly rendering the `/3d` and `/cardioid` pages into vertical MP4 clips — not part of the
+  zero-build app. See `tools/reel-pipeline/README.md` for its own commands.
+
+## Reel content pipeline
+
+`node tools/reel-pipeline/reels.mjs` (`ideas` / `sheets` / `batch` / `finish`) is the daily
+social-content routine: an agent drafts a batch of candidate reels as recipe JSON files, renders
+captioned previews and a review page, and the picked ones are finished at full size. Design:
+`docs/epic-reel-content-pipeline.md`; commands and recipe format: `tools/reel-pipeline/README.md`.
+
+- **Reel work runs on Opus 5.5 at medium effort.** This is a standing instruction: whenever a
+  reel batch is produced or picks are finished, hand it to the matching subagent
+  (`.claude/agents/reel-batch.md`, `.claude/agents/reel-finisher.md`) with model `opus` and effort
+  `medium`, rather than doing it in the main session. The scheduled run
+  (`tools/reel-pipeline/schedule/run-daily.ps1`) passes `--model claude-opus-5-5 --effort medium`.
+- **A message beginning "Finish reels from batch ..."** (copied from a batch's review page) goes to
+  the `reel-finisher` subagent, whose instructions are `tools/reel-pipeline/agents/finish-picks.md`.
+- A request to make a batch goes to the `reel-batch` subagent, whose instructions are
+  `tools/reel-pipeline/agents/daily-batch.md` (the same prompt the scheduled run uses). The
+  channel's taste lives in `tools/reel-pipeline/STYLE.md`.
+- Rendering reels with headless Chrome is the pipeline doing its job, not browser verification —
+  the `no-e2e` rule does not stop `reels.mjs` from running.
+- In-app half: `src/cardioid/CardioidReel.js` (Three.js) + `src/cardioid/cardioidReelFrame.js`
+  (pure timeline math), exposed as `window.__reelTimeline` only under `/cardioid/?reel=1`.
 
 ## Architecture
 

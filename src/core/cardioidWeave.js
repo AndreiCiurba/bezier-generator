@@ -29,11 +29,58 @@ function mod(value, modulus) {
  */
 export function circleNailPositions(nailCount, radius) {
   const nails = [];
-  for (let i = 0; i < nailCount; i++) {
-    const angle = (2 * Math.PI * i) / nailCount - Math.PI / 2;
-    nails.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
-  }
+  for (let i = 0; i < nailCount; i++) nails.push(circlePointAt(i, nailCount, radius));
   return nails;
+}
+
+/**
+ * The point on the circle at nail index `index` - the same formula
+ * `circleNailPositions` uses, but `index` may be fractional (a point part-way
+ * between two nails). Only the reel timeline needs that (see
+ * `cardioid/cardioidReelFrame.js`): animating the multiplier or the leap
+ * smoothly between whole numbers lands chord ends between nails mid-move.
+ * @param {number} index
+ * @param {number} nailCount
+ * @param {number} radius
+ * @returns {{x:number, y:number}}
+ */
+export function circlePointAt(index, nailCount, radius) {
+  const angle = (2 * Math.PI * index) / nailCount - Math.PI / 2;
+  return { x: radius * Math.cos(angle), y: radius * Math.sin(angle) };
+}
+
+/**
+ * How many of one layer's chords are drawn yet when the board is only
+ * `progress` (0..1) of the way through being strung - the "watch it being
+ * woven" reveal a reel plays.
+ * - `sequential`: one thread strings the whole board, layer after layer from
+ *   the bottom, so a layer is empty until every layer below it is finished.
+ * - `parallel`: every layer is strung at once, each as far along as the rest.
+ *
+ * The answer is not rounded: the whole part is how many chords are finished,
+ * and the fraction is how far the next one has been pulled from its first
+ * nail toward its second - so a slow build-up shows each string travelling
+ * across the board rather than appearing all at once.
+ * @param {{layerIndex:number, layerCount:number, chordsPerLayer:number, progress:number, mode?:'sequential'|'parallel'}} params
+ * @returns {number} 0 .. chordsPerLayer
+ */
+export function chordDrawAmount({ layerIndex, layerCount, chordsPerLayer, progress, mode = 'sequential' }) {
+  const clamped = Math.min(1, Math.max(0, progress));
+  if (mode === 'parallel') return clamped * chordsPerLayer;
+  const drawn = clamped * layerCount * chordsPerLayer - layerIndex * chordsPerLayer;
+  return Math.min(chordsPerLayer, Math.max(0, drawn));
+}
+
+/**
+ * How far nail `nailIndex` has been driven into the board when `progress`
+ * (0..1) of the nails are in - nails go in one after another round the
+ * circle, the "hammering the board together" part of a making-of reel.
+ * @param {{nailIndex:number, nailCount:number, progress:number}} params
+ * @returns {number} 0 (not placed yet) .. 1 (fully in); in between, the nail is standing proud mid-hammering
+ */
+export function nailSeating({ nailIndex, nailCount, progress }) {
+  const driven = Math.min(1, Math.max(0, progress)) * nailCount - nailIndex;
+  return Math.min(1, Math.max(0, driven));
 }
 
 /**

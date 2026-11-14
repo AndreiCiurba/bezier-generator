@@ -13,11 +13,31 @@
  * best. Time outside the first/last keyframe holds at that keyframe's
  * value (no extrapolation) - a track that only wants to change during part
  * of the clip just doesn't need entries covering the rest.
+ *
+ * A keyframe may carry its own `easing`, which shapes the move that arrives
+ * at it and overrides the track's - so one camera track can drift, snap and
+ * drift again.
  */
 
 const EASINGS = {
   linear: (t) => t,
   easeInOutQuad: (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2),
+  // The rest exist for reel camera moves: a push-in that starts fast and
+  // settles (`easeOutCubic`), one that winds up slowly then rushes
+  // (`easeInCubic`), and a firmer start/stop than the quad version
+  // (`easeInOutCubic`).
+  easeInCubic: (t) => t ** 3,
+  easeOutCubic: (t) => 1 - (1 - t) ** 3,
+  easeInOutCubic: (t) => (t < 0.5 ? 4 * t ** 3 : 1 - ((-2 * t + 2) ** 3) / 2),
+  // The whip moves: nearly all of the travel happens in a moment, with a
+  // long settle after it (`easeOutExpo`) or a long wind-up and settle either
+  // side of it (`easeInOutExpo`) - a snap zoom, a flip, a whip round.
+  easeOutExpo: (t) => (t >= 1 ? 1 : 1 - 2 ** (-10 * t)),
+  easeInOutExpo: (t) => {
+    if (t <= 0) return 0;
+    if (t >= 1) return 1;
+    return t < 0.5 ? 2 ** (20 * t - 10) / 2 : (2 - 2 ** (-20 * t + 10)) / 2;
+  },
 };
 
 /**
@@ -51,14 +71,13 @@ function locate(keyframes, t, easing) {
   const last = sorted[sorted.length - 1];
   if (t >= last.t) return { from: last, to: last, progress: 0 };
 
-  const ease = resolveEasing(easing);
   for (let i = 0; i < sorted.length - 1; i++) {
     const from = sorted[i];
     const to = sorted[i + 1];
     if (t >= from.t && t <= to.t) {
       const span = to.t - from.t;
       const localT = span === 0 ? 0 : (t - from.t) / span;
-      return { from, to, progress: ease(localT) };
+      return { from, to, progress: resolveEasing(to.easing ?? easing)(localT) };
     }
   }
   // Unreachable given the sorted/bounds checks above, but fall back to the

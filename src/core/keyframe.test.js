@@ -89,6 +89,19 @@ describe('wobble', () => {
   });
 });
 
+describe('per-keyframe easing', () => {
+  it('lets one keyframe shape the move arriving at it, so a single track can drift and then snap', () => {
+    const keyframes = [{ t: 0, value: 0 }, { t: 0.5, value: 10 }, { t: 1, value: 20, easing: 'easeOutExpo' }];
+    expect(interpolateNumber(keyframes, 0.25)).toBeCloseTo(5); // first move: the track's (linear) easing
+    expect(interpolateNumber(keyframes, 0.6)).toBeGreaterThan(17); // second move: most of the way there almost at once
+  });
+
+  it('takes precedence over the easing given for the whole track', () => {
+    const keyframes = [{ t: 0, value: 0 }, { t: 1, value: 10, easing: 'linear' }];
+    expect(interpolateNumber(keyframes, 0.25, 'easeInCubic')).toBeCloseTo(2.5);
+  });
+});
+
 describe('resolveEasing', () => {
   it('passes a function through unchanged', () => {
     const custom = (t) => t * 2;
@@ -97,5 +110,17 @@ describe('resolveEasing', () => {
 
   it('falls back to linear for an unrecognized name', () => {
     expect(resolveEasing('nonsense')(0.3)).toBeCloseTo(0.3, 10);
+  });
+
+  it('every named easing starts at 0 and ends at 1, so a keyframe pair always lands exactly on its two values', () => {
+    for (const name of ['linear', 'easeInOutQuad', 'easeInCubic', 'easeOutCubic', 'easeInOutCubic', 'easeOutExpo', 'easeInOutExpo']) {
+      expect(resolveEasing(name)(0)).toBeCloseTo(0, 10);
+      expect(resolveEasing(name)(1)).toBeCloseTo(1, 10);
+    }
+  });
+
+  it('easeOutCubic is ahead of linear mid-way and easeInCubic behind it - the fast-then-settle and slow-then-rush camera moves', () => {
+    expect(resolveEasing('easeOutCubic')(0.5)).toBeGreaterThan(0.5);
+    expect(resolveEasing('easeInCubic')(0.5)).toBeLessThan(0.5);
   });
 });

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CardioidSceneSync } from './CardioidSceneSync.js';
+import { CardioidReel } from './CardioidReel.js';
 import { SHAFT_RADIUS } from '../three-page/SceneSync.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
@@ -21,6 +22,14 @@ const CAMERA_FOV = 50;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 100000;
 const ORBIT_TARGET = { x: 0, y: 0, z: 0 };
+
+// Reel pipeline mode (see CardioidReel.js + tools/reel-pipeline/) - the same
+// `?reel=1` gate the /3d page has (see ThreeApp.js's REEL_MODE): inert on the
+// normal page, only read by the headless capture. It exposes
+// `window.__reelTimeline`, hides the menu, keeps the drawing buffer readable
+// after a scripted render, and leaves rendering to the timeline's own
+// `seek()` instead of the animation loop.
+const REEL_MODE = new URLSearchParams(window.location.search).get('reel') === '1';
 
 // Each field: its input id, the settings key it drives, and what it accepts.
 // `integer` fields reject fractions; anything outside [min, max] is refused
@@ -73,7 +82,7 @@ export class CardioidApp {
     this.sceneSync = new CardioidSceneSync(this.scene);
 
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, window.innerWidth / window.innerHeight, CAMERA_NEAR, CAMERA_FAR);
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, preserveDrawingBuffer: REEL_MODE });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
@@ -98,6 +107,14 @@ export class CardioidApp {
     window.addEventListener('resize', this.#handleResize);
     this.#handleResize();
     this.#rebuild();
+
+    if (REEL_MODE) {
+      for (const selector of ['#ui', '#burger', '.page-nav']) document.querySelector(selector)?.style.setProperty('display', 'none');
+      window.__reelTimeline = new CardioidReel({
+        camera: this.camera, controls: this.controls, renderer: this.renderer, scene: this.scene, sceneSync: this.sceneSync,
+      });
+      return; // every frame is rendered by the timeline's seek(), never by the loop below
+    }
     this.#animate();
   }
 

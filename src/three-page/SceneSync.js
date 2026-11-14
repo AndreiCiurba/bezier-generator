@@ -129,6 +129,24 @@ export function buildNailGeometry(shaftRadius, headRadius, radialSegments = NAIL
   return merged;
 }
 
+// A real nail head is a thin disc: about a third of its radius thick.
+export const HEAD_THICKNESS_RATIO = 0.3;
+
+/**
+ * A nail as two parts for instancing separately, so a tall nail's head stays
+ * a thin disc instead of stretching with the shaft (which `buildNailGeometry`'s
+ * single merged model does - its head is a fixed share of the height):
+ * `shaft` is a 1-tall cylinder standing on y = 0 (scale its y by the nail's
+ * height), `head` a 1-tall disc centered on y = 0 (scale its y by the head's
+ * thickness and place it at the top).
+ */
+export function buildNailParts(shaftRadius, headRadius, radialSegments = NAIL_RADIAL_SEGMENTS) {
+  const shaft = new THREE.CylinderGeometry(shaftRadius, shaftRadius, 1, radialSegments);
+  shaft.translate(0, 0.5, 0);
+  const head = new THREE.CylinderGeometry(headRadius, headRadius, 1, radialSegments);
+  return { shaft, head };
+}
+
 // Shared, module-level "inner nail" geometry/material - built once and
 // reused by every instance of the combined InstancedMesh #rebuildInnerNails
 // creates (only the mesh's own instance count varies as curves are added/

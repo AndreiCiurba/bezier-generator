@@ -1,0 +1,830 @@
+[
+  {
+    "name": "neon-542177",
+    "tag": "neon",
+    "colors": [
+      "#8e1ea2",
+      "#d552a3",
+      "#98e8de"
+    ],
+    "likes": 458,
+    "source": "https://colorhunt.co/palette/5421778e1ea2d552a398e8de"
+  },
+  {
+    "name": "neon-2391ff",
+    "tag": "neon",
+    "colors": [
+      "#2391ff",
+      "#fff83f",
+      "#ffcd54",
+      "#f70063"
+    ],
+    "likes": 714,
+    "source": "https://colorhunt.co/palette/2391fffff83fffcd54f70063"
+  },
+  {
+    "name": "neon-1f06ac",
+    "tag": "neon",
+    "colors": [
+      "#0f42c0",
+      "#5882e8",
+      "#e3ef4f"
+    ],
+    "likes": 571,
+    "source": "https://colorhunt.co/palette/1f06ac0f42c05882e8e3ef4f"
+  },
+  {
+    "name": "neon-8e1ea2",
+    "tag": "neon",
+    "colors": [
+      "#8e1ea2",
+      "#c654c3",
+      "#ed96d7",
+      "#ffc0de"
+    ],
+    "likes": 1356,
+    "source": "https://colorhunt.co/palette/8e1ea2c654c3ed96d7ffc0de"
+  },
+  {
+    "name": "neon-5003c0",
+    "tag": "neon",
+    "colors": [
+      "#ab03a9",
+      "#ff467a",
+      "#ffd51e"
+    ],
+    "likes": 1521,
+    "source": "https://colorhunt.co/palette/5003c0ab03a9ff467affd51e"
+  },
+  {
+    "name": "neon-70ffd2",
+    "tag": "neon",
+    "colors": [
+      "#70ffd2",
+      "#fffc8c",
+      "#ffcc4d",
+      "#ff9137"
+    ],
+    "likes": 921,
+    "source": "https://colorhunt.co/palette/70ffd2fffc8cffcc4dff9137"
+  },
+  {
+    "name": "sunset-522d60",
+    "tag": "sunset",
+    "colors": [
+      "#80426e",
+      "#f2a67b",
+      "#ffd38b"
+    ],
+    "likes": 1262,
+    "source": "https://colorhunt.co/palette/522d6080426ef2a67bffd38b"
+  },
+  {
+    "name": "sunset-a14646",
+    "tag": "sunset",
+    "colors": [
+      "#a14646",
+      "#da6556",
+      "#eb895b",
+      "#fdb773"
+    ],
+    "likes": 1144,
+    "source": "https://colorhunt.co/palette/a14646da6556eb895bfdb773"
+  },
+  {
+    "name": "sunset-601d49",
+    "tag": "sunset",
+    "colors": [
+      "#bd5579",
+      "#ea9d9d",
+      "#ffebb8"
+    ],
+    "likes": 2787,
+    "source": "https://colorhunt.co/palette/601d49bd5579ea9d9dffebb8"
+  },
+  {
+    "name": "sunset-e73f1e",
+    "tag": "sunset",
+    "colors": [
+      "#e73f1e",
+      "#fb6c00",
+      "#f9b637",
+      "#ffdd9c"
+    ],
+    "likes": 1959,
+    "source": "https://colorhunt.co/palette/e73f1efb6c00f9b637ffdd9c"
+  },
+  {
+    "name": "sunset-5e244e",
+    "tag": "sunset",
+    "colors": [
+      "#aa1c41",
+      "#e68457",
+      "#ffe8b4"
+    ],
+    "likes": 1846,
+    "source": "https://colorhunt.co/palette/5e244eaa1c41e68457ffe8b4"
+  },
+  {
+    "name": "sunset-ff9a86",
+    "tag": "sunset",
+    "colors": [
+      "#ff9a86",
+      "#ffb399",
+      "#ffd6a6",
+      "#fff0be"
+    ],
+    "likes": 5346,
+    "source": "https://colorhunt.co/palette/ff9a86ffb399ffd6a6fff0be"
+  },
+  {
+    "name": "gradient-00105b",
+    "tag": "gradient",
+    "colors": [
+      "#6061b6",
+      "#c9b5e0",
+      "#fcf9ec"
+    ],
+    "likes": 204,
+    "source": "https://colorhunt.co/palette/00105b6061b6c9b5e0fcf9ec"
+  },
+  {
+    "name": "gradient-5d866c",
+    "tag": "gradient",
+    "colors": [
+      "#5d866c",
+      "#c2a68c",
+      "#e6d8c3",
+      "#f5f5f0"
+    ],
+    "likes": 211,
+    "source": "https://colorhunt.co/palette/5d866cc2a68ce6d8c3f5f5f0"
+  },
+  {
+    "name": "gradient-071b2b",
+    "tag": "gradient",
+    "colors": [
+      "#167d8d",
+      "#b9e4e8",
+      "#eeeeee"
+    ],
+    "likes": 505,
+    "source": "https://colorhunt.co/palette/071b2b167d8db9e4e8eeeeee"
+  },
+  {
+    "name": "gradient-1e3b2f",
+    "tag": "gradient",
+    "colors": [
+      "#7f8c6a",
+      "#c8b48a",
+      "#f5f0e6"
+    ],
+    "likes": 620,
+    "source": "https://colorhunt.co/palette/1e3b2f7f8c6ac8b48af5f0e6"
+  },
+  {
+    "name": "gradient-1b365d",
+    "tag": "gradient",
+    "colors": [
+      "#005a9c",
+      "#60c1e5",
+      "#a0e0ef"
+    ],
+    "likes": 971,
+    "source": "https://colorhunt.co/palette/1b365d005a9c60c1e5a0e0ef"
+  },
+  {
+    "name": "gradient-421454",
+    "tag": "gradient",
+    "colors": [
+      "#802c62",
+      "#ff5b42",
+      "#ffd749"
+    ],
+    "likes": 424,
+    "source": "https://colorhunt.co/palette/421454802c62ff5b42ffd749"
+  },
+  {
+    "name": "rainbow-de7272",
+    "tag": "rainbow",
+    "colors": [
+      "#de7272",
+      "#ffca88",
+      "#fff6a9",
+      "#b4e4d6"
+    ],
+    "likes": 1196,
+    "source": "https://colorhunt.co/palette/de7272ffca88fff6a9b4e4d6"
+  },
+  {
+    "name": "rainbow-425b9a",
+    "tag": "rainbow",
+    "colors": [
+      "#425b9a",
+      "#76c0ec",
+      "#fff6dc",
+      "#ff95a5"
+    ],
+    "likes": 1644,
+    "source": "https://colorhunt.co/palette/425b9a76c0ecfff6dcff95a5"
+  },
+  {
+    "name": "rainbow-31aaa9",
+    "tag": "rainbow",
+    "colors": [
+      "#31aaa9",
+      "#f8e0a4",
+      "#a82020"
+    ],
+    "likes": 1458,
+    "source": "https://colorhunt.co/palette/31aaa9f8e0a4a820206c1a1a"
+  },
+  {
+    "name": "rainbow-df301c",
+    "tag": "rainbow",
+    "colors": [
+      "#df301c",
+      "#ff9100",
+      "#fff1d1",
+      "#00b7cd"
+    ],
+    "likes": 2058,
+    "source": "https://colorhunt.co/palette/df301cff9100fff1d100b7cd"
+  },
+  {
+    "name": "rainbow-007dcc",
+    "tag": "rainbow",
+    "colors": [
+      "#007dcc",
+      "#ffb900",
+      "#d10056",
+      "#b2054c"
+    ],
+    "likes": 1123,
+    "source": "https://colorhunt.co/palette/007dccffb900d10056b2054c"
+  },
+  {
+    "name": "rainbow-ff84ba",
+    "tag": "rainbow",
+    "colors": [
+      "#ff84ba",
+      "#ffdf82",
+      "#99c2ff",
+      "#ffefe3"
+    ],
+    "likes": 1975,
+    "source": "https://colorhunt.co/palette/ff84baffdf8299c2ffffefe3"
+  },
+  {
+    "name": "retro-ff6082",
+    "tag": "retro",
+    "colors": [
+      "#ff6082",
+      "#ffe4f6",
+      "#b26cff",
+      "#705eff"
+    ],
+    "likes": 611,
+    "source": "https://colorhunt.co/palette/ff6082ffe4f6b26cff705eff"
+  },
+  {
+    "name": "retro-4f7d32",
+    "tag": "retro",
+    "colors": [
+      "#4f7d32",
+      "#ffd16a",
+      "#f5b52e",
+      "#d9361e"
+    ],
+    "likes": 640,
+    "source": "https://colorhunt.co/palette/4f7d32ffd16af5b52ed9361e"
+  },
+  {
+    "name": "retro-f5ebdd",
+    "tag": "retro",
+    "colors": [
+      "#f5ebdd",
+      "#f2765e",
+      "#315b8c"
+    ],
+    "likes": 1039,
+    "source": "https://colorhunt.co/palette/f5ebddf2765e315b8c413333"
+  },
+  {
+    "name": "retro-ff7f50",
+    "tag": "retro",
+    "colors": [
+      "#ff7f50",
+      "#ffd166",
+      "#06d6a0",
+      "#118ab2"
+    ],
+    "likes": 890,
+    "source": "https://colorhunt.co/palette/ff7f50ffd16606d6a0118ab2"
+  },
+  {
+    "name": "retro-3e0f8d",
+    "tag": "retro",
+    "colors": [
+      "#9564dd",
+      "#e4da72",
+      "#eeeeee"
+    ],
+    "likes": 847,
+    "source": "https://colorhunt.co/palette/3e0f8d9564dde4da72eeeeee"
+  },
+  {
+    "name": "retro-722f99",
+    "tag": "retro",
+    "colors": [
+      "#722f99",
+      "#c5c1c1",
+      "#fee7c8",
+      "#ff9292"
+    ],
+    "likes": 745,
+    "source": "https://colorhunt.co/palette/722f99c5c1c1fee7c8ff9292"
+  },
+  {
+    "name": "night-092328",
+    "tag": "night",
+    "colors": [
+      "#12544f",
+      "#2a835f",
+      "#8bbb92"
+    ],
+    "likes": 3181,
+    "source": "https://colorhunt.co/palette/09232812544f2a835f8bbb92"
+  },
+  {
+    "name": "night-091413",
+    "tag": "night",
+    "colors": [
+      "#285a48",
+      "#408a71",
+      "#b0e4cc"
+    ],
+    "likes": 5038,
+    "source": "https://colorhunt.co/palette/091413285a48408a71b0e4cc"
+  },
+  {
+    "name": "night-061e29",
+    "tag": "night",
+    "colors": [
+      "#1d546d",
+      "#5f9598",
+      "#f3f4f4"
+    ],
+    "likes": 4491,
+    "source": "https://colorhunt.co/palette/061e291d546d5f9598f3f4f4"
+  },
+  {
+    "name": "night-452829",
+    "tag": "night",
+    "colors": [
+      "#57595b",
+      "#e8d1c5",
+      "#f3e8df"
+    ],
+    "likes": 4868,
+    "source": "https://colorhunt.co/palette/45282957595be8d1c5f3e8df"
+  },
+  {
+    "name": "night-450693",
+    "tag": "night",
+    "colors": [
+      "#8c00ff",
+      "#ff3f7f",
+      "#ffc400"
+    ],
+    "likes": 4068,
+    "source": "https://colorhunt.co/palette/4506938c00ffff3f7fffc400"
+  },
+  {
+    "name": "night-432323",
+    "tag": "night",
+    "colors": [
+      "#2f5755",
+      "#5a9690",
+      "#e0d9d9"
+    ],
+    "likes": 3194,
+    "source": "https://colorhunt.co/palette/4323232f57555a9690e0d9d9"
+  },
+  {
+    "name": "warm-fba17e",
+    "tag": "warm",
+    "colors": [
+      "#fba17e",
+      "#f7d794",
+      "#ff9a00",
+      "#ee6200"
+    ],
+    "likes": 213,
+    "source": "https://colorhunt.co/palette/fba17ef7d794ff9a00ee6200"
+  },
+  {
+    "name": "warm-f4be38",
+    "tag": "warm",
+    "colors": [
+      "#f4be38",
+      "#edda5e",
+      "#71951e",
+      "#587529"
+    ],
+    "likes": 269,
+    "source": "https://colorhunt.co/palette/f4be38edda5e71951e587529"
+  },
+  {
+    "name": "warm-ffead3",
+    "tag": "warm",
+    "colors": [
+      "#ffead3",
+      "#bfe7ea",
+      "#e89b5b",
+      "#d46743"
+    ],
+    "likes": 623,
+    "source": "https://colorhunt.co/palette/ffead3bfe7eae89b5bd46743"
+  },
+  {
+    "name": "warm-ff933e",
+    "tag": "warm",
+    "colors": [
+      "#ff933e",
+      "#ffcb56",
+      "#ffe9a9",
+      "#73a5ca"
+    ],
+    "likes": 667,
+    "source": "https://colorhunt.co/palette/ff933effcb56ffe9a973a5ca"
+  },
+  {
+    "name": "warm-7c0e44",
+    "tag": "warm",
+    "colors": [
+      "#aa5e7a",
+      "#d49a9a",
+      "#f2dace"
+    ],
+    "likes": 1714,
+    "source": "https://colorhunt.co/palette/7c0e44aa5e7ad49a9af2dace"
+  },
+  {
+    "name": "warm-09251c",
+    "tag": "warm",
+    "colors": [
+      "#a55704",
+      "#f3d2af",
+      "#f8eadc"
+    ],
+    "likes": 594,
+    "source": "https://colorhunt.co/palette/09251ca55704f3d2aff8eadc"
+  },
+  {
+    "name": "cold-4c2365",
+    "tag": "cold",
+    "colors": [
+      "#7f5d99",
+      "#9e7eb5",
+      "#c4a4da"
+    ],
+    "likes": 1519,
+    "source": "https://colorhunt.co/palette/4c23657f5d999e7eb5c4a4da"
+  },
+  {
+    "name": "cold-2f39a9",
+    "tag": "cold",
+    "colors": [
+      "#2e6fa0",
+      "#49a4bb",
+      "#15d8b3"
+    ],
+    "likes": 1153,
+    "source": "https://colorhunt.co/palette/2f39a92e6fa049a4bb15d8b3"
+  },
+  {
+    "name": "cold-464b71",
+    "tag": "cold",
+    "colors": [
+      "#464b71",
+      "#118ab2",
+      "#7cd5c7",
+      "#f2f2ed"
+    ],
+    "likes": 1250,
+    "source": "https://colorhunt.co/palette/464b71118ab27cd5c7f2f2ed"
+  },
+  {
+    "name": "cold-e3f2fd",
+    "tag": "cold",
+    "colors": [
+      "#e3f2fd",
+      "#90caf9",
+      "#2196f3",
+      "#0d47a1"
+    ],
+    "likes": 5309,
+    "source": "https://colorhunt.co/palette/e3f2fd90caf92196f30d47a1"
+  },
+  {
+    "name": "cold-321e48",
+    "tag": "cold",
+    "colors": [
+      "#43637e",
+      "#65dcd5",
+      "#d9fff4"
+    ],
+    "likes": 1934,
+    "source": "https://colorhunt.co/palette/321e4843637e65dcd5d9fff4"
+  },
+  {
+    "name": "cold-293681",
+    "tag": "cold",
+    "colors": [
+      "#4274d9",
+      "#95ccdd",
+      "#d0e7e6"
+    ],
+    "likes": 3390,
+    "source": "https://colorhunt.co/palette/2936814274d995ccddd0e7e6"
+  },
+  {
+    "name": "gold-fef3e2",
+    "tag": "gold",
+    "colors": [
+      "#fef3e2",
+      "#f4ae52",
+      "#d4621a"
+    ],
+    "likes": 1106,
+    "source": "https://colorhunt.co/palette/fef3e2f4ae52d4621a2a1a0e"
+  },
+  {
+    "name": "gold-f9e6a8",
+    "tag": "gold",
+    "colors": [
+      "#f9e6a8",
+      "#f2a900",
+      "#cc6f00"
+    ],
+    "likes": 1414,
+    "source": "https://colorhunt.co/palette/f9e6a8f2a900cc6f004d2a00"
+  },
+  {
+    "name": "gold-972828",
+    "tag": "gold",
+    "colors": [
+      "#972828",
+      "#e45742",
+      "#eb7f31",
+      "#fcad38"
+    ],
+    "likes": 1183,
+    "source": "https://colorhunt.co/palette/972828e45742eb7f31fcad38"
+  },
+  {
+    "name": "gold-ffedb9",
+    "tag": "gold",
+    "colors": [
+      "#ffedb9",
+      "#ffcb56",
+      "#ffa259",
+      "#ff7e7e"
+    ],
+    "likes": 1921,
+    "source": "https://colorhunt.co/palette/ffedb9ffcb56ffa259ff7e7e"
+  },
+  {
+    "name": "gold-fef2a0",
+    "tag": "gold",
+    "colors": [
+      "#fef2a0",
+      "#f3cd97",
+      "#e98b50",
+      "#bc4f4f"
+    ],
+    "likes": 1082,
+    "source": "https://colorhunt.co/palette/fef2a0f3cd97e98b50bc4f4f"
+  },
+  {
+    "name": "gold-f5f5dc",
+    "tag": "gold",
+    "colors": [
+      "#f5f5dc",
+      "#fbc02d",
+      "#ff8f00",
+      "#c62828"
+    ],
+    "likes": 1606,
+    "source": "https://colorhunt.co/palette/f5f5dcfbc02dff8f00c62828"
+  },
+  {
+    "name": "summer-fa699e",
+    "tag": "summer",
+    "colors": [
+      "#fa699e",
+      "#ff9fc7",
+      "#ffe7f0",
+      "#4add82"
+    ],
+    "likes": 88,
+    "source": "https://colorhunt.co/palette/fa699eff9fc7ffe7f04add82"
+  },
+  {
+    "name": "summer-f4baa3",
+    "tag": "summer",
+    "colors": [
+      "#f4baa3",
+      "#f4f0e2",
+      "#a6c8e2",
+      "#619dc6"
+    ],
+    "likes": 309,
+    "source": "https://colorhunt.co/palette/f4baa3f4f0e2a6c8e2619dc6"
+  },
+  {
+    "name": "summer-9fa0ff",
+    "tag": "summer",
+    "colors": [
+      "#9fa0ff",
+      "#d5e8e6",
+      "#fff3e3",
+      "#ff7171"
+    ],
+    "likes": 585,
+    "source": "https://colorhunt.co/palette/9fa0ffd5e8e6fff3e3ff7171"
+  },
+  {
+    "name": "summer-bedeff",
+    "tag": "summer",
+    "colors": [
+      "#bedeff",
+      "#fff2a7",
+      "#ffa500"
+    ],
+    "likes": 616,
+    "source": "https://colorhunt.co/palette/bedefffff2a7ffa500930031"
+  },
+  {
+    "name": "summer-ffcb3d",
+    "tag": "summer",
+    "colors": [
+      "#ffcb3d",
+      "#5d9253",
+      "#557945",
+      "#f1a344"
+    ],
+    "likes": 443,
+    "source": "https://colorhunt.co/palette/ffcb3d5d9253557945f1a344"
+  },
+  {
+    "name": "summer-086288",
+    "tag": "summer",
+    "colors": [
+      "#086288",
+      "#4d8dba",
+      "#97d7ff",
+      "#ffefc4"
+    ],
+    "likes": 1552,
+    "source": "https://colorhunt.co/palette/0862884d8dba97d7ffffefc4"
+  },
+  {
+    "name": "space-1a312c",
+    "tag": "space",
+    "colors": [
+      "#428475",
+      "#89d7b7",
+      "#fff4e1"
+    ],
+    "likes": 1739,
+    "source": "https://colorhunt.co/palette/1a312c42847589d7b7fff4e1"
+  },
+  {
+    "name": "space-000000",
+    "tag": "space",
+    "colors": [
+      "#cb2957",
+      "#dddddd",
+      "#eeeeee"
+    ],
+    "likes": 1736,
+    "source": "https://colorhunt.co/palette/000000cb2957ddddddeeeeee"
+  },
+  {
+    "name": "space-443199",
+    "tag": "space",
+    "colors": [
+      "#792ca2",
+      "#c13383",
+      "#e05454"
+    ],
+    "likes": 1354,
+    "source": "https://colorhunt.co/palette/443199792ca2c13383e05454"
+  },
+  {
+    "name": "space-e05454",
+    "tag": "space",
+    "colors": [
+      "#e05454",
+      "#c13383",
+      "#792ca2"
+    ],
+    "likes": 1397,
+    "source": "https://colorhunt.co/palette/e05454c13383792ca2443199"
+  },
+  {
+    "name": "space-462c7d",
+    "tag": "space",
+    "colors": [
+      "#831c91",
+      "#d552a3",
+      "#ff70bf"
+    ],
+    "likes": 2851,
+    "source": "https://colorhunt.co/palette/462c7d831c91d552a3ff70bf"
+  },
+  {
+    "name": "space-454040",
+    "tag": "space",
+    "colors": [
+      "#605b51",
+      "#d8d365",
+      "#e6f082"
+    ],
+    "likes": 1253,
+    "source": "https://colorhunt.co/palette/454040605b51d8d365e6f082"
+  },
+  {
+    "name": "popular-e3fdfd",
+    "tag": "popular",
+    "colors": [
+      "#e3fdfd",
+      "#cbf1f5",
+      "#a6e3e9",
+      "#71c9ce"
+    ],
+    "likes": 47946,
+    "source": "https://colorhunt.co/palette/e3fdfdcbf1f5a6e3e971c9ce"
+  },
+  {
+    "name": "popular-f9f7f7",
+    "tag": "popular",
+    "colors": [
+      "#f9f7f7",
+      "#dbe2ef",
+      "#3f72af"
+    ],
+    "likes": 46993,
+    "source": "https://colorhunt.co/palette/f9f7f7dbe2ef3f72af112d4e"
+  },
+  {
+    "name": "popular-fff5e4",
+    "tag": "popular",
+    "colors": [
+      "#fff5e4",
+      "#ffe3e1",
+      "#ffd1d1",
+      "#ff9494"
+    ],
+    "likes": 42504,
+    "source": "https://colorhunt.co/palette/fff5e4ffe3e1ffd1d1ff9494"
+  },
+  {
+    "name": "popular-f9f5f6",
+    "tag": "popular",
+    "colors": [
+      "#f9f5f6",
+      "#f8e8ee",
+      "#fdcedf",
+      "#f2bed1"
+    ],
+    "likes": 42390,
+    "source": "https://colorhunt.co/palette/f9f5f6f8e8eefdcedff2bed1"
+  },
+  {
+    "name": "popular-ad8b73",
+    "tag": "popular",
+    "colors": [
+      "#ad8b73",
+      "#ceab93",
+      "#e3caa5",
+      "#fffbe9"
+    ],
+    "likes": 39091,
+    "source": "https://colorhunt.co/palette/ad8b73ceab93e3caa5fffbe9"
+  },
+  {
+    "name": "popular-ffc7c7",
+    "tag": "popular",
+    "colors": [
+      "#ffc7c7",
+      "#ffe2e2",
+      "#f6f6f6",
+      "#8785a2"
+    ],
+    "likes": 38814,
+    "source": "https://colorhunt.co/palette/ffc7c7ffe2e2f6f6f68785a2"
+  }
+]

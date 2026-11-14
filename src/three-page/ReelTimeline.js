@@ -1,5 +1,7 @@
 import { Pattern } from '../models/Pattern.js';
 import { interpolateNumber, interpolateColor, wobble } from '../core/keyframe.js';
+import { WovenReel } from './WovenReel.js';
+import { prepareGrid, resolveGridFrame } from './gridReelFrame.js';
 
 // Same orbit target as ThreeApp's own ORBIT_TARGET - the board is always
 // centered at world X/Z = 0 (see SceneSync's origin shift), so a scripted
@@ -90,6 +92,18 @@ export class ReelTimeline {
    * @param {object} recipe see tools/reel-pipeline/recipes/ for real examples
    */
   async load(recipe) {
+    // A `"scene": "grid"` recipe describes the whole board itself (see
+    // gridReelFrame.js) rather than replaying a saved pattern on this page's
+    // own grid, so it is handed to a `WovenReel` that draws it in place of
+    // everything this page put in the scene.
+    if (recipe.scene === 'grid') {
+      this.delegate = new WovenReel({
+        camera: this.camera, renderer: this.renderer, scene: this.scene, controls: this.controls,
+        resolve: resolveGridFrame, prepare: prepareGrid,
+        hide: this.scene.children.filter((object) => !object.isLight),
+      });
+      return this.delegate.load(recipe);
+    }
     this.recipe = recipe;
 
     // Resize before stamping, not that it strictly matters for the final
@@ -141,6 +155,7 @@ export class ReelTimeline {
    * @param {number} t
    */
   seek(t) {
+    if (this.delegate) return this.delegate.seek(t);
     const clamped = Math.min(1, Math.max(0, t));
     this.#applyCamera(clamped);
     this.#applyColors(clamped);

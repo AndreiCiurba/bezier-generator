@@ -2,3 +2,8 @@ node_modules/
 output/
 frames/
 smoke-test.png
+
+# Content pipeline (reels.mjs): rendered batches and run logs stay local.
+# feedback/ (pick history) and STYLE.md are the pipeline memory and are tracked.
+batches/
+logs/

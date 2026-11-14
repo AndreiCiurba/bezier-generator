@@ -28,6 +28,15 @@ import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
 import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
+import { WovenReel } from '../three-page/WovenReel.js';
+import { resolveArrangeFrame } from './arrangeReelFrame.js';
+
+// Reel pipeline mode - the same `?reel=1` gate as /3d and /cardioid (see
+// CardioidApp.js): inert on the normal page. Exposes `window.__reelTimeline`
+// (a `WovenReel` driving `arrangeReelFrame.js` recipes), hides the menu and
+// the user's own arrangement, keeps the drawing buffer readable, and leaves
+// rendering to the timeline's `seek()` instead of the animation loop.
+const REEL_MODE = new URLSearchParams(window.location.search).get('reel') === '1';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -158,6 +167,16 @@ export class ArrangeApp {
 
     window.addEventListener('resize', this.#handleResize);
     this.#handleResize();
+
+    if (REEL_MODE) {
+      for (const selector of ['#ui', '#burger', '.page-nav']) document.querySelector(selector)?.style.setProperty('display', 'none');
+      window.__reelTimeline = new WovenReel({
+        camera: this.camera, controls: this.controls, renderer: this.renderer, scene: this.scene,
+        resolve: resolveArrangeFrame,
+        hide: this.scene.children.filter((object) => !object.isLight),
+      });
+      return; // every frame is rendered by the timeline's seek(), never by the loop below
+    }
     this.#animate();
   }
 
@@ -758,7 +777,7 @@ export class ArrangeApp {
   }
 
   #createRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, preserveDrawingBuffer: REEL_MODE });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   }
 
