@@ -110,6 +110,8 @@
         Height
         <input id="boardHeightInput" type="number" min="100" step="100" style="width: 100%;" />
       </label>
+      <!-- Real-life size of the typed values: 10 units = 1 mm, so 12000 = 120 cm. -->
+      <div id="boardRealSizeLabel" style="font-size: 10px; color: var(--panel-text-muted); margin-top: 4px;"></div>
       <div style="display:flex; gap:4px; margin-top: 6px;">
         <button id="applyBoardSizeBtn" class="menu-btn menu-btn--primary" style="width:auto; flex:1;">Apply</button>
         <button id="resetBoardSizeBtn" class="menu-btn" style="width:auto; flex:1;">Reset</button>
@@ -142,12 +144,24 @@
       <button id="applyGlobalHeightBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
     </div>
 
-    <!-- Global stroke weight default - used by any placed instance without its own override. -->
-    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Global Stroke Weight</div>
-    <div style="display:flex; align-items:center; gap:4px;">
-      <input id="globalWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
-      <button id="applyGlobalWeightBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Apply</button>
-    </div>
+    <!-- Real thread + nails (10 world units = 1 mm). Every string is drawn at
+         the real thread width, as the two strands that wrap a pair of nails. -->
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Thread &amp; Nails</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Thread width (mm)
+      <input id="threadWidthInput" type="number" min="0.01" max="10" step="0.01" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nail width (mm)
+      <input id="nailDiameterInput" type="number" min="0.1" max="50" step="0.1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Wrap
+      <select id="wrapTechniqueSelect" style="width: 100%;">
+        <option value="8">8 shape - strands cross (thinner line)</option>
+        <option value="O">O shape - strands parallel (thicker line)</option>
+      </select>
+    </label>
 
     <!-- Global nail visibility - used by any placed instance without its own override. -->
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 10px;">
@@ -181,14 +195,6 @@
       <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Height override
         <input id="instanceHeightInput" type="number" min="10" step="1" style="width: 100%;" />
-      </label>
-      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
-        <input id="instanceUseGlobalWeightCheckbox" type="checkbox" />
-        Use global stroke weight
-      </label>
-      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
-        Stroke weight override
-        <input id="instanceWeightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
       </label>
       <!-- This instance's own color layers - same swatches/picker modes as the other pages. Left-click changes a layer's color, right-click toggles it. -->
       <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Colors</div>

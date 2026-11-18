@@ -12,3 +12,6 @@ export const ARRANGEMENT_STORAGE_KEY = 'arrangement:v1';
 
 /** The Shape Designer's in-progress (not-yet-committed) shape, so an accidental reload doesn't lose it. */
 export const SHAPE_DRAFT_STORAGE_KEY = 'shapeDraft:v1';
+
+/** The Arrange board's real thread setup (thread width, nail width, 8/O wrap) - owned by `/arrange/`. */
+export const ARRANGE_THREAD_STORAGE_KEY = 'arrangeThread:v1';

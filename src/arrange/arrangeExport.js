@@ -2,7 +2,7 @@ import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { transformAnchors } from '../core/shapeTransform.js';
 import { closedWeaveSegmentsForCurve } from '../core/closedWeaveMath.js';
 import { controlPointDiameterForColorCount } from '../core/nailDotSize.js';
-import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
+import { threadGeometry, expandToStrands } from '../core/threadWrap.js';
 
 /**
  * PNG export for the Arrange board - the plan-view (top-down) equivalent of
@@ -22,19 +22,18 @@ const DOT_COLOR = '#000000';
 // The shared nail-dot sizes are tuned for a ~900px canvas; this image is 2400px
 // across, so they need widening to stay visible.
 const NAIL_DOT_SCALE = 3;
-// Same screen-px-per-weight mapping the 3D fat lines use (weaveLineBuilder.js),
-// so a string's thickness reads the same in the export as on the board.
-const BASELINE_LINE_WIDTH_PX = 2;
-const WEIGHT_TO_LINE_WIDTH_PX = BASELINE_LINE_WIDTH_PX / BASELINE_STROKE_WEIGHT;
-const MIN_LINE_WIDTH_PX = 1;
+// Strings are drawn at the real thread width scaled into the image, the same
+// as on the board - but never thinner than this, or they would vanish.
+const MIN_LINE_WIDTH_PX = 0.75;
 
 /**
  * Every placed instance's nails + weave segments in board (world) space.
  * @param {{shapeSnapshot: import('../models/FreeformShape.js').FreeformShape, position:{x:number,y:number}, rotationRadians:number, scale:number}[]} instances
- * @param {number} globalWeight board default stroke weight (used where an instance has no override)
- * @returns {{nails: {x:number,y:number}[], segments: {from:{x:number,y:number}, to:{x:number,y:number}, color:string, layerIndex:number}[], weight: number, colorCount: number}[]}
+ * Each connection becomes its two real strands (see core/threadWrap.js).
+ * @param {{threadWidthMm:number, nailDiameterMm:number, technique:string}} threadSettings
+ * @returns {{nails: {x:number,y:number}[], segments: {from:{x:number,y:number}, to:{x:number,y:number}, color:string, layerIndex:number}[], lineWidth: number, colorCount: number}[]}
  */
-export function arrangeExportGeometry(instances, globalWeight) {
+export function arrangeExportGeometry(instances, threadSettings) {
   return instances.map((instance) => {
     const shape = instance.shapeSnapshot;
     const anchors = transformAnchors(shape.anchors, {
@@ -43,10 +42,12 @@ export function arrangeExportGeometry(instances, globalWeight) {
       scale: instance.scale,
     });
     const nails = resampleClosedOutline(anchors, shape.nailCount);
+    const thread = threadGeometry(threadSettings, instance.nailScale ?? 1);
+    const segments = closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors, shape.weaveRule);
     return {
       nails,
-      segments: closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors, shape.weaveRule),
-      weight: shape.weight ?? globalWeight,
+      segments: expandToStrands(segments, thread.wrapRadius, thread.technique),
+      lineWidth: thread.lineWidth,
       colorCount: shape.colors.length,
     };
   });
@@ -117,8 +118,8 @@ export function renderArrangeExport(geometry, { withStrings }) {
 
   if (withStrings) {
     ctx.lineCap = 'round';
-    for (const { segments, weight } of geometry) {
-      ctx.lineWidth = Math.max(MIN_LINE_WIDTH_PX, weight * WEIGHT_TO_LINE_WIDTH_PX);
+    for (const { segments, lineWidth } of geometry) {
+      ctx.lineWidth = Math.max(MIN_LINE_WIDTH_PX, lineWidth * layout.scale);
       for (const { from, to, color } of [...segments].sort((a, b) => b.layerIndex - a.layerIndex)) {
         ctx.strokeStyle = color;
         ctx.beginPath();

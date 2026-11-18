@@ -9,7 +9,9 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { NailHeightUI } from '../three-page/NailHeightUI.js';
-import { StrokeWeightUI } from '../ui/StrokeWeightUI.js';
+import {
+  normalizeThreadSettings, worldToCm, MIN_THREAD_WIDTH_MM, MAX_THREAD_WIDTH_MM, MIN_NAIL_DIAMETER_MM, MAX_NAIL_DIAMETER_MM,
+} from '../core/threadWrap.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -27,7 +29,7 @@ import { transformAnchors } from '../core/shapeTransform.js';
 import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
-import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
+import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_THREAD_STORAGE_KEY } from '../io/storageKeys.js';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -51,7 +53,6 @@ const MIN_INSTANCE_PICK_RADIUS = 200;
 // This board's own defaults (the 3D page's 400 / baseline weight don't suit
 // the big freeform shapes placed here).
 const DEFAULT_ARRANGE_HEIGHT = 1000;
-const DEFAULT_ARRANGE_WEIGHT = 0.3;
 // A shape's drawing size on /shapes (its pixel canvas) says nothing about how
 // big it should be on this board, so every placement is sized to a target
 // length for its longest side instead (see placementSize.js) - chosen with the
@@ -98,7 +99,8 @@ export class ArrangeApp {
     this.instances = new ArrangedShapeStore(); // shapes actually placed on this board
 
     this.globalHeight = DEFAULT_ARRANGE_HEIGHT;
-    this.globalWeight = DEFAULT_ARRANGE_WEIGHT;
+    // Real thread width / nail width / 8-or-O wrap, in mm (10 world units = 1 mm) - see core/threadWrap.js.
+    this.threadSettings = normalizeThreadSettings(loadFromStorage(ARRANGE_THREAD_STORAGE_KEY));
     this.globalNailsVisible = true;
     this.boardWidth = DEFAULT_BOARD_WIDTH;
     this.boardDepth = DEFAULT_BOARD_DEPTH;
@@ -136,7 +138,7 @@ export class ArrangeApp {
     this.#initLibrarySync();
     this.#initPlacementSize();
     this.#initGlobalHeight();
-    this.#initGlobalWeight();
+    this.#initThreadSettings();
     this.#initGlobalNails();
     this.#initBoardSize();
     this.#initArrangementExportImport();
@@ -299,7 +301,8 @@ export class ArrangeApp {
 
   #updatePlacementSizeLabel() {
     document.getElementById('placementSizeLabel').textContent =
-      `Next shape: ${Math.round(this.placementSize)} units long (board is ${this.boardWidth} x ${this.boardDepth})`;
+      `Next shape: ${Math.round(this.placementSize)} units = ${+worldToCm(this.placementSize).toFixed(1)} cm long ` +
+      `(board is ${+worldToCm(this.boardWidth).toFixed(1)} x ${+worldToCm(this.boardDepth).toFixed(1)} cm)`;
   }
 
   /** Scale that makes `shape` come out `placementSize` long on its longest side. */
@@ -375,6 +378,15 @@ export class ArrangeApp {
     const heightInput = document.getElementById('boardHeightInput');
     widthInput.value = String(this.boardWidth);
     heightInput.value = String(this.boardDepth);
+    // Live real-life reading of whatever is typed, before Apply.
+    const realSizeLabel = document.getElementById('boardRealSizeLabel');
+    const updateRealSize = () => {
+      const cm = (input) => (Number.isFinite(Number(input.value)) ? +worldToCm(Number(input.value)).toFixed(1) : '?');
+      realSizeLabel.textContent = `Real size: ${cm(widthInput)} x ${cm(heightInput)} cm (10 units = 1 mm)`;
+    };
+    widthInput.addEventListener('input', updateRealSize);
+    heightInput.addEventListener('input', updateRealSize);
+    updateRealSize();
 
     toggleBtn.addEventListener('click', () => {
       body.hidden = !body.hidden;
@@ -392,6 +404,7 @@ export class ArrangeApp {
         alert(`Board width and height must each be between ${MIN_BOARD_SIDE} and ${MAX_BOARD_SIDE}.`);
         widthInput.value = String(this.boardWidth);
         heightInput.value = String(this.boardDepth);
+        updateRealSize();
         return;
       }
       this.boardWidth = width;
@@ -416,20 +429,46 @@ export class ArrangeApp {
     });
   }
 
-  #initGlobalWeight() {
-    new StrokeWeightUI(
-      { input: document.getElementById('globalWeightInput'), applyBtn: document.getElementById('applyGlobalWeightBtn') },
-      this.globalWeight,
-      (weight) => {
-        this.globalWeight = weight;
-        this.#syncScene();
+  /** Thread width, nail width and 8/O wrap - applied on change and remembered in this browser. */
+  #initThreadSettings() {
+    const threadInput = document.getElementById('threadWidthInput');
+    const nailInput = document.getElementById('nailDiameterInput');
+    const wrapSelect = document.getElementById('wrapTechniqueSelect');
+    const showCurrent = () => {
+      threadInput.value = String(this.threadSettings.threadWidthMm);
+      nailInput.value = String(this.threadSettings.nailDiameterMm);
+      wrapSelect.value = this.threadSettings.technique;
+    };
+    showCurrent();
+
+    const apply = (changes) => {
+      this.threadSettings = { ...this.threadSettings, ...changes };
+      saveToStorage(ARRANGE_THREAD_STORAGE_KEY, this.threadSettings);
+      this.#syncScene();
+    };
+    const readMm = (input, min, max, label) => {
+      const value = Number(input.value);
+      if (input.value.trim() === '' || !Number.isFinite(value) || value < min || value > max) {
+        alert(`${label} must be between ${min} and ${max} mm.`);
+        showCurrent();
+        return null;
       }
-    ).init();
+      return value;
+    };
+    threadInput.addEventListener('change', () => {
+      const value = readMm(threadInput, MIN_THREAD_WIDTH_MM, MAX_THREAD_WIDTH_MM, 'Thread width');
+      if (value !== null) apply({ threadWidthMm: value });
+    });
+    nailInput.addEventListener('change', () => {
+      const value = readMm(nailInput, MIN_NAIL_DIAMETER_MM, MAX_NAIL_DIAMETER_MM, 'Nail width');
+      if (value !== null) apply({ nailDiameterMm: value });
+    });
+    wrapSelect.addEventListener('change', () => apply({ technique: wrapSelect.value }));
   }
 
   #initPngExport() {
     const exportPng = (filename, withStrings) => {
-      const geometry = arrangeExportGeometry(this.instances.instances, this.globalWeight);
+      const geometry = arrangeExportGeometry(this.instances.instances, this.threadSettings);
       const canvas = renderArrangeExport(geometry, { withStrings });
       if (!canvas) {
         alert('Nothing to export yet - place a shape first.');
@@ -468,8 +507,6 @@ export class ArrangeApp {
     const scaleInput = document.getElementById('instanceScaleInput');
     const heightInput = document.getElementById('instanceHeightInput');
     const useGlobalHeightCheckbox = document.getElementById('instanceUseGlobalHeightCheckbox');
-    const weightInput = document.getElementById('instanceWeightInput');
-    const useGlobalWeightCheckbox = document.getElementById('instanceUseGlobalWeightCheckbox');
     const deleteBtn = document.getElementById('deleteInstanceBtn');
     const useGlobalNailsCheckbox = document.getElementById('instanceUseGlobalNailsCheckbox');
     const showNailsCheckbox = document.getElementById('instanceShowNailsCheckbox');
@@ -514,16 +551,6 @@ export class ArrangeApp {
       if (!this.selectedInstanceId || useGlobalHeightCheckbox.checked) return;
       const height = parseFloat(heightInput.value);
       if (Number.isFinite(height)) this.instances.setHeight(this.selectedInstanceId, height);
-    });
-    useGlobalWeightCheckbox.addEventListener('change', () => {
-      if (!this.selectedInstanceId) return;
-      weightInput.disabled = useGlobalWeightCheckbox.checked;
-      if (useGlobalWeightCheckbox.checked) this.instances.setWeight(this.selectedInstanceId, null);
-    });
-    weightInput.addEventListener('change', () => {
-      if (!this.selectedInstanceId || useGlobalWeightCheckbox.checked) return;
-      const weight = parseFloat(weightInput.value);
-      if (Number.isFinite(weight) && weight > 0) this.instances.setWeight(this.selectedInstanceId, weight);
     });
     deleteBtn.addEventListener('click', () => {
       if (!this.selectedInstanceId) return;
@@ -638,12 +665,6 @@ export class ArrangeApp {
     heightInput.disabled = useGlobalHeight;
     heightInput.value = String(instance.shapeSnapshot.height ?? this.globalHeight);
 
-    const useGlobalWeight = instance.shapeSnapshot.weight === null;
-    document.getElementById('instanceUseGlobalWeightCheckbox').checked = useGlobalWeight;
-    const weightInput = document.getElementById('instanceWeightInput');
-    weightInput.disabled = useGlobalWeight;
-    weightInput.value = String(instance.shapeSnapshot.weight ?? this.globalWeight);
-
     document.getElementById('instanceFitLayersCheckbox').checked = instance.fitLayersToNails;
 
     const useGlobalNails = instance.nailsVisible === null;
@@ -661,7 +682,7 @@ export class ArrangeApp {
   }
 
   #syncScene() {
-    this.arrangeSceneSync.syncAll(this.instances.instances, this.globalHeight, this.globalWeight, this.globalNailsVisible);
+    this.arrangeSceneSync.syncAll(this.instances.instances, this.globalHeight, this.threadSettings, this.globalNailsVisible);
   }
 
   #raycastToBoard(clientX, clientY) {

@@ -6,6 +6,7 @@ import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { computeWeaveSegments } from '../core/weaveMath.js';
 import { closedWeaveSegmentsForCurve } from '../core/closedWeaveMath.js';
 import { BASELINE_STROKE_WEIGHT } from '../core/strokeWeight.js';
+import { wrapStrands } from '../core/threadWrap.js';
 
 /**
  * Builds the "fat line" (`LineSegments2`/`LineMaterial`) Three.js object for
@@ -51,7 +52,10 @@ function desaturateForDimming(threeColor, alpha) {
 }
 
 /** Shared `LineSegments2` assembly once "here are the world-space vertex positions/colors" is known - identical for the open and closed weave builders below. */
-export function assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha = 1) {
+// `worldLineWidth` (optional) draws every string at a fixed width in world
+// units instead of screen pixels - the Arrange board's real-thread mode, where
+// a bigger board makes the same thread look thinner.
+export function assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha = 1, worldLineWidth = null) {
   if (positions.length === 0) return null;
 
   const geometry = new LineSegmentsGeometry();
@@ -60,7 +64,8 @@ export function assembleWeaveLineObject(positions, vertexColors, weight, lineRes
 
   const material = new LineMaterial({
     vertexColors: true,
-    linewidth: weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
+    linewidth: worldLineWidth ?? weight * STROKE_WEIGHT_TO_LINE_WIDTH_SCALE,
+    worldUnits: worldLineWidth !== null,
     resolution: lineResolution,
     transparent: alpha < 1,
     opacity: alpha,
@@ -129,7 +134,9 @@ export function buildWeaveLineObject({ points, colors, weight, maxHeight, toWorl
  * }} params
  * @returns {LineSegments2 | null}
  */
-export function buildClosedWeaveLineObject({ cellCorners, n, leap, colors, weight, maxHeight, toWorldPosition, lineResolution, alpha = 1, reverseLayers = false, rule = 'legacy', layerSlots = null }) {
+// `wrap` (optional, `{radius, technique}` - see core/threadWrap.js) draws each
+// connection as the two real strands of thread around its nails.
+export function buildClosedWeaveLineObject({ cellCorners, n, leap, colors, weight, maxHeight, toWorldPosition, lineResolution, alpha = 1, reverseLayers = false, rule = 'legacy', layerSlots = null, worldLineWidth = null, wrap = null }) {
   const colorCount = colors.length;
   // `layerSlots` spaces the heights as if there were that many layers (never fewer than the real count).
   const slotCount = Math.max(colorCount, layerSlots ?? 0);
@@ -144,10 +151,13 @@ export function buildClosedWeaveLineObject({ cellCorners, n, leap, colors, weigh
     const y = worldColorLayerHeight(heightIndex, slotCount, 0, maxHeight);
     _color.set(color);
     desaturateForDimming(_color, alpha);
-    const worldFrom = toWorldPosition(from, y);
-    const worldTo = toWorldPosition(to, y);
-    positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
-    vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
+    const strands = wrap ? wrapStrands(from, to, wrap.radius, wrap.technique) : [{ from, to }];
+    for (const strand of strands) {
+      const worldFrom = toWorldPosition(strand.from, y);
+      const worldTo = toWorldPosition(strand.to, y);
+      positions.push(worldFrom.x, worldFrom.y, worldFrom.z, worldTo.x, worldTo.y, worldTo.z);
+      vertexColors.push(_color.r, _color.g, _color.b, _color.r, _color.g, _color.b);
+    }
   }
-  return assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha);
+  return assembleWeaveLineObject(positions, vertexColors, weight, lineResolution, alpha, worldLineWidth);
 }

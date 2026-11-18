@@ -3,6 +3,8 @@ import { arrangeExportGeometry, exportBounds, exportLayout, EXPORT_MAX_SIZE_PX }
 import { FreeformShape } from '../models/FreeformShape.js';
 import { rectAnchors } from '../core/shapePresets.js';
 
+const thread = { threadWidthMm: 0.25, nailDiameterMm: 1.5, technique: '8' };
+
 const colors = [
   { color: '#ff0000', enabled: true },
   { color: '#00ff00', enabled: true },
@@ -16,21 +18,20 @@ function instance(position, { weight = null, scale = 1 } = {}) {
 }
 
 describe('arrangeExportGeometry', () => {
-  it('produces one entry per instance with nailCount nails and a weave segment per nail per enabled layer', () => {
-    const [entry] = arrangeExportGeometry([instance({ x: 0, y: 0 })], 0.6);
+  it('produces one entry per instance with nailCount nails and two thread strands per weave connection', () => {
+    const [entry] = arrangeExportGeometry([instance({ x: 0, y: 0 })], thread);
     expect(entry.nails).toHaveLength(8);
-    expect(entry.segments).toHaveLength(8 * 2);
+    expect(entry.segments).toHaveLength(8 * 2 * 2);
   });
 
-  it('falls back to the board weight only when the instance has no override, so export matches the board', () => {
-    const [a, b] = arrangeExportGeometry([instance({ x: 0, y: 0 }), instance({ x: 0, y: 0 }, { weight: 3 })], 0.6);
-    expect(a.weight).toBe(0.6);
-    expect(b.weight).toBe(3);
+  it('uses the real thread width in world units, ignoring the shape pixel stroke weight, so export matches the board', () => {
+    const [entry] = arrangeExportGeometry([instance({ x: 0, y: 0 }, { weight: 3 })], thread);
+    expect(entry.lineWidth).toBe(2.5);
   });
 
   it('applies the instance position so shapes land where they sit on the board', () => {
-    const near = exportBounds(arrangeExportGeometry([instance({ x: 0, y: 0 })], 1));
-    const moved = exportBounds(arrangeExportGeometry([instance({ x: 1000, y: 0 })], 1));
+    const near = exportBounds(arrangeExportGeometry([instance({ x: 0, y: 0 })], thread));
+    const moved = exportBounds(arrangeExportGeometry([instance({ x: 1000, y: 0 })], thread));
     expect(moved.minX - near.minX).toBeCloseTo(1000);
   });
 });

@@ -6,6 +6,7 @@ import {
 import { buildClosedWeaveLineObject } from '../three-page/weaveLineBuilder.js';
 import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { transformAnchors } from '../core/shapeTransform.js';
+import { threadGeometry } from '../core/threadWrap.js';
 
 /**
  * Owns every Three.js object on the Arrange board: a flat board plane (no
@@ -54,15 +55,17 @@ export class ArrangeSceneSync {
    * Rebuilds every placed instance's woven geometry from the current
    * `ArrangedShapeStore#instances` - disposes any instance id no longer
    * present, then rebuilds every currently-present one against its own
-   * transform and its own height/stroke-weight (each instance's own
-   * `shapeSnapshot.height`/`.weight` override, or the board's global
-   * defaults when either is `null` - see `FreeformShape`'s own doc).
+   * transform and its own height (`shapeSnapshot.height`, or the board's
+   * global height when `null`). Strings are drawn as real thread: the global
+   * thread width in world units (10 units = 1 mm), two strands per
+   * connection wrapped around nails of the global diameter (times the
+   * instance's own nail scale) - see core/threadWrap.js.
    * @param {{id:string, shapeSnapshot: import('../models/FreeformShape.js').FreeformShape, position:{x:number,y:number}, rotationRadians:number, scale:number}[]} instances
    * @param {number} globalHeight the Arrange board's own default height
-   * @param {number} globalWeight the Arrange board's own default stroke weight
+   * @param {{threadWidthMm:number, nailDiameterMm:number, technique:string}} threadSettings
    * @param {boolean} globalNailsVisible whether nails show for instances without their own override
    */
-  syncAll(instances, globalHeight, globalWeight, globalNailsVisible = true) {
+  syncAll(instances, globalHeight, threadSettings, globalNailsVisible = true) {
     const currentIds = new Set(instances.map((i) => i.id));
     for (const id of new Set([...this.instanceLines.keys(), ...this.instanceNails.keys()])) {
       if (!currentIds.has(id)) this.#disposeInstance(id);
@@ -70,7 +73,7 @@ export class ArrangeSceneSync {
 
     for (const instance of instances) {
       this.#disposeInstance(instance.id);
-      const { lines, nails } = this.#buildInstanceObjects(instance, globalHeight, globalWeight, globalNailsVisible);
+      const { lines, nails } = this.#buildInstanceObjects(instance, globalHeight, threadSettings, globalNailsVisible);
       this.scene.add(nails);
       this.instanceNails.set(instance.id, nails);
       if (!lines) continue;
@@ -79,7 +82,7 @@ export class ArrangeSceneSync {
     }
   }
 
-  #buildInstanceObjects(instance, globalHeight, globalWeight, globalNailsVisible) {
+  #buildInstanceObjects(instance, globalHeight, threadSettings, globalNailsVisible) {
     const anchors = transformAnchors(instance.shapeSnapshot.anchors, {
       position: instance.position,
       rotationRadians: instance.rotationRadians,
@@ -87,14 +90,16 @@ export class ArrangeSceneSync {
     });
     const nails = resampleClosedOutline(anchors, instance.shapeSnapshot.nailCount);
     const maxHeight = instance.shapeSnapshot.height ?? globalHeight;
-    const weight = instance.shapeSnapshot.weight ?? globalWeight;
+    const thread = threadGeometry(threadSettings, instance.nailScale ?? 1);
 
     const lines = buildClosedWeaveLineObject({
       cellCorners: nails,
       n: 0,
       leap: instance.shapeSnapshot.leap,
       colors: instance.shapeSnapshot.colors,
-      weight,
+      weight: 1, // unused: worldLineWidth below sets the width
+      worldLineWidth: thread.lineWidth,
+      wrap: { radius: thread.wrapRadius, technique: thread.technique },
       maxHeight,
       toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
       lineResolution: this.lineResolution,
@@ -104,12 +109,12 @@ export class ArrangeSceneSync {
       layerSlots: instance.fitLayersToNails ? Math.floor(instance.shapeSnapshot.nailCount / 2) : null,
       reverseLayers: instance.shapeSnapshot.weaveRule === 'legacy',
     });
-    const nailMesh = this.#buildNailMesh(nails, maxHeight, instance.nailScale ?? 1);
+    const nailMesh = this.#buildNailMesh(nails, maxHeight, thread.nailRadius / SHAFT_RADIUS);
     nailMesh.visible = instance.nailsVisible ?? globalNailsVisible;
     return { lines, nails: nailMesh };
   }
 
-  /** One standing nail per outline point, as tall as the shape's max string height - same look as the grid page's nails. */
+  /** One standing nail per outline point, as tall as the shape's max string height - same look as the grid page's nails, its shaft widened/narrowed by `thickness` to the real nail diameter. */
   #buildNailMesh(points, height, thickness) {
     const mesh = new THREE.InstancedMesh(this.nailGeometry, this.nailMaterial, points.length);
     const matrix = new THREE.Matrix4();
