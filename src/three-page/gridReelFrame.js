@@ -3,6 +3,7 @@ import { enumerateCells, sidesForGridLayout } from '../core/cellDetection.js';
 import { smoothFalloff } from '../core/deformation/puppetWarp.js';
 import { resolveTrack, resolveColor, colorGradient, colorBands, colorAt, resolveOrbitCamera, windowProgress } from '../core/reelCamera.js';
 import { resolveEnvironment } from '../core/reelLighting.js';
+import { withTransitions } from '../core/reelTransitions.js';
 import { partialClosedWeave, stackHeight, hash01 } from '../core/reelWeave.js';
 
 /**
@@ -252,7 +253,7 @@ export function resolveGridFrame(recipe, t, prepared) {
     segments,
     weight: resolveTrack(weave.weight, time, GRID_REEL_DEFAULTS.weight),
     nailsVisible: weave.nailsVisible ?? true,
-    camera: resolveOrbitCamera(recipe.camera, time, Math.max(prepared.width, prepared.depth) / 2),
+    camera: withTransitions(resolveOrbitCamera(recipe.camera, time, Math.max(prepared.width, prepared.depth) / 2), recipe, time),
     environment: resolveEnvironment(recipe, time, Math.max(prepared.width, prepared.depth) / 2),
   };
 }

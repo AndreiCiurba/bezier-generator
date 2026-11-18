@@ -54,3 +54,16 @@ describe('hash01', () => {
     }
   });
 });
+
+describe("the 'times' rule on a shape", () => {
+  const ring = Array.from({ length: 24 }, (_, i) => ({ x: Math.cos((i / 24) * 2 * Math.PI) * 100, y: Math.sin((i / 24) * 2 * Math.PI) * 100 }));
+  const key = (s) => [s.a, s.b].map((p) => `${Math.round(p.x)},${Math.round(p.y)}`).sort().join('|');
+
+  it('turns every layer one nail further round, like the cardioid page, so the layers differ and the stack twists', () => {
+    const segments = partialClosedWeave({ ring, leap: 1, rule: 'times', multiplier: 2, layerColors: ['#a', '#b'], heightAt: (layer) => layer });
+    const layer0 = new Set(segments.filter((s) => s.a.h === 0).map(key));
+    const layer1 = segments.filter((s) => s.a.h === 1).map(key);
+    expect(layer0.size).toBeGreaterThan(10);
+    expect(layer1.filter((k) => layer0.has(k)).length).toBeLessThan(layer1.length / 2);
+  });
+});

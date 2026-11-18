@@ -1,10 +1,12 @@
 import { ovalAnchors } from '../core/shapePresets.js';
 import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { transformAnchors } from '../core/shapeTransform.js';
-import { resolveTrack, resolveColor, colorGradient, colorBands, resolveOrbitCamera, windowProgress, flyPathPoint } from '../core/reelCamera.js';
+import { resolveTrack, resolveColor, colorGradient, colorBands, resolveOrbitCamera, windowProgress, flyPathPoint, cameraShotAt } from '../core/reelCamera.js';
 import { resolveEnvironment, mountPoint } from '../core/reelLighting.js';
+import { withTransitions, transitionList, transitionWindows } from '../core/reelTransitions.js';
 import { partialClosedWeave, stackHeight, hash01 } from '../core/reelWeave.js';
 import { chordDrawAmount, nailSeating } from '../core/cardioidWeave.js';
+import { hammerRaise } from '../cardioid/cardioidReelFrame.js';
 
 /**
  * Pure "what does the Arrange board look like at clip time t" for the reel
@@ -26,13 +28,17 @@ import { chordDrawAmount, nailSeating } from '../core/cardioidWeave.js';
  *     `star` (`points`, `inner` = inner/outer radius); `heart`; `petal`
  *     (`width`, a lens pointing along +y); or `anchors` (raw Shapes-page anchors).
  *   - `size` (world units, the outline's radius), `nails`, `leap`, `rule`
- *     (`"center"` default, or `"legacy"`), and the layer colors - `colors`
+ *     (`"center"` default, `"legacy"`, or `"times"`: the cardioid page's
+ *     times-table weave on this outline - nail j to nail `multiplier` x j -
+ *     with every layer starting `leap` nails further round, so the stack
+ *     twists; `multiplier` may be a track), and the layer colors - `colors`
  *     (one per layer) or `palette` + `layers` (a gradient through the palette).
  *   - `x`, `y`, `rotation` (degrees), `scale`, `height` (how tall the string
  *     stack is), `base` (how high above the board it starts - long nails
  *     carry it) - each a number or track.
  *   - `weight`: a multiplier on `weave.weight` for this shape's strings (e.g.
- *     0.6 for a soft, fine fill).
+ *     0.6 for a soft, fine fill). `nailThickness`: a multiplier on
+ *     `look.nailThickness` for this shape's nails (e.g. 0.5 on small figures).
  *   - `border`: thicker strings run round the shape's own outline, nail to
  *     next nail, marking its edge: `{ weight, layers, color }` - `weight` a
  *     multiplier (default 2.5), `layers` which layers get one (`"bands"`
@@ -63,10 +69,19 @@ import { chordDrawAmount, nailSeating } from '../core/cardioidWeave.js';
  * - `camera`: the shared orbit camera, or with `fly` the drone camera whose
  *   path is in board coordinates (see `core/reelCamera.js`).
  * - `mount`, `lighting`, `room`: see `core/reelLighting.js`.
+ * - `making` (optional): the making-of tools, `{ hammer, spool, scale }`.
+ *   `hammer` (default true) shows a hammer driving each nail of a figure
+ *   being nailed with `nailMode: "hammer"` (three blows a nail); `spool`
+ *   (default true) a spool of the thread's own color laying the string that
+ *   is going on right now. `scale` multiplies their size (default 1: a 16 cm
+ *   tack hammer next to nails about 1 cm apart, 200 world units). The
+ *   hammer's handle runs off to the right of the picture, away from the lens.
+ * - `transitions`: editing transitions, see `core/reelTransitions.js`.
  *
  * Output: `{ board, nails: [{x, y, h}], segments: [{a, b, color}], weight,
- * nailsVisible, camera, environment }`, all in 2D design space + height (see
- * `core/reelWeave.js`).
+ * nailsVisible, camera, environment, making }`, all in 2D design space +
+ * height (see `core/reelWeave.js`); `making` is `{ scale, hammers: [{x, y,
+ * top, raise, angle}], spools: [{x, y, h, color, angle}] }` or null.
  */
 
 export const ARRANGE_REEL_DEFAULTS = { boardSize: 12000, weight: 0.35, height: 900, nails: 80, size: 2000 };
@@ -74,6 +89,10 @@ export const ARRANGE_REEL_DEFAULTS = { boardSize: 12000, weight: 0.35, height: 9
 const NAIL_RISE_SHARE = 0.15;
 // How far above its final height a hammered nail stands when first set down.
 const HAMMER_PROUD = 0.8;
+const HAMMER_HITS_PER_NAIL = 3;
+// The handle comes in at this angle to the line from the figure's center out
+// through the nail, so a camera looking in at that nail sees the hammer side-on.
+const HAMMER_APPROACH_DEGREES = 62;
 
 const deg = (d) => (d * Math.PI) / 180;
 const point = (x, y) => ({ x, y, handleIn: { x, y }, handleOut: { x, y } });
@@ -275,16 +294,36 @@ function resolveFigure({ shape, offsetX, offsetY, turn }, local, weave, drawMode
 
   const nails = [];
   const segments = [];
+  let hammer = null;
+  // A per-shape nail thickness (multiplier on look.nailThickness): small figures with close-set nails want slimmer ones.
+  const nailWidth = shape.nailThickness === undefined ? undefined : resolveTrack(shape.nailThickness, time, 1);
   const nailShare = resolveTrack(shape.nailShare ?? weave.nailShare, time, NAIL_RISE_SHARE);
   const rise = nailShare > 0 ? Math.min(1, local / nailShare) : 1;
   if ((shape.nailMode ?? weave.nailMode) === 'hammer') {
     // One nail after another round the outline, each set down proud and driven in to its height.
     ring.forEach((p, k) => {
       const seat = nailSeating({ nailIndex: k, nailCount: ring.length, progress: rise });
-      if (seat > 0) nails.push({ x: p.x, y: p.y, h: top * (1 + HAMMER_PROUD * (1 - seat)) });
+      if (seat > 0) nails.push({ x: p.x, y: p.y, h: top * (1 + HAMMER_PROUD * (1 - seat)), ...(nailWidth === undefined ? {} : { w: nailWidth }) });
     });
+    if (rise > 0 && rise < 1) {
+      // The hammer is on the nail going in now, coming at it from outside the figure and a little to one side.
+      const driven = rise * ring.length;
+      const index = Math.min(ring.length - 1, Math.floor(driven));
+      const fraction = driven - index;
+      const nail = ring[index];
+      const cx = ring.reduce((sum, p) => sum + p.x, 0) / ring.length;
+      const cy = ring.reduce((sum, p) => sum + p.y, 0) / ring.length;
+      hammer = {
+        x: nail.x,
+        y: nail.y,
+        top: top * (1 + HAMMER_PROUD * (1 - fraction)),
+        raise: hammerRaise(fraction, HAMMER_HITS_PER_NAIL),
+        // Replaced by `hammerSide` once the camera is known; this is the fallback.
+        angle: Math.atan2(nail.y - cy, nail.x - cx) + deg(HAMMER_APPROACH_DEGREES),
+      };
+    }
   } else {
-    for (const p of ring) nails.push({ x: p.x, y: p.y, h: top * rise });
+    for (const p of ring) nails.push({ x: p.x, y: p.y, h: top * rise, ...(nailWidth === undefined ? {} : { w: nailWidth }) });
   }
 
   const strung = windowProgress(local, nailShare, 1);
@@ -296,6 +335,7 @@ function resolveFigure({ shape, offsetX, offsetY, turn }, local, weave, drawMode
       ring,
       leap: Math.round(resolveTrack(shape.leap, time, 0)),
       rule: shape.rule ?? 'center',
+      multiplier: resolveTrack(shape.multiplier, time, 2),
       layerColors,
       progress: strung,
       drawMode: shape.drawMode ?? drawMode,
@@ -306,7 +346,15 @@ function resolveFigure({ shape, offsetX, offsetY, turn }, local, weave, drawMode
     }
     if (shape.border) segments.push(...borderSegments(shape, ring, layerColors, strung, shape.drawMode ?? drawMode, heightAt, time));
   }
-  return { ring, top, nails, segments };
+  // The spool lays the topmost string going on right now.
+  let spool = null;
+  for (let k = segments.length - 1; k >= 0 && strung < 1; k--) {
+    const { a, b, color, tip } = segments[k];
+    if (!tip) continue;
+    spool = { x: b.x, y: b.y, h: b.h, color, angle: Math.atan2(b.y - a.y, b.x - a.x) };
+    break;
+  }
+  return { ring, top, nails, segments, hammer, spool };
 }
 
 /**
@@ -321,6 +369,7 @@ export function resolveArrangeFrame(recipe, t) {
 
   const nails = [];
   const segments = [];
+  const making = recipe.making ? { scale: recipe.making.scale ?? 1, hammers: [], spools: [] } : null;
   for (const copy of expandShapes(recipe.shapes ?? [], time)) {
     const [start, end] = copy.shape.window ?? [0, 1];
     const local = windowProgress(progress, start + copy.windowShift, end + copy.windowShift);
@@ -328,21 +377,47 @@ export function resolveArrangeFrame(recipe, t) {
     const figure = resolveFigure(copy, local, weave, drawMode, time);
     nails.push(...figure.nails);
     segments.push(...figure.segments);
+    if (making && figure.hammer && recipe.making.hammer !== false) making.hammers.push(figure.hammer);
+    if (making && figure.spool && recipe.making.spool !== false) making.spools.push(figure.spool);
   }
 
   const boardSpec = recipe.board ?? {};
   const boardSize = boardSpec === false ? ARRANGE_REEL_DEFAULTS.boardSize : boardSpec.size ?? ARRANGE_REEL_DEFAULTS.boardSize;
   const unit = recipe.unit ?? boardSize / 2;
   const environment = resolveEnvironment(recipe, time, unit);
+  const camera = resolveOrbitCamera(recipe.camera, time, unit, (p) => mountPoint(p, environment.mount));
+  if (making) for (const hammer of making.hammers) hammer.angle = hammerSide(camera, environment.mount);
   return {
     board: boardSpec === false ? null : { width: boardSize, depth: boardSpec.depth ?? boardSize, color: boardSpec.color ? resolveColor(boardSpec.color, time) : null },
     nails,
     segments,
     weight: resolveTrack(weave.weight, time, ARRANGE_REEL_DEFAULTS.weight),
     nailsVisible: weave.nailsVisible ?? true,
-    camera: resolveOrbitCamera(recipe.camera, time, unit, (p) => mountPoint(p, environment.mount)),
+    camera: withTransitions(camera, recipe, time),
     environment,
+    making,
   };
+}
+
+/**
+ * Which way (an angle on the board) a hammer's handle runs from the nail to
+ * the grip: off to the right of the picture and a little away from the
+ * camera, as a right-handed maker holds it - never toward the lens, where a
+ * hammer this close would fill the frame.
+ */
+function hammerSide(camera, mount) {
+  const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+  const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const forward = sub(camera.target, camera.position);
+  const up = camera.up ?? { x: 0, y: 1, z: 0 };
+  const right = { x: forward.y * up.z - forward.z * up.y, y: forward.z * up.x - forward.x * up.z, z: forward.x * up.y - forward.y * up.x };
+  const origin = mountPoint({ x: 0, y: 0, h: 0 }, mount);
+  const ex = sub(mountPoint({ x: 1, y: 0, h: 0 }, mount), origin);
+  const ey = sub(mountPoint({ x: 0, y: 1, h: 0 }, mount), origin);
+  const norm = (v) => Math.hypot(v.x, v.y, v.z) || 1;
+  const r = { x: dot(right, ex) / norm(right), y: dot(right, ey) / norm(right) };
+  const f = { x: dot(forward, ex) / norm(forward), y: dot(forward, ey) / norm(forward) };
+  return Math.atan2(0.8 * r.y + 0.5 * f.y, 0.8 * r.x + 0.5 * f.x);
 }
 
 // A string closer than this to a nail's center catches on it: the nail
@@ -440,15 +515,17 @@ export function nailClashes(recipe, { t, clearance = NAIL_CLEARANCE } = {}) {
  * @param {{samples?: number, clearance?: number}} [options]
  */
 export function flyCrashes(recipe, { samples = 150, clearance = 2 * NAIL_CLEARANCE } = {}) {
-  const path = recipe.camera?.fly?.path;
-  if (!path?.length) return [];
+  if (!hasFlyShot(recipe.camera)) return [];
   const boardSize = recipe.board === false ? ARRANGE_REEL_DEFAULTS.boardSize : recipe.board?.size ?? ARRANGE_REEL_DEFAULTS.boardSize;
   const unit = recipe.unit ?? boardSize / 2;
-  const points = path.map((p) => ({ t: p.t, x: p.x ?? 0, y: p.y ?? 0, h: p.h ?? 0 })).sort((a, b) => a.t - b.t);
   const crashes = [];
   for (let k = 0; k <= samples; k++) {
     const t = k / samples;
-    const p = flyPathPoint(points, t);
+    // Each shot of a cut-together camera flies its own path, on screen only for its own stretch.
+    const { shot, from, to } = cameraShotAt(recipe.camera, t);
+    if (!shot.fly?.path?.length) continue;
+    const points = shot.fly.path.map((p) => ({ t: p.t, x: p.x ?? 0, y: p.y ?? 0, h: p.h ?? 0 })).sort((a, b) => a.t - b.t);
+    const p = flyPathPoint(points, Math.min(to, Math.max(from, t)));
     const at = { x: p.x * unit, y: p.y * unit, h: p.h * unit };
     if (at.h < 0) {
       crashes.push({ t, what: 'board', at });
@@ -458,4 +535,70 @@ export function flyCrashes(recipe, { samples = 150, clearance = 2 * NAIL_CLEARAN
     if (nail) crashes.push({ t, what: 'nail', at });
   }
   return crashes;
+}
+
+/** Whether a camera flies a drone path anywhere in the clip (itself, or one of its shots). */
+function hasFlyShot(camera) {
+  return Boolean(camera?.fly?.path?.length || camera?.shots?.some((shot) => shot.fly?.path?.length));
+}
+
+/**
+ * The moments a `fly` camera's picture loses its sense of direction: the
+ * room upside down (`what: 'upside-down'` - on a wall-hung piece, diving
+ * down the wall while looking into it puts the ceiling at the bottom of the
+ * picture; dive up the wall or across it instead), the picture tipped
+ * sideways by roll or bank (`what: 'tilted'`, more than `maxRoll` degrees),
+ * or the picture spinning about the line of sight (`what: 'rolling'`, more
+ * than `maxSpin` degrees within half a second - typically the hand-over from
+ * flying along the board to looking face-on at the wall while heading across
+ * it; rise out heading up the wall, or turn up the wall first), or the
+ * view whipping round (`what: 'whip'`, turning faster than `maxTurn`
+ * degrees a second - usually the path passing right over or beside its own
+ * look point, or a sharp kink in the path).
+ * Only the drone shots are checked, each on its own: the jump at a cut
+ * (`camera.shots`) is not a whip, and nor is a fast turn inside a moving
+ * transition (`transitions`, see `core/reelTransitions.js`) - those are meant.
+ * Empty for an orbit camera.
+ */
+export function flyFraming(recipe, { samples = 300, maxRoll = 8, maxSpin = 25, maxTurn = 90 } = {}) {
+  if (!hasFlyShot(recipe.camera)) return [];
+  const boardSize = recipe.board === false ? ARRANGE_REEL_DEFAULTS.boardSize : recipe.board?.size ?? ARRANGE_REEL_DEFAULTS.boardSize;
+  const unit = recipe.unit ?? boardSize / 2;
+  const seconds = recipe.durationSeconds ?? 20;
+  samples = Math.max(samples, Math.ceil(seconds * 30));
+  const moves = transitionWindows(transitionList(recipe), seconds);
+  const problems = [];
+  const twist = new Array(samples + 1).fill(0);
+  let previous = null;
+  for (let k = 0; k <= samples; k++) {
+    const t = k / samples;
+    const { shot, index } = cameraShotAt(recipe.camera, t);
+    if (!shot.fly) {
+      previous = null;
+      continue;
+    }
+    const { mount } = resolveEnvironment(recipe, t, unit);
+    const pose = resolveOrbitCamera(recipe.camera, t, unit, (p) => mountPoint(p, mount));
+    if (pose.up && pose.up.y < -0.2) problems.push({ t, what: 'upside-down' });
+    else if (Math.abs(pose.roll) > maxRoll) problems.push({ t, what: 'tilted' });
+    // How far the picture turned about the line of sight since the last sample, in degrees.
+    const f = { x: pose.target.x - pose.position.x, y: pose.target.y - pose.position.y, z: pose.target.z - pose.position.z };
+    const length = Math.hypot(f.x, f.y, f.z) || 1;
+    const up = pose.up ?? { x: 0, y: 1, z: 0 };
+    if (previous && previous.shot === index) {
+      const turnRate = (Math.acos(Math.min(1, Math.max(-1, (f.x * previous.f.x + f.y * previous.f.y + f.z * previous.f.z) / length))) * 180) / Math.PI * (samples / seconds);
+      if (turnRate > maxTurn && !moves.some(([a, b]) => t >= a && t <= b)) problems.push({ t, what: 'whip' });
+      const side = { x: (f.y * up.z - f.z * up.y) / length, y: (f.z * up.x - f.x * up.z) / length, z: (f.x * up.y - f.y * up.x) / length };
+      const turn = (up.x - previous.up.x) * side.x + (up.y - previous.up.y) * side.y + (up.z - previous.up.z) * side.z;
+      twist[k] = (turn * 180) / Math.PI + (pose.roll - previous.roll);
+    }
+    previous = { shot: index, up, roll: pose.roll, f: { x: f.x / length, y: f.y / length, z: f.z / length } };
+  }
+  const window = Math.max(1, Math.round((0.5 / seconds) * samples));
+  for (let k = 0; k + window <= samples; k++) {
+    let net = 0;
+    for (let j = k + 1; j <= k + window; j++) net += twist[j];
+    if (Math.abs(net) > maxSpin) problems.push({ t: (k + window / 2) / samples, what: 'rolling' });
+  }
+  return problems.sort((a, b) => a.t - b.t);
 }

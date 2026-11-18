@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveArrangeFrame, outlineAnchors, borderLayers, nailClashes, flyCrashes } from './arrangeReelFrame.js';
+import { resolveArrangeFrame, outlineAnchors, borderLayers, nailClashes, flyCrashes, flyFraming } from './arrangeReelFrame.js';
 
 const petalRing = {
   weave: { drawProgress: { keyframes: [{ t: 0, value: 0 }, { t: 1, value: 1 }] } },
@@ -88,6 +88,29 @@ describe('making-of', () => {
   it('lets the board color change over the clip, for the board being painted', () => {
     expect(at(0).board.color).not.toBe(at(1).board.color);
   });
+
+  const tools = (progress, making = {}) =>
+    resolveArrangeFrame({ board: false, making, weave: { drawProgress: progress }, shapes: [shape] }, progress).making;
+
+  it('puts a hammer on the nail going in while a figure is being nailed, and none once it is', () => {
+    const nailing = tools(0.2);
+    expect(nailing.hammers).toHaveLength(1);
+    // Mid-blow the nail still stands proud, so the hammer meets it above its final height.
+    expect(nailing.hammers[0].top).toBeGreaterThanOrEqual(100);
+    expect(tools(0.75).hammers).toHaveLength(0);
+  });
+
+  it('lays the string going on with a spool at its end, and puts it away when the figure is strung', () => {
+    const stringing = tools(0.76);
+    expect(stringing.spools).toHaveLength(1);
+    expect(stringing.spools[0].color).toBe('#ffffff');
+    expect(tools(1).spools).toHaveLength(0);
+    expect(tools(0.76, { spool: false }).spools).toHaveLength(0);
+  });
+
+  it('shows no tools at all unless the recipe asks for the making-of', () => {
+    expect(resolveArrangeFrame({ board: false, weave: { drawProgress: 0.2 }, shapes: [shape] }, 0.2).making).toBeNull();
+  });
 });
 
 describe('borderLayers', () => {
@@ -174,5 +197,117 @@ describe('irregular shapes', () => {
     expect(center(nailsOf(2))).toBeGreaterThan(center(nailsOf(0)) + 900);
     expect(spread(nailsOf(2))).toBeGreaterThan(spread(nailsOf(0)) * 2);
     expect(nailsOf(2)[0].h).toBeGreaterThan(nailsOf(0)[0].h);
+  });
+});
+
+describe('per-shape nail thickness', () => {
+  it("passes a shape's own nail thickness to its nails, so small figures can have slimmer nails than the big one", () => {
+    const frame = resolveArrangeFrame({ shapes: [
+      { outline: { type: 'circle' }, size: 1000, nails: 12, palette: ['#ff0000'], layers: 2, x: -2000 },
+      { outline: { type: 'circle' }, size: 200, nails: 12, palette: ['#ff0000'], layers: 2, x: 2000, nailThickness: 0.4 },
+    ] }, 1);
+    expect(frame.nails.slice(0, 12).every((n) => n.w === undefined)).toBe(true);
+    expect(frame.nails.slice(12).every((n) => n.w === 0.4)).toBe(true);
+  });
+});
+
+describe('flyFraming', () => {
+  const onWall = (path, extra = {}) => ({ mount: 'wall', shapes: [], camera: { fly: { path, bank: 0, ...extra } } });
+
+  it('passes a dive that flies across or up a wall-hung piece, because the board stays below and the room the right way up', () => {
+    expect(flyFraming(onWall([{ t: 0, x: -0.5, y: 0.5, h: 0.1 }, { t: 1, x: 0.5, y: 0.5, h: 0.1 }]))).toEqual([]);
+    expect(flyFraming(onWall([{ t: 0, x: 0, y: 0.5, h: 0.4 }, { t: 1, x: 0, y: -0.5, h: 0.05 }]))).toEqual([]);
+  });
+
+  it('flags a dive down the wall while looking into it, which shows the room upside down', () => {
+    const problems = flyFraming(onWall([{ t: 0, x: 0, y: -0.5, h: 0.6 }, { t: 1, x: 0, y: 0.5, h: 0.05 }]));
+    expect(problems.some((p) => p.what === 'upside-down')).toBe(true);
+  });
+
+  it('flags the picture spinning about the line of sight, as when a pass across the wall swings round to look face-on at it', () => {
+    const leg = (path, look) => {
+      const recipe = onWall(path, { look: { ...look, h: 0 } });
+      recipe.durationSeconds = 10;
+      return recipe;
+    };
+    // Across the wall low, then rising to look face-on at it: the picture has to turn a quarter round.
+    const swing = leg([{ t: 0, x: -0.6, y: 0, h: 0.6 }, { t: 0.5, x: 0.5, y: 0, h: 0.6 }, { t: 0.7, x: 1, y: 0, h: 3 }, { t: 1, x: 1, y: 0, h: 3 }], { x: 1.1, y: 0 });
+    expect(flyFraming(swing).some((p) => p.what === 'rolling')).toBe(true);
+    // The same rise heading up the wall: the board's up and the room's agree, so nothing turns.
+    const climb = leg([{ t: 0, x: 0, y: 0.6, h: 0.6 }, { t: 0.5, x: 0, y: -0.5, h: 0.6 }, { t: 0.7, x: 0, y: -1, h: 3 }, { t: 1, x: 0, y: -1, h: 3 }], { x: 0, y: -1.1 });
+    expect(flyFraming(climb)).toEqual([]);
+  });
+
+  it('flags the view whipping round when the drone flies right over its own look point', () => {
+    const over = onWall([{ t: 0, x: 0, y: 0.6, h: 0.15 }, { t: 1, x: 0, y: -0.6, h: 0.15 }], { look: { x: 0, y: 0, h: 0.1 } });
+    over.durationSeconds = 10;
+    expect(flyFraming(over).some((p) => p.what === 'whip')).toBe(true);
+    const far = onWall([{ t: 0, x: 0, y: 0.6, h: 0.15 }, { t: 1, x: 0, y: -0.6, h: 0.15 }], { look: { x: 0, y: -3, h: 0.1 } });
+    far.durationSeconds = 10;
+    expect(flyFraming(far).filter((p) => p.what === 'whip')).toEqual([]);
+  });
+
+  it('flags a picture tipped sideways by roll', () => {
+    const problems = flyFraming(onWall([{ t: 0, x: -0.5, y: 0, h: 0.1 }, { t: 1, x: 0.5, y: 0, h: 0.1 }], {}), {});
+    expect(problems).toEqual([]);
+    const rolled = { ...onWall([{ t: 0, x: -0.5, y: 0, h: 0.1 }, { t: 1, x: 0.5, y: 0, h: 0.1 }]) };
+    rolled.camera.roll = 20;
+    expect(flyFraming(rolled).every((p) => p.what === 'tilted' || p.what === 'rolling')).toBe(true);
+    expect(flyFraming(rolled).length).toBeGreaterThan(0);
+  });
+});
+
+describe('flyFraming with cuts and transitions', () => {
+  const flyShot = (from, path, extra = {}) => ({ from, fly: { path, bank: 0, ...extra } });
+
+  it('does not take the jump at a cut between two drone shots for a whip', () => {
+    const recipe = {
+      mount: 'wall', shapes: [], durationSeconds: 10,
+      camera: {
+        shots: [
+          flyShot(0, [{ t: 0, x: -0.5, y: 0.5, h: 0.1 }, { t: 0.5, x: 0.5, y: 0.5, h: 0.1 }]),
+          flyShot(0.5, [{ t: 0.5, x: 0.5, y: 0.5, h: 0.1 }, { t: 1, x: 0.5, y: -0.5, h: 0.1 }]),
+        ],
+      },
+    };
+    expect(flyFraming(recipe)).toEqual([]);
+  });
+
+  it('still checks each drone shot on its own', () => {
+    const recipe = {
+      mount: 'wall', shapes: [], durationSeconds: 10,
+      camera: { shots: [{ from: 0, azimuth: 90, elevation: 10 }, flyShot(0.5, [{ t: 0.5, x: 0, y: -0.5, h: 0.6 }, { t: 1, x: 0, y: 0.5, h: 0.05 }])] },
+    };
+    expect(flyFraming(recipe).some((p) => p.what === 'upside-down' && p.t >= 0.5)).toBe(true);
+    expect(flyFraming(recipe).some((p) => p.t < 0.5)).toBe(false);
+  });
+
+  it('lets a fast turn through inside a moving transition, where it is meant', () => {
+    const over = { mount: 'wall', shapes: [], durationSeconds: 10, camera: { fly: { path: [{ t: 0, x: 0, y: 0.6, h: 0.15 }, { t: 1, x: 0, y: -0.6, h: 0.15 }], look: { x: 0, y: 0, h: 0.1 }, bank: 0 } } };
+    const whips = flyFraming(over).filter((p) => p.what === 'whip');
+    expect(whips.length).toBeGreaterThan(0);
+    const middle = (whips[0].t + whips[whips.length - 1].t) / 2;
+    const seconds = (whips[whips.length - 1].t - whips[0].t) * 10 + 0.5;
+    const blurred = { ...over, transitions: [{ type: 'blur', t: middle, seconds }] };
+    expect(flyFraming(blurred).filter((p) => p.what === 'whip')).toEqual([]);
+  });
+});
+
+describe('flyCrashes with cuts', () => {
+  it('follows whichever drone shot is on screen', () => {
+    const shapes = [{ outline: { type: 'circle' }, size: 1000, nails: 24, palette: ['#ffffff'], layers: 2 }];
+    const recipe = {
+      board: { size: 8000 }, shapes,
+      camera: {
+        shots: [
+          { from: 0, fly: { path: [{ t: 0, x: 0, y: -1.5, h: 0.5 }, { t: 1, x: 0, y: -1.5, h: 0.5 }] } },
+          // The second shot sits right on the rim of the circle, where its nails stand.
+          { from: 0.5, fly: { path: [{ t: 0, x: 0, y: -0.25, h: 0.001 }, { t: 1, x: 0, y: -0.25, h: 0.001 }] } },
+        ],
+      },
+    };
+    const crashes = flyCrashes(recipe, { samples: 20 });
+    expect(crashes.length).toBeGreaterThan(0);
+    expect(crashes.every((c) => c.t >= 0.5)).toBe(true);
   });
 });

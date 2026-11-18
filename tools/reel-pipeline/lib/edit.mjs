@@ -25,6 +25,7 @@ import puppeteer from 'puppeteer';
 import { runFfmpeg, FPS } from './capture.mjs';
 import { synthesizeTrack, writeWav } from './audio.mjs';
 import { resolveTrack } from '../../../src/cardioid/cardioidReelFrame.js';
+import { transitionList, transitionOverlays } from '../../../src/core/reelTransitions.js';
 
 const PIPELINE_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CAPTION_FADE = 0.25;
@@ -182,9 +183,16 @@ export async function editClip({ rawPath, recipe, outPath, workDir, width, heigh
   const captionFiles = await renderCaptionImages(captions, width, height, workDir);
   const audio = prepareAudio(recipe, workDir);
 
+  // Flashes and dips (the recipe's `transitions`) - each a plain color laid over the picture, fading in and out.
+  const overlays = transitionOverlays(transitionList(recipe), duration);
+
   const inputs = ['-i', rawPath];
   for (const file of captionFiles) inputs.push('-loop', '1', '-framerate', String(FPS), '-t', String(duration), '-i', file);
   if (audio) inputs.push(...audio.inputArgs);
+  const overlayIndex = 1 + captionFiles.length + (audio ? 1 : 0);
+  for (const overlay of overlays) {
+    inputs.push('-f', 'lavfi', '-i', `color=c=${overlay.color.replace('#', '0x')}:s=${width}x${height}:r=${FPS}:d=${duration}`);
+  }
 
   const filters = [];
   let last = '0:v';
@@ -195,6 +203,15 @@ export async function editClip({ rawPath, recipe, outPath, workDir, width, heigh
     filters.push(`[0:v]${videoFades.join(',')}[faded]`);
     last = 'faded';
   }
+  overlays.forEach((overlay, i) => {
+    const rise = Math.max(0.01, overlay.peak - overlay.start);
+    const fall = Math.max(0.01, overlay.end - overlay.peak);
+    filters.push(
+      `[${overlayIndex + i}:v]format=rgba,fade=t=in:st=${overlay.start}:d=${rise}:alpha=1,fade=t=out:st=${overlay.peak}:d=${fall}:alpha=1,colorchannelmixer=aa=${overlay.strength}[tr${i}]`
+    );
+    filters.push(`[${last}][tr${i}]overlay=x=0:y=0:enable='between(t,${overlay.start},${overlay.end})'[trv${i}]`);
+    last = `trv${i}`;
+  });
   captions.forEach((caption, i) => {
     const start = caption.start ?? 0;
     const end = Math.min(duration, caption.end ?? duration);

@@ -22,7 +22,7 @@ import { galleryHtml } from './lib/gallery.mjs';
 import { readHistory, recordBatch, pickRates, archetypeWeights } from './lib/feedback.mjs';
 import { startReviewServer } from './lib/reviewServer.mjs';
 import { spawn } from 'node:child_process';
-import { nailClashes, flyCrashes } from '../../src/arrange/arrangeReelFrame.js';
+import { nailClashes, flyCrashes, flyFraming } from '../../src/arrange/arrangeReelFrame.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const BATCHES = path.join(ROOT, 'batches');
@@ -129,6 +129,17 @@ function buildProblems(recipe) {
   if (crashes.length) {
     const times = crashes.map((c) => `${c.t.toFixed(2)} ${c.what}`);
     lines.push(`fly camera crashes at t = ${times.slice(0, 6).join(', ')}${times.length > 6 ? ', ...' : ''}`);
+  }
+  const framing = flyFraming(recipe);
+  if (framing.length) {
+    const spans = [];
+    for (const f of framing) {
+      const last = spans[spans.length - 1];
+      if (last && last.what === f.what && f.t - last.to < 0.011) last.to = f.t;
+      else spans.push({ what: f.what, from: f.t, to: f.t });
+    }
+    const text = spans.map((s) => `${s.from.toFixed(2)}-${s.to.toFixed(2)} ${s.what}`);
+    lines.push(`fly camera loses its sense of direction at t = ${text.slice(0, 6).join(', ')}${text.length > 6 ? ', ...' : ''}`);
   }
   return lines;
 }

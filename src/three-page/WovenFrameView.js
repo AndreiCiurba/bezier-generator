@@ -10,8 +10,47 @@ const _color = new THREE.Color();
 const SURFACE_DIVISIONS = 48;
 // Shadows sit a hair in front of the wall/board, as a fraction of the room width.
 const SHADOW_LIFT = 0.0008;
+// Shadow strings are drawn in this many height bands, crisp near the surface and soft far from it.
+const SHADOW_BUCKETS = 4;
+// How dark the closest shadow strings are drawn (overlaps darken further).
+const SHADOW_OPACITY = 0.6;
 // The wall sits just behind a backing board's back face, so the two never fight for the same depth.
 const WALL_Z = -(DEFAULT_BOARD_THICKNESS + 2);
+// Making-of tools at `making.scale` 1, in world units (nails about 1 cm = 200 units apart).
+const HAMMER_HANDLE = 3200;
+const HAMMER_SWING_DEGREES = 22;
+const SPOOL_RADIUS = 170;
+const SPOOL_LENGTH = 480;
+
+/** Handle along local +X from the grip (the origin), head across its far end with the striking face down. */
+function buildHammer(materials) {
+  const group = new THREE.Group();
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, 1, 16), materials.wood);
+  handle.rotation.z = Math.PI / 2;
+  handle.position.x = 0.5;
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.36, 24), materials.steel);
+  head.position.set(1, 0, 0);
+  const claw = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.045, 0.14, 16), materials.steel);
+  claw.position.set(1, 0.24, 0);
+  group.add(handle, head, claw);
+  return group;
+}
+
+/** A spool along local +X: thread wound in the middle, a wooden flange each end. */
+function buildSpool(materials) {
+  const group = new THREE.Group();
+  const thread = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 0.8, 28), new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.85 }));
+  thread.rotation.z = Math.PI / 2;
+  group.add(thread);
+  for (const side of [-1, 1]) {
+    const flange = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.1, 28), materials.wood);
+    flange.rotation.z = Math.PI / 2;
+    flange.position.x = side * 0.45;
+    group.add(flange);
+  }
+  group.userData.thread = thread;
+  return group;
+}
 
 /**
  * Draws one resolved reel frame of the Arrange or Grid scene (see
@@ -44,6 +83,12 @@ export class WovenFrameView {
     this.lines = [];
     this.surfaces = [];
     this.resolution = new THREE.Vector2(1, 1);
+    this.toolMaterials = {
+      wood: new THREE.MeshStandardMaterial({ color: '#b98a52', roughness: 0.7 }),
+      steel: new THREE.MeshStandardMaterial({ color: '#b9bec6', roughness: 0.35, metalness: 0.6 }),
+    };
+    this.hammers = [];
+    this.spools = [];
   }
 
   setViewportSize(width, height) {
@@ -60,6 +105,7 @@ export class WovenFrameView {
     if (env.lighting?.background) this.scene.background = new THREE.Color(env.lighting.background);
     this.#syncBoard(frame.board);
     this.#syncNails(frame.nailsVisible ? frame.nails : []);
+    this.#syncMaking(frame.making);
     this.#clearLines();
     this.#syncRoom(env);
     // No shadows while a piece is being lifted onto the wall: it is between surfaces.
@@ -105,20 +151,20 @@ export class WovenFrameView {
       this.mounted.add(this.nailMeshes.shaft, this.nailMeshes.head);
     }
     // The head is a thin disc of fixed thickness capping the nail, however tall the nail is.
-    const headThickness = HEAD_RADIUS * this.nailThickness * HEAD_THICKNESS_RATIO;
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
     const scale = new THREE.Vector3();
     const position = new THREE.Vector3();
     standing.forEach((nail, i) => {
-      const thick = Math.min(headThickness, nail.h * 0.5);
+      const width = this.nailThickness * (nail.w ?? 1);
+      const thick = Math.min(HEAD_RADIUS * width * HEAD_THICKNESS_RATIO, nail.h * 0.5);
       const world = to3D(nail, 0);
       position.set(world.x, world.y, world.z);
-      scale.set(this.nailThickness, nail.h - thick, this.nailThickness);
+      scale.set(width, nail.h - thick, width);
       matrix.compose(position, quaternion, scale);
       this.nailMeshes.shaft.setMatrixAt(i, matrix);
       position.set(world.x, world.y + nail.h - thick / 2, world.z);
-      scale.set(this.nailThickness, thick, this.nailThickness);
+      scale.set(width, thick, width);
       matrix.compose(position, quaternion, scale);
       this.nailMeshes.head.setMatrixAt(i, matrix);
     });
@@ -126,6 +172,47 @@ export class WovenFrameView {
       mesh.count = standing.length;
       mesh.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  /** The making-of tools (`arrangeReelFrame.js` `making`): a hammer on each nail going in, a spool laying each string going on. */
+  #syncMaking(making) {
+    const hammers = making?.hammers ?? [];
+    const spools = making?.spools ?? [];
+    const scale = making?.scale ?? 1;
+    while (this.hammers.length < hammers.length) {
+      const hammer = buildHammer(this.toolMaterials);
+      this.mounted.add(hammer);
+      this.hammers.push(hammer);
+    }
+    while (this.spools.length < spools.length) {
+      const spool = buildSpool(this.toolMaterials);
+      this.mounted.add(spool);
+      this.spools.push(spool);
+    }
+    const handle = HAMMER_HANDLE * scale;
+    this.hammers.forEach((mesh, i) => {
+      const h = hammers[i];
+      mesh.visible = Boolean(h);
+      if (!h) return;
+      const outX = Math.cos(h.angle);
+      const outZ = Math.sin(h.angle);
+      mesh.scale.setScalar(handle);
+      // The head's striking face rests on the nail's head; the grip is a handle's length outside.
+      mesh.position.set(h.x + outX * handle, h.top + 0.18 * handle, h.y + outZ * handle);
+      // Yaw turns the handle to point in at the nail; the Z turn lifts the head about the grip.
+      mesh.rotation.set(0, Math.atan2(outZ, -outX), (h.raise * HAMMER_SWING_DEGREES * Math.PI) / 180, 'YXZ');
+    });
+    this.spools.forEach((mesh, i) => {
+      const s = spools[i];
+      mesh.visible = Boolean(s);
+      if (!s) return;
+      const radius = SPOOL_RADIUS * scale;
+      mesh.scale.set(SPOOL_LENGTH * scale, radius, radius);
+      // Riding just above the string's end, its axle across the string, the thread paying out from underneath.
+      mesh.position.set(s.x, s.h + radius * 1.05, s.y);
+      mesh.rotation.set(0, -s.angle + Math.PI / 2, 0);
+      mesh.userData.thread.material.color.set(s.color);
+    });
   }
 
   #clearLines() {
@@ -192,27 +279,93 @@ export class WovenFrameView {
   #addShadows(frame, env, widthScale) {
     const { segments, weight } = frame;
     const normal = mountNormal(env.mount);
-    // Shadows fall on the board when there is one, otherwise on the wall (or the floor under a flat piece).
+    // Shadows fall on the board when there is one, otherwise on the wall itself
+    // (which stands a little behind the board's plane), or the floor under a flat piece.
     const surface = frame.board ? frame.board.color ?? DEFAULT_BOARD_COLOR : env.mount === 'board' ? env.room.floor ?? env.room.wall : env.room.wall;
+    const plane = frame.board || env.mount === 'board' ? 0 : WALL_Z;
     const wall = hexToRgb(surface);
     const lift = SHADOW_LIFT * env.room.width;
+    const shift = (p, d) => ({ x: p.x + normal.x * d, y: p.y + normal.y * d, z: p.z + normal.z * d });
+    const height = (p) => p.x * normal.x + p.y * normal.y + p.z * normal.z - plane;
+    let maxHeight = 1e-6;
+    for (const { a, b } of segments) maxHeight = Math.max(maxHeight, height(mountPoint(a, env.mount)), height(mountPoint(b, env.mount)));
     for (const light of env.lighting.lights) {
       if (!light.shadow || light.intensity <= 0) continue;
-      const positions = [];
-      const colors = [];
+      // Project onto the receiving plane: move it to the origin, project, move back.
+      const lightThere = light.type === 'point' ? { ...light, position: shift(light.position, -plane) } : light;
+      // A thread's shadow softens and fades the further the thread is from the
+      // surface (a real light is not a point), so strings are bucketed by height:
+      // close ones throw crisp, dark shadows, high ones wide, faint ones.
+      const buckets = Array.from({ length: SHADOW_BUCKETS }, () => ({ positions: [], colors: [] }));
       for (const { a, b } of segments) {
-        const pa = projectOntoMount(mountPoint(a, env.mount), light, env.mount);
-        const pb = projectOntoMount(mountPoint(b, env.mount), light, env.mount);
+        const wa = mountPoint(a, env.mount);
+        const wb = mountPoint(b, env.mount);
+        const pa = projectOntoMount(shift(wa, -plane), lightThere, env.mount);
+        const pb = projectOntoMount(shift(wb, -plane), lightThere, env.mount);
         if (!pa || !pb) continue;
-        const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2, z: (pa.z + pb.z) / 2 };
-        const shade = wallShade(wall, mid, normal, env.lighting, light);
+        const f = Math.min(1, Math.max(0, (height(wa) + height(wb)) / 2 / maxHeight));
+        const bucket = buckets[Math.min(SHADOW_BUCKETS - 1, Math.floor(f * SHADOW_BUCKETS))];
+        const ma = shift(pa, plane + lift);
+        const mb = shift(pb, plane + lift);
+        const shade = wallShade(wall, { x: (ma.x + mb.x) / 2, y: (ma.y + mb.y) / 2, z: (ma.z + mb.z) / 2 }, normal, env.lighting, light);
         _color.setRGB(shade.r, shade.g, shade.b, THREE.SRGBColorSpace);
-        for (const p of [pa, pb]) {
-          positions.push(p.x + normal.x * lift, p.y + normal.y * lift, p.z + normal.z * lift);
-          colors.push(_color.r, _color.g, _color.b);
+        for (const p of [ma, mb]) {
+          bucket.positions.push(p.x, p.y, p.z);
+          bucket.colors.push(_color.r, _color.g, _color.b);
         }
       }
-      if (positions.length) this.#pushLines(new Float32Array(positions), new Float32Array(colors), weight * widthScale * 1.3);
+      buckets.forEach((bucket, i) => {
+        if (!bucket.positions.length) return;
+        const f = (i + 0.5) / SHADOW_BUCKETS;
+        this.#pushShadowLines(bucket, weight * widthScale * (1.2 + 2.8 * f), SHADOW_OPACITY * (1 - 0.65 * f));
+      });
+    }
+  }
+
+  /**
+   * Shadow strings: see-through so overlapping ones darken where threads are
+   * dense, as real shadows do, and drawn before the strings and never over
+   * them (the figure always stands in front of its own shadow).
+   */
+  #pushShadowLines({ positions, colors }, width, opacity) {
+    const line = assembleWeaveLineObject(new Float32Array(positions), new Float32Array(colors), width, this.resolution);
+    if (!line) return;
+    const pixels = line.material.linewidth;
+    line.material.linewidth = Math.max(1, pixels);
+    line.material.transparent = true;
+    line.material.opacity = opacity * Math.min(1, Math.max(0.15, pixels));
+    line.material.depthWrite = false;
+    line.renderOrder = -1;
+    this.group.add(line);
+    this.lines.push(line);
+  }
+
+  /** The visible light: a dark spot can on a thin rod (from the ceiling, or up from the floor for an uplight), aimed at its target, its lens glowing in the light's color. */
+  #addFixture(light, room) {
+    if (light.type !== 'point' || !light.fixture) return;
+    const size = room.width * 0.012;
+    const at = light.position;
+    const aim = new THREE.Vector3(light.target.x - at.x, light.target.y - at.y, light.target.z - at.z).normalize();
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), aim);
+    const can = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.75, size, size * 2.6, 24, 1, true), new THREE.MeshBasicMaterial({ color: '#1d1d22', side: THREE.DoubleSide }));
+    can.quaternion.copy(quaternion);
+    can.position.set(at.x, at.y, at.z);
+    const glow = Math.min(1, 0.25 + 0.75 * Math.min(1, light.intensity));
+    const c = light.color;
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(size * 0.95, 24), new THREE.MeshBasicMaterial({ color: new THREE.Color().setRGB(Math.min(1, 0.15 + c.r * glow), Math.min(1, 0.15 + c.g * glow), Math.min(1, 0.15 + c.b * glow), THREE.SRGBColorSpace) }));
+    lens.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), aim));
+    lens.position.set(at.x + aim.x * size * 1.31, at.y + aim.y * size * 1.31, at.z + aim.z * size * 1.31);
+    // Hung from the ceiling when it shines down, stood on the floor when it shines up.
+    const end = at.y >= light.target.y ? room.floorY + room.height : room.floorY;
+    const parts = [can, lens];
+    if (Math.abs(end - at.y) > size) {
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(size * 0.08, size * 0.08, Math.abs(end - at.y), 8), new THREE.MeshBasicMaterial({ color: '#2a2a30' }));
+      rod.position.set(at.x, (end + at.y) / 2, at.z);
+      parts.push(rod);
+    }
+    for (const mesh of parts) {
+      this.group.add(mesh);
+      this.surfaces.push(mesh);
     }
   }
 
@@ -233,6 +386,7 @@ export class WovenFrameView {
       this.#addSurface(room.wall, { x: 0, y: (room.floorY + top) / 2, z: WALL_Z - back }, { x: room.width, y: 0, z: 0 }, { x: 0, y: room.height, z: 0 }, { x: 0, y: 0, z: 1 }, lighting, room.brightness);
       if (room.floor) this.#addSurface(room.floor, { x: 0, y: room.floorY, z: room.width / 2 }, { x: room.width, y: 0, z: 0 }, { x: 0, y: 0, z: -room.width }, { x: 0, y: 1, z: 0 }, lighting, room.brightness);
       if (room.brightness > 0.01) for (const lamp of room.lamps ?? []) this.#addLamp(lamp, lighting);
+      for (const light of lighting?.lights ?? []) this.#addFixture(light, room);
     } else {
       // A board lying flat: the "room" is a floor under it and a wall behind it.
       this.#addSurface(room.floor ?? room.wall, { x: 0, y: -(DEFAULT_BOARD_THICKNESS + 2), z: 0 }, { x: room.width, y: 0, z: 0 }, { x: 0, y: 0, z: -room.width }, { x: 0, y: 1, z: 0 }, lighting, room.brightness);

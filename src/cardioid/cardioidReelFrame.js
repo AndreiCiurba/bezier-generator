@@ -1,4 +1,5 @@
 import { resolveTrack, resolveColor, colorGradient, resolveOrbitCamera, REEL_CAMERA_DEFAULTS } from '../core/reelCamera.js';
+import { withTransitions } from '../core/reelTransitions.js';
 
 export { resolveTrack, REEL_CAMERA_DEFAULTS };
 
@@ -131,7 +132,7 @@ export function resolveCardioidFrame(recipe, t) {
 
   return {
     settings,
-    camera: resolveOrbitCamera(recipe.camera, time, numbers.radius),
+    camera: withTransitions(resolveOrbitCamera(recipe.camera, time, numbers.radius), recipe, time),
     making,
   };
 }

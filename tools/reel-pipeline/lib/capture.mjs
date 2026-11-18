@@ -11,6 +11,7 @@ import { spawn } from 'node:child_process';
 import puppeteer from 'puppeteer';
 import ffmpegPath from 'ffmpeg-static';
 import { startStaticServer, REPO_ROOT } from '../static-server.js';
+import { transitionList, motionBlurAt } from '../../../src/core/reelTransitions.js';
 
 export const FPS = 30;
 export const FULL_SIZE = { width: 1080, height: 1920 };
@@ -80,15 +81,40 @@ export async function openSession(recipe, { width = FULL_SIZE.width, height = FU
     await page.evaluate((r) => window.__reelTimeline.load(r), recipe);
     if (pageErrors.length) throw new Error(`Page errors while loading the recipe:\n${pageErrors.join('\n')}`);
 
-    /** Seeks to normalized time `t` and returns that frame as JPEG bytes. */
-    const grabJpeg = async (t) => {
+    /**
+     * Seeks to normalized time `t` and returns that frame as JPEG bytes. With
+     * `blur` (`{ shutter, samples }`, see `core/reelTransitions.js#motionBlurAt`)
+     * the frame is the average of `samples` moments spread over `shutter` of
+     * clip time round `t` - motion blur, for the fast moves of a transition.
+     */
+    const grabJpeg = async (t, blur = null) => {
       const dataUrl = await page.evaluate(
-        (time, selector) => {
-          window.__reelTimeline.seek(time);
-          return document.querySelector(selector).toDataURL('image/jpeg', 0.95);
+        (time, selector, motion) => {
+          const canvas = document.querySelector(selector);
+          if (!motion) {
+            window.__reelTimeline.seek(time);
+            return canvas.toDataURL('image/jpeg', 0.95);
+          }
+          let sum = window.__motionBlurCanvas;
+          if (!sum || sum.width !== canvas.width || sum.height !== canvas.height) {
+            sum = window.__motionBlurCanvas = document.createElement('canvas');
+            sum.width = canvas.width;
+            sum.height = canvas.height;
+          }
+          const context = sum.getContext('2d');
+          // A running average: the k-th moment is mixed in at 1/(k+1), so every moment counts the same.
+          for (let k = 0; k < motion.samples; k++) {
+            const at = time + motion.shutter * (k / (motion.samples - 1) - 0.5);
+            window.__reelTimeline.seek(Math.min(1, Math.max(0, at)));
+            context.globalAlpha = 1 / (k + 1);
+            context.drawImage(canvas, 0, 0);
+          }
+          context.globalAlpha = 1;
+          return sum.toDataURL('image/jpeg', 0.95);
         },
         t,
-        scene.canvas
+        scene.canvas,
+        blur
       );
       return Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
     };
@@ -144,9 +170,12 @@ export async function renderClip(recipe, outPath, options = {}) {
     ],
     { stdin: 'pipe' }
   );
+  const transitions = transitionList(recipe);
+  const duration = recipe.durationSeconds ?? 8;
   try {
     for (let i = 0; i < total; i++) {
-      await writeAsync(proc.stdin, await session.grabJpeg(total === 1 ? 0 : i / (total - 1)));
+      const t = total === 1 ? 0 : i / (total - 1);
+      await writeAsync(proc.stdin, await session.grabJpeg(t, motionBlurAt(transitions, t, duration, FPS)));
       options.onFrame?.(i + 1, total);
     }
     proc.stdin.end();

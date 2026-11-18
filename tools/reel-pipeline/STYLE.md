@@ -107,6 +107,235 @@ length and placement._
 _The finishing agent appends dated notes here from what gets picked, what gets passed over, and
 any "for next time" comments. Newest first._
 
+### 2026-11-18 - before the cuts batch: making-of, day and night, editing
+
+His words: "insist on the making of", "alternate between daylight and night lamp", "add
+transitions like rotating camera 360 or other professional editing tricks".
+
+- **Insist on the making-of.** The build is the story, not a short intro: at least a third of the
+  reel goes to it. Show nails going in (`nailMode: "hammer"` with `making`, so a tack hammer drives
+  them), then thread being laid (the spool rides the string going on). Open with a close-up of
+  the first nails at real speed, then speed up (time-lapse). Cut between close-ups and the wide
+  shot as the piece fills in.
+- **Day and night lamp, alternating.** Each reel switches between daylight and a warm night lamp
+  at least once (daylight build → lamp-lit reveal, or night build → morning light). Make the
+  switch a beat of the edit: a cut, a flash or a spin landing on the new light. Across the batch,
+  some reels start in day and some at night.
+- **Professional editing.** These tools exist now (README "Cuts" and "Transitions"):
+  - `camera.shots` for real cuts;
+  - a `spin` (360 about the lens), `whip`, `zoom` punch, `flash` and `dip`, with motion blur;
+  - fast 360 orbits (an `azimuth` track plus `blur`);
+  - match cuts (the same framing, day then night);
+  - speed ramps (easing).
+
+  Use 2-4 transitions a reel, each on a story beat, and keep everything else as calm and smooth
+  as before.
+- **Still holds from 11-17:**
+  - regular tiled boards (squares, circles, hexagons, /3d layouts) without satellites;
+  - evening and lamp light;
+  - heavy threads inside the dives;
+  - smooth, look-ahead camera.
+
+### 2026-11-17 - feedback on the signature batch (`2026-11-17-signature`)
+
+- **Evening and dark lighting "went really good"**: the museum dimming to one warm spot (01),
+  sunset into a lamp clicking on (06), and dark stages.
+- **05 Rubik's floor "was great"**: the user loved how the square tiles looked. Explore regular
+  shapes more, *without* the small satellite pieces. Use the /3d page's board layouts as a
+  reference (its Grid Shape lattices: square, triangle and hexagon/honeycomb). Build boards
+  tiled with many squares, circles or hexagons, fill every cell with a weave, and dive through
+  them.
+- **"The dive does not look very smooth at some points, it looks glitchy."** There were two causes.
+  The camera flew right over its look point, whipping round at up to 1500 degrees a second. And
+  the path overshot hover waypoints, so the camera stopped and backed up. Both are now fixed in
+  the engine (steadicam gaze, monotone path), and `check` flags `whip`. Keep look points well
+  ahead and the motion calm. Smoothness beats speed.
+
+### 2026-11-15 - feedback on extended-dives-2 (`2026-11-15-extended-dives-2`), applied in `-3`
+
+His words: "3 more scenes with bigger stroke weight, dive in looks pretty empty/poor."
+
+- **Heavier strings.** This overrides the older "0.6/sqrt(layers)" rule for the dive reels. Line
+  width is in screen pixels (about `weight` x 3.3 px at 1080 wide), so a thread up close is no
+  wider than one far away. In `-3`, `weave.weight` was 0.22 on the wide shots and 0.65 inside the
+  dive, with an easeInOutQuad ramp on the way in and out. Dense times-table stacks had a shape
+  `weight` of 0.6-0.7 so they do not turn into a solid disc from the front.
+- **A full dive.** The camera flies through tall times-table stacks (threads above and below, not
+  just an open bowl) or down a narrow canyon (walls 400 apart). Inside, look about 0.95 ahead at
+  h 0, which pitches the view 10-18 degrees. The longest stretch is inside the densest figure.
+- **No black band.** `lighting.background` set to a mid warm grey (`#9d978f`) turns the dark
+  "sky" above the room into a soft haze.
+- **Exits.** Climb straight up the wall and leave by the top. Then pull back and away while still
+  looking up the wall at the figure just left and the small tower above it, so the shot never
+  lingers on blank wall.
+
+### 2026-11-15 - feedback on the extended-dives batch (`2026-11-15-extended-dives`)
+
+- Liked the overall idea of the long dives (in, through the threads, out between nails, on to the
+  next figure).
+- But "the dive seems upside down (relative to the board) and not in a horizontal direction, feels
+  a little bit tilted, after it gets in". The cause was the camera keeping the room's up while
+  diving down a wall-hung piece. The drone now flies with the board as its ground
+  (`fly.horizon`, default on). Dive up or across the wall, never down it, and look along the
+  board inside a figure. `check` flags upside-down and tipped frames.
+- "Doesn't have to necessarily be a regular movement, but I want a sense of direction." Curves,
+  climbs and hops are fine. What matters: the board always below, the picture level, and each
+  leg heading one readable way.
+
+### 2026-11-15 - feedback on the gallery-dives batch (`2026-11-15-gallery-dives`)
+
+His words: "Excellent work for the last published artifact with the dives. I want you to do 10
+more with extended dives, meaning it should go inside and through the threads, get out on the
+sides etc. For the smaller shapes, i like the transition from one to another, keep that."
+
+Rules (on top of the gallery-dives formula, which still holds: gallery wall, room 16 x 10,
+`floorAt` 3, two or three distant spots with `shadow` and `fixture` at 0.4-0.55, ambient
+0.25-0.3, discreet nails, `layerSpacing`, amphitheaters and `rule: "times"` bowls, mandala
+build-up, Rubik's turns, weave-style captions, silence):
+
+- **Extended dives.** The `camera.fly` part is long and involved, not one dip in and out:
+  - go into a bowl and travel through its thread layers;
+  - leave through the side of the figure, between two nails, not only back over the rim;
+  - then go on: cross into the next figure through its side, skim low along rows, rise and
+    dive again. Vary the exits: side exits, low passes, figure-to-figure crossings.
+  - Keep it smooth, slow and oriented: bank 0, the wall as the frame of reference, and a short
+    wide establishing moment so the viewer knows the piece. Clips may run 18-24 s.
+- **Side exits must be real gaps.** `check` must show no fly crash. With the default nail
+  clearance (60 world units each side) a gap needs nail spacing of about 200 world units, so
+  these pieces are built at `unit` 4000 with `layerSpacing` 40 (same proportions as `unit`
+  1000 / spacing 10). Put the crossing on a mid-gap: a circle's nails start at angle 0, so with
+  N divisible by 4 the line `x = -R sin(180/N)` threads its top and bottom gaps; a polygon with
+  an odd number of nails per edge has a gap at every edge midpoint. Keep three or four
+  waypoints collinear around each crossing so the spline cannot drift into a nail.
+- **Keep the small-shape transitions.** The camera travels satellite to satellite while they are
+  strung, and the build and the turns pass figure to figure. Make that part of the long path.
+- **Threads up close stay fine;** a subtle `weave.weight` lift (about 1.4-1.5x) while inside is
+  still useful, because sub-pixel threads fade to haze.
+- **Captions:** fun point-of-view lines tied to the journey (going in, slipping out the side,
+  hopping to the next one), naming the weave style, not the shadows.
+
+### 2026-11-15 - feedback on the mandala gallery batch (`2026-11-14-mandala-gallery`)
+
+His words: "This is amazing. Now also dive into the shapes. They can be amphitheaters too, not
+complete shapes (cardioid derived). Keep the shadows and gallery style. Don't focus captions too
+much on shadows, but on the style used. 10 more."
+
+Rules:
+
+- **The mandala-gallery formula works; keep it:**
+  - build-up component by component on a gallery wall;
+  - many layers;
+  - Rubik's turns once complete;
+  - distant spots with fixtures and soft shadows.
+- **Dive into the shapes:** the camera (`camera.fly`, path in board coordinates; on a wall `h`
+  is distance out from the wall) makes one slow, clear dive into a figure's stack and back out,
+  oriented and unhurried:
+  - bank 0-0.1;
+  - the wall stays the frame of reference;
+  - the look blends back to the whole piece before the end.
+- **Mix the weaves:** not every figure is a complete times-table shape. Amphitheaters (center rule,
+  each layer's leap walking one nail, an open bowl) are welcome again next to the
+  cardioid-derived `rule: "times"` figures. They are the best thing to dive into.
+- **Captions name the style, not the shadows:**
+  - what weave it is ("times 3 on 96 nails", "each layer shifts one nail", "an amphitheater of
+    52 rows", "leap 7, layer by layer");
+  - how it's built;
+  - true string facts.
+
+  Mention the light at most once.
+
+### 2026-11-14 - stopped gallery batch (`2026-11-14-gallery`, not shown)
+
+His words, condensed: "I saw the first previews and I don't like it: it does not look realistic,
+it's glitchy, and the shadows are not realistic and they overlap the figure. The main shapes
+could benefit from a leap: every new layer should start from a sibling nail, just like it
+happens in the cardioid. Generate 10 more and keep this gallery style. Maybe let me see the
+source of lights."
+
+What changed in the code (the main session fixed it):
+
+- Shadows are drawn behind the strings, never over them. They are soft and see-through, so
+  overlaps darken. Strings far from the wall throw wider, fainter shadows than strings close to
+  it. Without a board, shadows land on the wall itself.
+- New weave `rule: "times"` (with `multiplier`, 2 = cardioid, 3 = nephroid, ...) puts the
+  cardioid page's times-table weave on any shape outline. Every layer starts `leap` nails
+  further round, so the stack twists and fills its middle instead of leaving an empty bowl.
+- A point light with `fixture: true` draws its spotlight: a dark can aimed at the piece on a
+  rod from the ceiling (or from the floor for an uplight), its lens glowing in the light's
+  color.
+
+Rules (override older entries where they conflict):
+
+- **Realistic gallery lighting:**
+  - spots far from the piece, as in a real gallery: point lights at `distance` 5-7 units in a
+    big room (`room.width` about 16, `height` about 10, `floorAt` about 3), with no `reach`;
+  - each light's intensity about 0.4-0.55 (two to three lights; more burns the wall out white);
+  - ambient about 0.25-0.3.
+
+  Near lights blow shadows up across the whole wall; that looked fake. Shadows should be about
+  the piece's own size, offset and fanned by each light. Light moves are slow and small.
+- **Show the light sources:** set `fixture: true` on every gallery light and frame them in at
+  least one beat: start or end wide enough (camera pulled back, `targetY` raised) to see the
+  cans on their rods aiming at the piece.
+- **Main shapes use the twist:** most main figures use `rule: "times"` (`multiplier` 2-5,
+  `leap` 1-2, nails 90-180, layers 40-70) on ovals, blobs and polygons. It fills the middle
+  and visibly turns layer to layer. Other rules are for accents.
+- **Calm and real:** no glitchy effects, no snaps in the gallery reels, a slow camera. The
+  piece reads as a real object on a real wall. Discreet nails (thin, wall- or board-colored).
+
+### 2026-11-14 - feedback on the showcase batch (`2026-11-14-showcase`, picked 02, 03, 07, 10, 11, 14, 15)
+
+His words, condensed: "02 loved, but the dive happened too fast to understand the idea. 03:
+nails too thick and large, especially on the small irregular shapes, but loved how it went on
+the wall, and the colors are amazing when the lighting changes. 07: camera too drone-like, I
+lose the sense of orientation. 10: didn't feel a leap between layers, but I like the figure.
+11: the face looks bad, drop the concept. 14: the moons are not nail tall. 15: great colors,
+but the inner circle could have been something irregular. Something in the last second of most
+videos goes shaky. The many-layer main shapes all look like amphitheaters with a lot of free
+space inside; try different leaps on /shapes for a more interesting look. Try to exclude the
+nails, they don't look good. A board here and there helps. I want more shadows: on a wall, show
+the pieces like works exhibited in a museum, lit by several lights from different angles, to
+capture the essence of shadow, especially the tall ones. In that case add nails, but keep them
+discreet."
+
+Rules (these override older entries where they conflict):
+
+- **The end-of-clip shake was the camera, and it is fixed.** The drone camera's heading was
+  measured over a window that grew in jumps near the clip's ends; it is continuous now and the
+  lean fades out while the camera watches the piece. Nothing to do in recipes, but keep the last
+  second calm: no snap in the final 0.5 s.
+- **Orientation first.** Keep a horizon or the board in view and the piece's center
+  recognizable. Fewer turns, slower and wider moves, gentle or no bank. Show the idea first,
+  from where it reads, before the dive, and dive slowly enough to follow (02's lesson). A dive is
+  one clear move in, one clear move out; not a constant weave.
+- **Leaps that fill the inside.** Stop defaulting to amphitheaters with an empty middle. Try
+  leaps the way the /shapes page allows and put the most interesting on sheets:
+  - leaps where every layer's chords cross through the middle;
+  - hourglass-like waists (avoid true domes);
+  - layer counts past nails/2, so the shift wraps round and the layers twist;
+  - the legacy rule;
+  - low-nail-count figures with big layer counts.
+
+  The leap must visibly change from layer to layer (10's lesson). Inner figures should be
+  irregular (`blob`), not plain circles (15's lesson).
+- **No faces.** Drop face concepts.
+- **Nails: hidden by default** (`weave.nailsVisible: false`), everywhere except the museum
+  pieces. Where nails show, keep them discreet: thin (`look.nailThickness` about 0.25-0.35 on
+  small figures), muted, close to the board or wall color. Every figure's top layer should come
+  up to its nails' tops (14's lesson). Nails that stop far above or below the strings look wrong.
+- **A board here and there:** some reels show the board (`board.color`), not all.
+- **Museum walls, shadows first.** Several reels hang the piece on a wall (`room`, mount `wall`)
+  like a work in a gallery:
+  - lit by two to four lights from different angles: spotlights high left and right, a low
+    grazing light, a warm and a cool one;
+  - each casting shadows (`shadow: true`), so the tall stacks throw long, layered,
+    multi-colored shadow fans onto the wall;
+  - light intensities and positions animated slowly, so the shadows swing and cross;
+  - the camera moving around the hung piece to show the depth.
+
+  Tall pieces suit this best. 03's wall-and-lighting moment is the reference he loved; the room
+  can be a calm gallery (pale wall, darker floor).
+
 ### 2026-11-13 - feedback on the dives batch (`2026-11-13-dives`)
 
 His words, condensed: "When operating with multiple layers, stroke weight should be smaller. I

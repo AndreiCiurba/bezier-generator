@@ -22,18 +22,25 @@ export function lineWidthScale(renderer) {
 }
 
 /**
- * Puts `camera` where `resolveOrbitCamera` says. Tilt and roll turn it in
- * place after aiming: tilt pitches the view up, roll spins it about its own axis.
+ * Puts `camera` where `resolveOrbitCamera` says. Yaw, tilt and roll turn it
+ * in place after aiming: yaw swings the view right (a whip pan), tilt
+ * pitches it up, roll spins it about its own axis. `zoom` narrows the view
+ * (2 = half as wide) on top of `fov` - see `core/reelTransitions.js`.
  * @param {import('three').PerspectiveCamera} camera
- * @param {{position:{x:number,y:number,z:number}, target:{x:number,y:number,z:number}, fov:number, roll:number, tilt:number}} pose
+ * @param {{position:{x:number,y:number,z:number}, target:{x:number,y:number,z:number}, up?:{x:number,y:number,z:number}, fov:number, roll:number, tilt:number, yaw?:number, zoom?:number}} pose
  */
 export function applyReelCamera(camera, pose) {
   camera.position.set(pose.position.x, pose.position.y, pose.position.z);
+  // The drone camera says which way is up (the board, not the room); the rest keep the room's.
+  camera.up.set(pose.up?.x ?? 0, pose.up?.y ?? 1, pose.up?.z ?? 0);
   camera.lookAt(pose.target.x, pose.target.y, pose.target.z);
+  if (pose.yaw) camera.rotateY((-pose.yaw * Math.PI) / 180);
   if (pose.tilt) camera.rotateX((pose.tilt * Math.PI) / 180);
   if (pose.roll) camera.rotateZ((pose.roll * Math.PI) / 180);
-  if (camera.fov !== pose.fov) {
-    camera.fov = pose.fov;
+  const zoom = pose.zoom ?? 1;
+  const fov = zoom > 1 ? (2 * Math.atan(Math.tan((pose.fov * Math.PI) / 360) / zoom) * 180) / Math.PI : pose.fov;
+  if (camera.fov !== fov) {
+    camera.fov = fov;
     camera.updateProjectionMatrix();
   }
 }

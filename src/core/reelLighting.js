@@ -108,7 +108,8 @@ function resolveLight(spec, t, unit) {
     unit
   );
   const reach = spec.reach === undefined ? null : resolveTrack(spec.reach, t, 1) * unit;
-  return { ...base, type: 'point', position: pose.position, reach };
+  // `fixture: true` draws the light itself (a spot can aimed at its target), so the viewer sees where it comes from.
+  return { ...base, type: 'point', position: pose.position, target: pose.target, reach, fixture: Boolean(spec.fixture) };
 }
 
 /**

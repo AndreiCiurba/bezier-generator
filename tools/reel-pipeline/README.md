@@ -207,6 +207,11 @@ In short:
   color }` adds thicker strings round the outline - by default at the top
   layer of every color band, 2.5x as heavy - so edges read crisply over a
   fine fill. Borders are strung along with their layer.
+- Per shape, `nailThickness` multiplies `look.nailThickness` for that shape's
+  nails: slimmer nails on small figures whose nails stand close together.
+- `rule: "times"` (with `multiplier`, may be a track): the cardioid page's
+  times-table weave on the shape's own nails, every layer starting `leap`
+  nails further round, so the stack twists as it rises.
 - Irregular figures: outline `blob` (`lobes`, `wobble`, `seed`, `ratio`) is an
   organic lumpy shape. A `repeat` can vary its copies: `grow` (each one scaled
   up), `radiusStep` (a spiral), `layersStep` (each one taller), `turnStep`,
@@ -215,6 +220,15 @@ In short:
 - `board: { size, color }` or `false`; `unit` (world units per camera
   distance unit - set it to the composition's radius so `distance` 3.5-4
   frames the whole piece); `camera` as in the cardioid scene.
+- `making: { hammer, spool, scale }` - the making-of tools. A figure with
+  `nailMode: "hammer"` gets a tack hammer driving each nail (three blows a
+  nail, the nail sinking with each), its handle off to the right of the
+  picture; every figure being strung gets a spool of its thread's color
+  riding the end of the string going on. `hammer` / `spool` (default true)
+  turn either off; `scale` sizes both (1 = a 16 cm hammer beside nails
+  ~200 units apart). Give a nail at least ~0.25 s on screen in a close-up
+  (`nailShare` and a slow `drawProgress`), or the hammer jumps nail to
+  nail; speed up (a time-lapse) in the wide shots.
 - `look`: `background`, `nailColor`, `nailThickness`, `bloom`.
 
 **It has to be buildable.** A nail is a real rod. A string that runs through
@@ -256,6 +270,33 @@ path like a drone, low between the nails and under raised strings:
   piece for the last frame (1). Looking ahead just after flying through
   something shows empty dark, so blend back before that.
 - `bank` leans into turns (0 = level). `fov`, `tilt` and `roll` work as usual.
+- **Which way is up.** The drone flies with the **board as its ground**
+  (`horizon`, a track 0..1, default 1): the board stays at the bottom of the
+  picture and level, like a drone over a landscape. `horizon: 0` keeps the
+  room's up instead. Looking straight into the board it eases to the room's up
+  by itself, so wide face-on shots of a wall stay upright.
+  On a wall-hung piece this means: **dive up the wall or across it, never down
+  it while looking into it** - going down, the board is below but the room
+  (floor, ceiling, fixtures) turns upside down, and the hand-over from the
+  face-on shot rolls the picture over. Board `y` runs *down* the wall, so "up
+  the wall" is toward negative `y`. Inside a figure, look along the board
+  (mostly level, the threads around you as walls) rather than steeply into it,
+  so the move reads as flying in one clear direction. Keep `bank` 0 and `roll`
+  0 there. `check` flags upside-down and tipped (over 8 degrees) moments,
+  and the picture spinning more than 25 degrees in half a second (`rolling`).
+  That usually happens when the camera rises out while heading *across* the
+  wall: once it looks face-on at the wall, "up" hands over from the board to
+  the room, a quarter turn. So turn up the wall before rising out.
+- **Smoothness.** The path is a monotone curve through the waypoints: it
+  never overshoots a waypoint and backs up, so a hover before a fast dive no
+  longer bounces. A waypoint where the path turns back (a peak, a hover) is
+  eased into and out of. The gaze runs through a steadicam (`smooth`, a
+  fraction of the clip either side, default 0.02), which averages it over
+  about a second. `check` still flags `whip` when the view turns faster than
+  90 degrees a second, almost always because the camera flies right over or
+  beside its own look point. Keep the look point well ahead of the camera
+  (at least about half a unit, further when fast), move it smoothly, and
+  never let the camera pass over it.
 - Fly *inside* the strings: every figure starts at the board, so the way in
   is down an open center (a high leap keeps the chords near the rim) or
   between nails where they are sparse (spacing well over 120 units), then
@@ -267,6 +308,47 @@ path like a drone, low between the nails and under raised strings:
   keep the passing rods from filling the frame.
 - `check` also flags the moments a fly path goes through a nail or under the
   board.
+
+**Cuts (`camera.shots`).** A reel can be edited from several cameras:
+
+```json
+"camera": {
+  "fov": 55,
+  "shots": [
+    { "from": 0,    "azimuth": { "keyframes": [...] }, "elevation": 30, "distance": 1.2 },
+    { "from": 0.38, "fly": { "path": [...], "look": {...} } },
+    { "from": 0.74, "azimuth": ..., "distance": 4 }
+  ]
+}
+```
+
+Each shot is a whole camera (orbit or `fly`) plus `from`, the clip time it
+cuts in at; it runs until the next shot's `from`. Tracks stay in clip time.
+Fields beside `shots` are every shot's defaults. A fly shot's steadicam never
+looks past its own cut, and `check` checks each drone shot on its own (the
+jump at a cut is not a whip). Mix shot sizes like an editor: a macro of a nail
+going in, cut to the wide, cut to the dive.
+
+**Transitions (top-level `transitions`).** Each is `{ type, t, seconds }`,
+centred on clip time `t` (normalized, like a keyframe):
+
+- `spin` - the picture turns a full 360 about the lens, fastest at `t`
+  (`turns`, default 1; -1 the other way). Put a cut at the same `t`: the
+  classic spin transition, the cut hidden in the blur. ~0.6-0.8 s.
+- `whip` - whip pan: the view swings out sideways (`angle`, default 70) and
+  in from the other side after `t`. Cut at `t`. ~0.4-0.5 s.
+- `zoom` - punch in (`zoom`, default 2.2) up to `t`, back out after. Cut at `t`.
+- `blur` - motion blur only, for a fast move of the camera's own (a quick
+  360 orbit as an `azimuth` track, a speed ramp).
+- `flash` - a flash of `color` (default white, `strength` 0.85) peaking at
+  `t`: on a cut, or on a light switching on. A warm `#ffd9a0` flash suits a lamp.
+- `dip` - out to `color` (default black) by `t` and back: a time jump.
+
+`spin`, `whip`, `zoom` and `blur` render with real motion blur (each frame
+averages up to 32 moments across half a frame), so they cost more capture
+time - only inside their windows. `check` lets fast turns through inside
+them. Keep transitions to 2-4 a reel, each on a story beat (build done, light
+switch, dive in, reveal); never two within a second.
 
 ### Recipe format (grid scene)
 
@@ -308,7 +390,13 @@ Full reference: the doc comment of `src/core/reelLighting.js`.
   sunlight comes from). Plus `color`, `intensity` (1 = full white; a step in
   the track is a switch), `sheen` (0..1, the glint along a thread),
   `reach` (point only, units - the light halves at this distance, which
-  gives a lamp a pool of light), `shadow` (default on in a room).
+  gives a lamp a pool of light), `shadow` (default on in a room), `fixture`
+  (point only: draw the spotlight itself, a can aimed at the light's target on
+  a rod from the ceiling, or from the floor when it shines up). Shadows are
+  soft and drawn behind the strings: strings far from the wall throw wider,
+  fainter shadows. For gallery-like shadows put spots far away (`distance`
+  5-7 in a room about 16 wide and 10 high) at intensity 0.4-0.55; near
+  lights blow the shadows up across the whole wall.
   Strings are lit like thread: bright where the light falls across them, dark
   where it runs along them, so a moving light makes the weave shimmer.
 - `mount`: `"board"` (lying flat, default) or `"wall"` (hung upright on a wall
