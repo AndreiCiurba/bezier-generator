@@ -95,32 +95,6 @@ export function layerChords({ nailCount, multiplier, leap, layerIndex, colorCoun
 }
 
 /**
- * The two straight strings that stand in for one chord when the thread goes
- * *around* its nails rather than through their centers: two parallel lines,
- * each shifted sideways by half the nail thickness, so the gap between them is
- * exactly `nailThickness`. (A real string wrapped round both nails touches
- * them on the same side at each end, which is this outer-tangent pair.) A
- * thickness of 0 (or a zero-length chord) gives just the one center line.
- * @param {{x:number,y:number}} from
- * @param {{x:number,y:number}} to
- * @param {number} nailThickness diameter of the nail, in world units
- * @returns {{from:{x:number,y:number}, to:{x:number,y:number}}[]}
- */
-export function parallelStrings(from, to, nailThickness) {
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const length = Math.hypot(dx, dy);
-  if (nailThickness <= 0 || length === 0) return [{ from, to }];
-  const half = nailThickness / 2;
-  const ox = (-dy / length) * half; // unit normal to the chord, scaled to half the thickness
-  const oy = (dx / length) * half;
-  return [
-    { from: { x: from.x + ox, y: from.y + oy }, to: { x: to.x + ox, y: to.y + oy } },
-    { from: { x: from.x - ox, y: from.y - oy }, to: { x: to.x - ox, y: to.y - oy } },
-  ];
-}
-
-/**
  * The curve a thread follows where it turns around one nail: an arc of the
  * nail's circle joining the tangent points of the strings that leave it. Each
  * string toward direction `d` touches the nail at the two points 90 degrees

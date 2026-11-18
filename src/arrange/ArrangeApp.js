@@ -9,9 +9,8 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { NailHeightUI } from '../three-page/NailHeightUI.js';
-import {
-  normalizeThreadSettings, worldToCm, MIN_THREAD_WIDTH_MM, MAX_THREAD_WIDTH_MM, MIN_NAIL_DIAMETER_MM, MAX_NAIL_DIAMETER_MM,
-} from '../core/threadWrap.js';
+import { worldToCm } from '../core/threadWrap.js';
+import { ThreadSettingsUI, loadThreadSettings } from '../ui/ThreadSettingsUI.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -27,7 +26,7 @@ import { arrangeExportGeometry, renderArrangeExport } from './arrangeExport.js';
 import { shapeExtent, scaleForTargetSize } from './placementSize.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
-import { SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_THREAD_STORAGE_KEY } from '../io/storageKeys.js';
+import { SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -102,7 +101,7 @@ export class ArrangeApp {
 
     this.globalHeight = DEFAULT_ARRANGE_HEIGHT;
     // Real thread width / nail width / 8-or-O wrap, in mm (10 world units = 1 mm) - see core/threadWrap.js.
-    this.threadSettings = normalizeThreadSettings(loadFromStorage(ARRANGE_THREAD_STORAGE_KEY));
+    this.threadSettings = loadThreadSettings();
     this.globalNailsVisible = true;
     this.boardWidth = DEFAULT_BOARD_WIDTH;
     this.boardDepth = DEFAULT_BOARD_DEPTH;
@@ -472,39 +471,18 @@ export class ArrangeApp {
 
   /** Thread width, nail width and 8/O wrap - applied on change and remembered in this browser. */
   #initThreadSettings() {
-    const threadInput = document.getElementById('threadWidthInput');
-    const nailInput = document.getElementById('nailDiameterInput');
-    const wrapSelect = document.getElementById('wrapTechniqueSelect');
-    const showCurrent = () => {
-      threadInput.value = String(this.threadSettings.threadWidthMm);
-      nailInput.value = String(this.threadSettings.nailDiameterMm);
-      wrapSelect.value = this.threadSettings.technique;
-    };
-    showCurrent();
-
-    const apply = (changes) => {
-      this.threadSettings = { ...this.threadSettings, ...changes };
-      saveToStorage(ARRANGE_THREAD_STORAGE_KEY, this.threadSettings);
-      this.#syncScene();
-    };
-    const readMm = (input, min, max, label) => {
-      const value = Number(input.value);
-      if (input.value.trim() === '' || !Number.isFinite(value) || value < min || value > max) {
-        alert(`${label} must be between ${min} and ${max} mm.`);
-        showCurrent();
-        return null;
+    new ThreadSettingsUI(
+      {
+        threadInput: document.getElementById('threadWidthInput'),
+        nailInput: document.getElementById('nailDiameterInput'),
+        wrapSelect: document.getElementById('wrapTechniqueSelect'),
+      },
+      () => this.threadSettings,
+      (settings) => {
+        this.threadSettings = settings;
+        this.#syncScene();
       }
-      return value;
-    };
-    threadInput.addEventListener('change', () => {
-      const value = readMm(threadInput, MIN_THREAD_WIDTH_MM, MAX_THREAD_WIDTH_MM, 'Thread width');
-      if (value !== null) apply({ threadWidthMm: value });
-    });
-    nailInput.addEventListener('change', () => {
-      const value = readMm(nailInput, MIN_NAIL_DIAMETER_MM, MAX_NAIL_DIAMETER_MM, 'Nail width');
-      if (value !== null) apply({ nailDiameterMm: value });
-    });
-    wrapSelect.addEventListener('change', () => apply({ technique: wrapSelect.value }));
+    ).init();
   }
 
   #initPngExport() {

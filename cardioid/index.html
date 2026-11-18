@@ -148,25 +148,35 @@
       <input id="heightInput" type="number" min="10" step="10" style="width: 100%;" />
     </label>
 
-    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">String weight</div>
-    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      Weight (all layers)
-      <input id="weightInput" type="number" min="0.01" max="30" step="0.01" style="width: 100%;" />
-    </label>
+    <!-- Real-life size of the radius/height above (10 world units = 1 mm). -->
+    <div id="realSizeLabel" style="font-size: 10px; color: var(--panel-text-muted); margin-top: 4px;"></div>
 
-    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Nails</div>
+    <!-- Real thread + nails (10 world units = 1 mm), shared with the Arrange page.
+         Every chord is drawn at the real thread width, as the two strands that wrap its pair of nails. -->
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Thread &amp; Nails</div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Thread width (mm)
+      <input id="threadWidthInput" type="number" min="0.01" max="10" step="0.01" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Nail width (mm)
+      <input id="nailDiameterInput" type="number" min="0.1" max="50" step="0.1" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Wrap
+      <select id="wrapTechniqueSelect" style="width: 100%;">
+        <option value="8">8 shape - strands cross (thinner line)</option>
+        <option value="O">O shape - strands parallel (thicker line)</option>
+      </select>
+    </label>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       <input id="showNailsCheckbox" type="checkbox" />
       Show nails
     </label>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
-      title="Draw the arc where each thread turns around its nail, joining the pair of parallel strings.">
+      title="Draw the arc where each thread turns around its nail, joining the pair of strands.">
       <input id="showWrapCheckbox" type="checkbox" />
       Show thread wrap
-    </label>
-    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
-      Nail thickness
-      <input id="nailThicknessInput" type="number" min="1" max="500" step="1" style="width: 100%;" />
     </label>
 
     <!-- Each layer is split into this many equal arcs of the circle, one color per arc. -->

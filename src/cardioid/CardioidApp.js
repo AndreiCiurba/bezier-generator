@@ -1,7 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CardioidSceneSync } from './CardioidSceneSync.js';
-import { SHAFT_RADIUS } from '../three-page/SceneSync.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
 import { ColorPickerUI } from '../ui/ColorPickerUI.js';
@@ -19,9 +18,8 @@ import { ShapeLibraryStore } from '../state/ShapeLibraryStore.js';
 import { saveToStorage, loadFromStorage } from '../io/BrowserStorage.js';
 import { CARDIOID_LIBRARY_STORAGE_KEY } from '../io/storageKeys.js';
 import { generateId } from '../utils/id.js';
-
-// The nail model's own shaft diameter - the starting thickness, so nails look as before.
-const DEFAULT_NAIL_THICKNESS = 2 * SHAFT_RADIUS;
+import { ThreadSettingsUI, loadThreadSettings } from '../ui/ThreadSettingsUI.js';
+import { worldToCm } from '../core/threadWrap.js';
 const CAMERA_FOV = 50;
 const CAMERA_NEAR = 1;
 const CAMERA_FAR = 100000;
@@ -41,15 +39,14 @@ const FIELDS = [
   { id: 'rangeStartInput', key: 'rangeStart', integer: true, min: 1, max: (s) => s.nailCount },
   { id: 'rangeEndInput', key: 'rangeEnd', integer: true, min: 1, max: (s) => s.nailCount },
   { id: 'heightInput', key: 'height', min: 10, max: 5000 },
-  { id: 'weightInput', key: 'weight', min: 0.01, max: 30 },
-  { id: 'nailThicknessInput', key: 'nailThickness', min: 1, max: 500 },
 ];
 
 /**
  * The Cardioid board page: one circle of nails, woven as a times table
  * (nail j to nail multiplier*j - cardioid at 2) and stacked into layers that
- * are each the same pattern rotated by `leap` nails, all with one string
- * weight. Every number in the weave is a field
+ * are each the same pattern rotated by `leap` nails. Thread and nails are
+ * real-size (10 world units = 1 mm), sharing Arrange's thread width, nail
+ * width and 8/O wrap (see `ui/ThreadSettingsUI.js`). Every number in the weave is a field
  * in the menu; the layer's colors are split into equal arcs of the circle
  * (see `core/cardioidWeave.js`).
  *
@@ -65,16 +62,16 @@ export class CardioidApp {
       multiplier: 2,
       radius: 3000,
       height: 2000,
-      weight: 0.2,
       nailsVisible: false,
       showWrap: true,
-      nailThickness: DEFAULT_NAIL_THICKNESS,
       outline: 'circle', // or 'ellipse', which applies `stretch`
       stretch: 1.5,
       direction: 'cw',
       rangeStart: 1, // visible threads, 1-based and inclusive; 1 .. nailCount = all
       rangeEnd: 48,
     };
+    // Real thread width / nail width / 8-or-O wrap in mm, shared with Arrange.
+    this.thread = loadThreadSettings();
     this.library = new ShapeLibraryStore();
     this.palette = new StrokePalette(); // one slot per color group a layer is split into
     this.palette.resize(2);
@@ -109,6 +106,7 @@ export class CardioidApp {
     this.#initLibrary();
     this.#initNailsToggle();
     this.#initWrapToggle();
+    this.#initThreadSettings();
     this.#initColors();
     document.getElementById('resetCameraBtn').addEventListener('click', () => this.#applyDefaultCameraView());
 
@@ -316,6 +314,33 @@ export class CardioidApp {
     });
   }
 
+  /** Thread width, nail width and 8/O wrap - the same fields and saved values as on Arrange. */
+  #initThreadSettings() {
+    new ThreadSettingsUI(
+      {
+        threadInput: document.getElementById('threadWidthInput'),
+        nailInput: document.getElementById('nailDiameterInput'),
+        wrapSelect: document.getElementById('wrapTechniqueSelect'),
+      },
+      () => this.thread,
+      (thread) => {
+        this.thread = thread;
+        this.#rebuild();
+      }
+    ).init();
+  }
+
+  /** Real-life size of the nail ring and layer stack, so the world units mean something. */
+  #showRealSize() {
+    const { radius, height } = this.settings;
+    const cm = (units) => Number(worldToCm(units).toFixed(1));
+    const across = this.#stretch === 1
+      ? `${cm(2 * radius)} cm across`
+      : `${cm(2 * radius * this.#stretch)} x ${cm(2 * radius)} cm`;
+    document.getElementById('realSizeLabel').textContent =
+      `Nail ring ${across}, layers ${cm(height)} cm tall (10 units = 1 mm).`;
+  }
+
   /** The colors a layer is split into: swatches, a count field, Default/Custom picker mode, and saved color schemes - the same UI classes the other pages use. */
   #initColors() {
     this.palette.onChange(() => this.#rebuild());
@@ -366,7 +391,10 @@ export class CardioidApp {
   }
 
   #rebuild() {
-    this.sceneSync.rebuild({ ...this.settings, stretch: this.#stretch, range: this.#range, colors: this.palette.getEnabledColors() });
+    this.sceneSync.rebuild({
+      ...this.settings, stretch: this.#stretch, range: this.#range, colors: this.palette.getEnabledColors(), thread: this.thread,
+    });
+    this.#showRealSize();
     this.sceneSync.setViewportSize(window.innerWidth, window.innerHeight);
   }
 

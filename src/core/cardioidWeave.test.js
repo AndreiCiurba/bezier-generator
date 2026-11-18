@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { circleNailPositions, ellipseNailPositions, layerChords, threadInRange, parallelStrings, wrapArc } from './cardioidWeave.js';
+import { circleNailPositions, ellipseNailPositions, layerChords, threadInRange, wrapArc } from './cardioidWeave.js';
 
 const base = { nailCount: 12, multiplier: 2, leap: 1, layerIndex: 0, colorCount: 2 };
 
@@ -99,26 +99,6 @@ describe('visible thread range', () => {
     const full = layerChords({ ...half, colorCount: 2 });
     const part = layerChords({ ...half, colorCount: 2, range: { start: 20, end: 30 } });
     for (const c of part) expect(c.colorIndex).toBe(full.find((f) => f.fromIndex === c.fromIndex).colorIndex);
-  });
-});
-
-describe('parallelStrings', () => {
-  it('returns two parallel strings whose gap is exactly the nail thickness', () => {
-    const [a, b] = parallelStrings({ x: 0, y: 0 }, { x: 100, y: 0 }, 10);
-    expect(a.from.y - b.from.y).toBeCloseTo(10);
-    expect(a.to.y - b.to.y).toBeCloseTo(10);
-    expect(a.from.x).toBeCloseTo(0);
-    expect(a.to.x).toBeCloseTo(100);
-  });
-
-  it('keeps the gap equal to the thickness on a diagonal chord, not just an axis-aligned one', () => {
-    const [a, b] = parallelStrings({ x: 0, y: 0 }, { x: 30, y: 40 }, 10);
-    expect(Math.hypot(a.from.x - b.from.x, a.from.y - b.from.y)).toBeCloseTo(10);
-    expect(Math.hypot(a.to.x - b.to.x, a.to.y - b.to.y)).toBeCloseTo(10);
-  });
-
-  it('falls back to the single center line when there is no thickness to wrap around', () => {
-    expect(parallelStrings({ x: 0, y: 0 }, { x: 5, y: 5 }, 0)).toHaveLength(1);
   });
 });
 
