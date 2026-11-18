@@ -15,3 +15,6 @@ export const SHAPE_DRAFT_STORAGE_KEY = 'shapeDraft:v1';
 
 /** The Arrange board's real thread setup (thread width, nail width, 8/O wrap) - owned by `/arrange/`. */
 export const ARRANGE_THREAD_STORAGE_KEY = 'arrangeThread:v1';
+
+/** Cardioids saved on `/cardioid/` - read (and deletable) on `/arrange/` alongside the Shape Designer library. */
+export const CARDIOID_LIBRARY_STORAGE_KEY = 'cardioidLibrary:v1';

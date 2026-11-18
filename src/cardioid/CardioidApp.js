@@ -14,6 +14,11 @@ import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { OrientationGizmo } from '../three-page/OrientationGizmo.js';
 import { defaultCameraPosition } from '../three-page/cameraFraming.js';
+import { CardioidShape } from '../models/CardioidShape.js';
+import { ShapeLibraryStore } from '../state/ShapeLibraryStore.js';
+import { saveToStorage, loadFromStorage } from '../io/BrowserStorage.js';
+import { CARDIOID_LIBRARY_STORAGE_KEY } from '../io/storageKeys.js';
+import { generateId } from '../utils/id.js';
 
 // The nail model's own shaft diameter - the starting thickness, so nails look as before.
 const DEFAULT_NAIL_THICKNESS = 2 * SHAFT_RADIUS;
@@ -31,6 +36,10 @@ const FIELDS = [
   { id: 'leapInput', key: 'leap', integer: true, min: 0, max: 1000 },
   { id: 'multiplierInput', key: 'multiplier', integer: true, min: 1, max: 100 },
   { id: 'radiusInput', key: 'radius', min: 100, max: 20000, refit: true },
+  { id: 'stretchInput', key: 'stretch', min: 0.1, max: 10, refit: true },
+  // Thread numbers run 1 .. nailCount, so their max follows the nail count.
+  { id: 'rangeStartInput', key: 'rangeStart', integer: true, min: 1, max: (s) => s.nailCount },
+  { id: 'rangeEndInput', key: 'rangeEnd', integer: true, min: 1, max: (s) => s.nailCount },
   { id: 'heightInput', key: 'height', min: 10, max: 5000 },
   { id: 'weightInput', key: 'weight', min: 0.01, max: 30 },
   { id: 'nailThicknessInput', key: 'nailThickness', min: 1, max: 500 },
@@ -60,7 +69,13 @@ export class CardioidApp {
       nailsVisible: false,
       showWrap: true,
       nailThickness: DEFAULT_NAIL_THICKNESS,
+      outline: 'circle', // or 'ellipse', which applies `stretch`
+      stretch: 1.5,
+      direction: 'cw',
+      rangeStart: 1, // visible threads, 1-based and inclusive; 1 .. nailCount = all
+      rangeEnd: 48,
     };
+    this.library = new ShapeLibraryStore();
     this.palette = new StrokePalette(); // one slot per color group a layer is split into
     this.palette.resize(2);
     this.palette.setColor(1, '#ffffff'); // second color defaults to white
@@ -90,6 +105,8 @@ export class CardioidApp {
     initThemeToggle();
 
     this.#initFields();
+    this.#initPartAndOutline();
+    this.#initLibrary();
     this.#initNailsToggle();
     this.#initWrapToggle();
     this.#initColors();
@@ -107,16 +124,177 @@ export class CardioidApp {
       input.value = String(this.settings[field.key]);
       input.addEventListener('change', () => {
         const value = Number(input.value);
-        const valid = Number.isFinite(value) && value >= field.min && value <= field.max && (!field.integer || Number.isInteger(value));
+        const max = typeof field.max === 'function' ? field.max(this.settings) : field.max;
+        const valid = Number.isFinite(value) && value >= field.min && value <= max && (!field.integer || Number.isInteger(value));
         if (!valid || input.value.trim() === '') {
           input.value = String(this.settings[field.key]);
           return;
         }
+        const previousNailCount = this.settings.nailCount;
         this.settings[field.key] = value;
+        if (field.key === 'nailCount') this.#fitRangeToNailCount(previousNailCount);
         if (field.refit) this.#applyDefaultCameraView();
         this.#rebuild();
       });
     }
+  }
+
+  /** A full range stays full when the nail count changes; a part range is kept, clipped to the new count. */
+  #fitRangeToNailCount(previousNailCount) {
+    const nailCount = this.settings.nailCount;
+    const wasFull = this.settings.rangeStart === 1 && this.settings.rangeEnd === previousNailCount;
+    this.settings.rangeStart = Math.min(this.settings.rangeStart, nailCount);
+    this.settings.rangeEnd = wasFull ? nailCount : Math.min(this.settings.rangeEnd, nailCount);
+    this.#showSettingsInFields();
+  }
+
+  /** Writes every setting back into its menu field - after loading a saved cardioid, or when one setting moves another. */
+  #showSettingsInFields() {
+    for (const field of FIELDS) document.getElementById(field.id).value = String(this.settings[field.key]);
+    document.getElementById('directionSelect').value = this.settings.direction;
+    document.getElementById('outlineSelect').value = this.settings.outline;
+    document.getElementById('stretchInput').disabled = this.settings.outline !== 'ellipse';
+  }
+
+  /** Thread range "Show all", counting direction, and circle/ellipse. */
+  #initPartAndOutline() {
+    document.getElementById('rangeAllBtn').addEventListener('click', () => {
+      this.settings.rangeStart = 1;
+      this.settings.rangeEnd = this.settings.nailCount;
+      this.#showSettingsInFields();
+      this.#rebuild();
+    });
+    const directionSelect = document.getElementById('directionSelect');
+    directionSelect.addEventListener('change', () => {
+      this.settings.direction = directionSelect.value === 'ccw' ? 'ccw' : 'cw';
+      this.#rebuild();
+    });
+    const outlineSelect = document.getElementById('outlineSelect');
+    outlineSelect.addEventListener('change', () => {
+      this.settings.outline = outlineSelect.value === 'ellipse' ? 'ellipse' : 'circle';
+      this.#showSettingsInFields();
+      this.#applyDefaultCameraView();
+      this.#rebuild();
+    });
+    this.#showSettingsInFields();
+  }
+
+  /** Ellipse stretch actually in effect (1 for a circle). */
+  get #stretch() {
+    return this.settings.outline === 'ellipse' ? this.settings.stretch : 1;
+  }
+
+  /** Visible thread range, or null when every thread shows. */
+  get #range() {
+    const { rangeStart, rangeEnd, nailCount } = this.settings;
+    return rangeStart === 1 && rangeEnd === nailCount ? null : { start: rangeStart, end: rangeEnd };
+  }
+
+  /**
+   * Save to Library + the list of saved cardioids (click one to load it back,
+   * x to delete it). Saved in this browser under its own key, which the
+   * Arrange page also reads, so a saved cardioid is ready to place there.
+   */
+  #initLibrary() {
+    const load = () => {
+      const raw = loadFromStorage(CARDIOID_LIBRARY_STORAGE_KEY);
+      this.library.clear();
+      if (Array.isArray(raw)) this.library.importShapes(raw, CardioidShape);
+    };
+    const save = () => saveToStorage(CARDIOID_LIBRARY_STORAGE_KEY, this.library.shapes.map((s) => s.toJSON()));
+    this.library.onChange(() => this.#renderLibraryList());
+    load();
+    // Arrange can delete from this library too.
+    window.addEventListener('storage', (event) => {
+      if (event.key === null || event.key.endsWith(CARDIOID_LIBRARY_STORAGE_KEY)) load();
+    });
+    this.saveLibrary = save;
+
+    const nameInput = document.getElementById('cardioidNameInput');
+    document.getElementById('saveCardioidBtn').addEventListener('click', () => {
+      const range = this.#range;
+      const shape = new CardioidShape({
+        id: generateId(),
+        name: nameInput.value.trim() || `Cardioid_${this.library.count + 1}`,
+        nailCount: this.settings.nailCount,
+        layerCount: this.settings.layerCount,
+        leap: this.settings.leap,
+        multiplier: this.settings.multiplier,
+        radius: this.settings.radius,
+        stretch: this.#stretch,
+        direction: this.settings.direction,
+        rangeStart: range ? range.start : null,
+        rangeEnd: range ? range.end : null,
+        colors: this.palette.snapshot(),
+        // Arrange sizes it with its own placement size and global height.
+        height: null,
+      });
+      this.library.add(shape);
+      save();
+      nameInput.value = '';
+    });
+  }
+
+  #renderLibraryList() {
+    const list = document.getElementById('cardioidLibraryList');
+    list.innerHTML = '';
+    for (const shape of this.library.shapes) {
+      const li = document.createElement('li');
+      li.style.cssText = 'cursor:pointer; margin-bottom:4px; display:flex; align-items:center; gap:4px;';
+      li.title = 'Load these settings';
+      const label = document.createElement('span');
+      label.style.flex = '1';
+      const part = shape.range ? `, threads ${shape.range.start}-${shape.range.end}` : '';
+      label.textContent = `${shape.name} (nails=${shape.nailCount}, layers=${shape.layerCount}${part})`;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'panel-close-btn';
+      removeBtn.style.position = 'static';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Delete from library';
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        if (!confirm(`Delete "${shape.name}" from the library?`)) return;
+        this.library.remove(shape.id);
+        this.saveLibrary();
+      });
+      li.append(label, removeBtn);
+      li.addEventListener('click', () => this.#loadShape(shape));
+      list.appendChild(li);
+    }
+    if (this.library.count === 0) {
+      const li = document.createElement('li');
+      li.textContent = 'Nothing saved yet.';
+      li.style.color = 'var(--panel-text-muted, #888)';
+      list.appendChild(li);
+    }
+  }
+
+  /** Puts a saved cardioid's settings and colors back on the page. */
+  #loadShape(shape) {
+    Object.assign(this.settings, {
+      nailCount: shape.nailCount,
+      layerCount: shape.layerCount,
+      leap: shape.leap,
+      multiplier: shape.multiplier,
+      radius: shape.radius,
+      outline: shape.stretch === 1 ? 'circle' : 'ellipse',
+      stretch: shape.stretch === 1 ? this.settings.stretch : shape.stretch,
+      direction: shape.direction,
+      rangeStart: shape.range ? shape.range.start : 1,
+      rangeEnd: shape.range ? shape.range.end : shape.nailCount,
+    });
+    this.#showSettingsInFields();
+    if (shape.colors.length > 0) {
+      this.palette.resize(shape.colors.length);
+      shape.colors.forEach((c, i) => {
+        this.palette.setColor(i, c.color);
+        if (this.palette.getSlot(i).enabled !== Boolean(c.enabled)) this.palette.toggleEnabled(i);
+      });
+      this.colorPickerUI.rebuild();
+      this.colorCountUI.setCount(shape.colors.length);
+    }
+    this.#applyDefaultCameraView();
+    this.#rebuild();
   }
 
   #initNailsToggle() {
@@ -149,14 +327,14 @@ export class CardioidApp {
       this.colorPickerUI
     ).init();
 
-    const colorCountUI = new ColorCountUI(
+    const colorCountUI = (this.colorCountUI = new ColorCountUI(
       { input: document.getElementById('colorCountInput'), applyBtn: document.getElementById('applyColorCountBtn') },
       this.palette.size,
       (count) => {
         this.palette.resize(count);
         this.colorPickerUI.rebuild();
       }
-    );
+    ));
     colorCountUI.init();
 
     // The schemes flyout is `position: fixed` (see cardioid/index.html) so the
@@ -188,12 +366,12 @@ export class CardioidApp {
   }
 
   #rebuild() {
-    this.sceneSync.rebuild({ ...this.settings, colors: this.palette.getEnabledColors() });
+    this.sceneSync.rebuild({ ...this.settings, stretch: this.#stretch, range: this.#range, colors: this.palette.getEnabledColors() });
     this.sceneSync.setViewportSize(window.innerWidth, window.innerHeight);
   }
 
   #applyDefaultCameraView() {
-    const size = CardioidSceneSync.boardSizeFor(this.settings.radius);
+    const size = CardioidSceneSync.boardSizeFor(this.settings.radius, this.#stretch);
     const position = defaultCameraPosition(size, size, CAMERA_FOV);
     this.camera.position.set(position.x, position.y, position.z);
     this.camera.lookAt(ORBIT_TARGET.x, ORBIT_TARGET.y, ORBIT_TARGET.z);

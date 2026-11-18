@@ -1,6 +1,5 @@
-import { resampleClosedOutline } from '../core/bezierOutline.js';
-import { transformAnchors } from '../core/shapeTransform.js';
-import { closedWeaveSegmentsForCurve } from '../core/closedWeaveMath.js';
+import { isCardioid } from '../models/shapeFromJSON.js';
+import { placedNails, placedSegments } from './placedShape.js';
 import { controlPointDiameterForColorCount } from '../core/nailDotSize.js';
 import { threadGeometry, expandToStrands } from '../core/threadWrap.js';
 
@@ -36,14 +35,12 @@ const MIN_LINE_WIDTH_PX = 0.75;
 export function arrangeExportGeometry(instances, threadSettings) {
   return instances.map((instance) => {
     const shape = instance.shapeSnapshot;
-    const anchors = transformAnchors(shape.anchors, {
-      position: instance.position,
-      rotationRadians: instance.rotationRadians,
-      scale: instance.scale,
-    });
-    const nails = resampleClosedOutline(anchors, shape.nailCount);
+    const nails = placedNails(instance);
     const thread = threadGeometry(threadSettings, instance.nailScale ?? 1);
-    const segments = closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors, shape.weaveRule);
+    let segments = placedSegments(instance, nails);
+    // The export draws higher layerIndex first (underneath). A cardioid's
+    // layer 0 sits at the board, i.e. underneath, so flip its numbering here.
+    if (isCardioid(shape)) segments = segments.map((s) => ({ ...s, layerIndex: shape.layerCount - 1 - s.layerIndex }));
     return {
       nails,
       segments: expandToStrands(segments, thread.wrapRadius, thread.technique),

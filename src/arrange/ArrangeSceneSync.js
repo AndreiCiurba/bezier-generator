@@ -3,10 +3,11 @@ import { to3D } from '../three-page/axisMapping.js';
 import {
   DEFAULT_BOARD_THICKNESS, DEFAULT_BOARD_COLOR, BOARD_TOP_Y, DEFAULT_NAIL_COLOR, SHAFT_RADIUS, HEAD_RADIUS, buildNailGeometry,
 } from '../three-page/SceneSync.js';
-import { buildClosedWeaveLineObject } from '../three-page/weaveLineBuilder.js';
-import { resampleClosedOutline } from '../core/bezierOutline.js';
-import { transformAnchors } from '../core/shapeTransform.js';
-import { threadGeometry } from '../core/threadWrap.js';
+import { buildClosedWeaveLineObject, assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
+import { threadGeometry, wrapStrands } from '../core/threadWrap.js';
+import { worldColorLayerHeight } from '../core/curveZLayers.js';
+import { isCardioid } from '../models/shapeFromJSON.js';
+import { placedNails, placedSegments } from './placedShape.js';
 
 /**
  * Owns every Three.js object on the Arrange board: a flat board plane (no
@@ -83,36 +84,53 @@ export class ArrangeSceneSync {
   }
 
   #buildInstanceObjects(instance, globalHeight, threadSettings, globalNailsVisible) {
-    const anchors = transformAnchors(instance.shapeSnapshot.anchors, {
-      position: instance.position,
-      rotationRadians: instance.rotationRadians,
-      scale: instance.scale,
-    });
-    const nails = resampleClosedOutline(anchors, instance.shapeSnapshot.nailCount);
+    const nails = placedNails(instance);
     const maxHeight = instance.shapeSnapshot.height ?? globalHeight;
     const thread = threadGeometry(threadSettings, instance.nailScale ?? 1);
 
-    const lines = buildClosedWeaveLineObject({
-      cellCorners: nails,
-      n: 0,
-      leap: instance.shapeSnapshot.leap,
-      colors: instance.shapeSnapshot.colors,
-      weight: 1, // unused: worldLineWidth below sets the width
-      worldLineWidth: thread.lineWidth,
-      wrap: { radius: thread.wrapRadius, technique: thread.technique },
-      maxHeight,
-      toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
-      lineResolution: this.lineResolution,
-      // Old-rule shapes put their widest layer first, so they stack reversed; center-out shapes already start at the board.
-      rule: instance.shapeSnapshot.weaveRule,
-      // With the "fit layers to nails" option, a layer's height is where it would be if the shape had nails / 2 colors.
-      layerSlots: instance.fitLayersToNails ? Math.floor(instance.shapeSnapshot.nailCount / 2) : null,
-      reverseLayers: instance.shapeSnapshot.weaveRule === 'legacy',
-    });
+    const lines = isCardioid(instance.shapeSnapshot)
+      ? this.#buildCardioidLines(instance, nails, maxHeight, thread)
+      : buildClosedWeaveLineObject({
+          cellCorners: nails,
+          n: 0,
+          leap: instance.shapeSnapshot.leap,
+          colors: instance.shapeSnapshot.colors,
+          weight: 1, // unused: worldLineWidth below sets the width
+          worldLineWidth: thread.lineWidth,
+          wrap: { radius: thread.wrapRadius, technique: thread.technique },
+          maxHeight,
+          toWorldPosition: (point2, height) => this.toWorldPosition(point2, height),
+          lineResolution: this.lineResolution,
+          // Old-rule shapes put their widest layer first, so they stack reversed; center-out shapes already start at the board.
+          rule: instance.shapeSnapshot.weaveRule,
+          // With the "fit layers to nails" option, a layer's height is where it would be if the shape had nails / 2 colors.
+          layerSlots: instance.fitLayersToNails ? Math.floor(instance.shapeSnapshot.nailCount / 2) : null,
+          reverseLayers: instance.shapeSnapshot.weaveRule === 'legacy',
+      });
     const nailMesh = this.#buildNailMesh(nails, maxHeight, thread.nailRadius / SHAFT_RADIUS);
     nailMesh.visible = instance.nailsVisible ?? globalNailsVisible;
     return { lines, nails: nailMesh };
   }
+
+  /** A placed cardioid: each of its layers at its own height (layer 0 at the board, like the Cardioid page), every thread as its two real strands. */
+  #buildCardioidLines(instance, nails, maxHeight, thread) {
+    const layerCount = instance.shapeSnapshot.layerCount;
+    const positions = [];
+    const vertexColors = [];
+    const color = new THREE.Color();
+    for (const { from, to, color: hex, layerIndex } of placedSegments(instance, nails)) {
+      const y = worldColorLayerHeight(layerIndex, layerCount, 0, maxHeight);
+      color.set(hex);
+      for (const strand of wrapStrands(from, to, thread.wrapRadius, thread.technique)) {
+        const a = this.toWorldPosition(strand.from, y);
+        const b = this.toWorldPosition(strand.to, y);
+        positions.push(a.x, a.y, a.z, b.x, b.y, b.z);
+        vertexColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+      }
+    }
+    return assembleWeaveLineObject(positions, vertexColors, 1, this.lineResolution, 1, thread.lineWidth);
+  }
+
 
   /** One standing nail per outline point, as tall as the shape's max string height - same look as the grid page's nails, its shaft widened/narrowed by `thickness` to the real nail diameter. */
   #buildNailMesh(points, height, thickness) {

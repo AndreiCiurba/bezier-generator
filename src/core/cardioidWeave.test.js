@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { circleNailPositions, layerChords, parallelStrings, wrapArc } from './cardioidWeave.js';
+import { circleNailPositions, ellipseNailPositions, layerChords, threadInRange, parallelStrings, wrapArc } from './cardioidWeave.js';
 
 const base = { nailCount: 12, multiplier: 2, leap: 1, layerIndex: 0, colorCount: 2 };
 
@@ -50,6 +50,55 @@ describe('layerChords', () => {
 
   it('supports other multipliers, e.g. 3 for a nephroid', () => {
     expect(layerChords({ ...base, multiplier: 3 }).find((c) => c.fromIndex === 2)).toMatchObject({ toIndex: 6 });
+  });
+});
+
+describe('ellipseNailPositions', () => {
+  it('matches the circle at stretch 1, so a plain cardioid is unchanged', () => {
+    expect(ellipseNailPositions(8, 100)).toEqual(circleNailPositions(8, 100));
+  });
+
+  it('widens the board sideways by the stretch factor while keeping the height', () => {
+    const nails = ellipseNailPositions(4, 100, { stretch: 2 });
+    expect(nails[1].x).toBeCloseTo(200); // a quarter turn from the top, on the side
+    expect(nails[2].y).toBeCloseTo(100); // the bottom, unstretched
+  });
+
+  it('numbers the nails the other way round when counting counter-clockwise', () => {
+    const cw = ellipseNailPositions(4, 100);
+    const ccw = ellipseNailPositions(4, 100, { direction: 'ccw' });
+    expect(ccw[1].x).toBeCloseTo(-cw[1].x);
+    expect(ccw[0].y).toBeCloseTo(cw[0].y); // same starting nail
+  });
+});
+
+describe('visible thread range', () => {
+  const half = { nailCount: 48, multiplier: 2, leap: 0, layerIndex: 0, colorCount: 1 };
+
+  it('keeps threads 1-2 .. 24-48 for range 1-24 of 48: half a cardioid', () => {
+    const chords = layerChords({ ...half, range: { start: 1, end: 24 } });
+    expect(chords.map((c) => c.fromIndex)).toEqual(Array.from({ length: 24 }, (_, i) => i + 1));
+    expect(chords.at(-1)).toMatchObject({ fromIndex: 24, toIndex: 0 }); // 24 -> 48, nail 48 being nail 0
+  });
+
+  it('keeps threads 25-2 .. 36-24 for range 25-36: the third quarter', () => {
+    const chords = layerChords({ ...half, range: { start: 25, end: 36 } });
+    expect(chords[0]).toMatchObject({ fromIndex: 25, toIndex: 2 });
+    expect(chords.at(-1)).toMatchObject({ fromIndex: 36, toIndex: 24 });
+    expect(chords).toHaveLength(12);
+  });
+
+  it('wraps past the last nail when start is after end', () => {
+    expect(threadInRange(47, 48, { start: 40, end: 5 })).toBe(true);
+    expect(threadInRange(0, 48, { start: 40, end: 5 })).toBe(true); // thread 48
+    expect(threadInRange(3, 48, { start: 40, end: 5 })).toBe(true);
+    expect(threadInRange(20, 48, { start: 40, end: 5 })).toBe(false);
+  });
+
+  it('keeps each thread its color when others are hidden, so a part cardioid matches the full one', () => {
+    const full = layerChords({ ...half, colorCount: 2 });
+    const part = layerChords({ ...half, colorCount: 2, range: { start: 20, end: 30 } });
+    for (const c of part) expect(c.colorIndex).toBe(full.find((f) => f.fromIndex === c.fromIndex).colorIndex);
   });
 });
 

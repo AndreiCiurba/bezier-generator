@@ -5,7 +5,7 @@ import {
 } from '../three-page/SceneSync.js';
 import { assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
-import { circleNailPositions, layerChords, parallelStrings, wrapArc } from '../core/cardioidWeave.js';
+import { ellipseNailPositions, layerChords, parallelStrings, wrapArc } from '../core/cardioidWeave.js';
 
 const BOARD_MARGIN = 1.3; // board half-extent as a multiple of the circle radius
 
@@ -28,9 +28,9 @@ export class CardioidSceneSync {
     this.nailMaterial = new THREE.MeshStandardMaterial({ color: DEFAULT_NAIL_COLOR });
   }
 
-  /** Side length of the board for a given circle radius - also what the camera frames. */
-  static boardSizeFor(radius) {
-    return radius * 2 * BOARD_MARGIN;
+  /** Side length of the board for a given circle radius (and ellipse stretch) - also what the camera frames. */
+  static boardSizeFor(radius, stretch = 1) {
+    return radius * Math.max(1, stretch) * 2 * BOARD_MARGIN;
   }
 
   setViewportSize(width, height) {
@@ -42,14 +42,15 @@ export class CardioidSceneSync {
    * @param {{
    *   nailCount:number, layerCount:number, leap:number, multiplier:number, radius:number,
    *   height:number, weight:number,
+   *   stretch:number, direction:'cw'|'ccw', range: {start:number, end:number} | null,
    *   colors: string[], nailsVisible:boolean, nailThickness:number, showWrap:boolean
    * }} settings `colors` are the enabled palette colors, one per color group
    */
   rebuild(settings) {
     this.#disposeContent();
-    this.#buildBoard(CardioidSceneSync.boardSizeFor(settings.radius));
+    this.#buildBoard(CardioidSceneSync.boardSizeFor(settings.radius, settings.stretch));
 
-    const nails = circleNailPositions(settings.nailCount, settings.radius);
+    const nails = ellipseNailPositions(settings.nailCount, settings.radius, { stretch: settings.stretch, direction: settings.direction });
     this.#buildNails(nails, settings);
     this.#buildLayers(nails, settings);
   }
@@ -82,7 +83,7 @@ export class CardioidSceneSync {
   }
 
   #buildLayers(nails, settings) {
-    const { nailCount, layerCount, leap, multiplier, height, weight, colors, nailThickness, showWrap } = settings;
+    const { nailCount, layerCount, leap, multiplier, height, weight, colors, nailThickness, showWrap, range } = settings;
     if (colors.length === 0) return;
     const threeColors = colors.map((c) => new THREE.Color(c));
 
@@ -91,7 +92,7 @@ export class CardioidSceneSync {
       const positions = [];
       const vertexColors = [];
       const leaving = new Map(); // nail index -> { directions, colorIndex } for the thread wrapped round it
-      for (const { fromIndex, toIndex, colorIndex } of layerChords({ nailCount, multiplier, leap, layerIndex, colorCount: colors.length })) {
+      for (const { fromIndex, toIndex, colorIndex } of layerChords({ nailCount, multiplier, leap, layerIndex, colorCount: colors.length, range })) {
         const c = threeColors[colorIndex];
         // The thread wraps around its nails, so each chord is two parallel
         // strings a nail-thickness apart rather than one through the centers.

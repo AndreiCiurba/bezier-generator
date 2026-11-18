@@ -180,10 +180,20 @@
         <div style="font-size: 11px; color: var(--panel-text);">Selected Shape</div>
         <button id="closeInstancePanelBtn" class="panel-close-btn" style="position: static;" title="Close" aria-label="Close selected shape menu">&times;</button>
       </div>
+      <!-- Where the shape's centre sits, in board units (10 = 1 mm, 0 = board centre). Dragging it in Placement Mode moves it too. -->
       <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+        X
+        <input id="instancePositionXInput" type="number" step="10" style="width: 100%;" />
+        Y
+        <input id="instancePositionYInput" type="number" step="10" style="width: 100%;" />
+      </label>
+      <div id="instancePositionCmLabel" style="font-size: 10px; color: var(--panel-text-muted);"></div>
+      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
+        title="Shift + mouse wheel over the board (in Placement Mode) also turns the selected shape.">
         Rotation (deg)
         <input id="instanceRotationInput" type="number" step="1" style="width: 100%;" />
       </label>
+      <input id="instanceRotationSlider" type="range" min="-180" max="180" step="1" style="width: 100%;" />
       <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
         Scale
         <input id="instanceScaleInput" type="number" min="0.1" step="0.1" style="width: 100%;" />
@@ -217,7 +227,7 @@
       </div>
 
       <!-- Layers sit where they would with nails / 2 colors, instead of stretching the few colors over the full nail height. -->
-      <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 8px;">
+      <label id="instanceFitLayersRow" style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 8px;">
         <input id="instanceFitLayersCheckbox" type="checkbox" />
         Fit layers to nail count (nails / 2 slots)
       </label>

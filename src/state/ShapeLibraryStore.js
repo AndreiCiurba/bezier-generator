@@ -56,7 +56,8 @@ export class ShapeLibraryStore {
    */
   importShapes(rawShapes, ShapeClass) {
     for (const raw of rawShapes) {
-      if (raw.id && raw.name && Array.isArray(raw.anchors) && typeof raw.nailCount === 'number') {
+      // Outline shapes carry anchors; cardioids (`kind: 'cardioid'`) carry their weave settings instead.
+      if (raw?.id && raw.name && (Array.isArray(raw.anchors) || raw.kind === 'cardioid') && typeof raw.nailCount === 'number') {
         this.#shapes.push(ShapeClass.fromJSON(raw));
       }
     }

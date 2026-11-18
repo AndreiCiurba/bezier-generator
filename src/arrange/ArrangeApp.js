@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ShapeLibraryStore } from '../state/ShapeLibraryStore.js';
 import { ArrangedShapeStore } from '../state/ArrangedShapeStore.js';
-import { FreeformShape } from '../models/FreeformShape.js';
-import { anchorsCentroid } from '../core/shapeTransform.js';
+import { AnyShape, shapeFromJSON, isCardioid } from '../models/shapeFromJSON.js';
+import { ghostOutline, shapeRadius } from './placedShape.js';
 import { ArrangeSceneSync } from './ArrangeSceneSync.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
@@ -25,11 +25,9 @@ import { downloadJson, readJsonFile } from '../io/JsonFile.js';
 import { downloadCanvasPng } from '../io/PngFile.js';
 import { arrangeExportGeometry, renderArrangeExport } from './arrangeExport.js';
 import { shapeExtent, scaleForTargetSize } from './placementSize.js';
-import { transformAnchors } from '../core/shapeTransform.js';
-import { resampleClosedOutline } from '../core/bezierOutline.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
-import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_THREAD_STORAGE_KEY } from '../io/storageKeys.js';
+import { SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_THREAD_STORAGE_KEY } from '../io/storageKeys.js';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -39,6 +37,10 @@ import { SHAPE_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_THREAD_STOR
 // Grid page - `defaultCameraPosition` below re-frames to fit automatically.
 const DEFAULT_BOARD_WIDTH = 12000;
 const DEFAULT_BOARD_DEPTH = 12000;
+// Where library shapes are saved: outlines by /shapes/, cardioids by /cardioid/.
+const LIBRARY_STORAGE_KEYS = [SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY];
+// Shift + wheel over the board turns the selected shape by this much.
+const WHEEL_ROTATE_DEGREES = 5;
 const MIN_BOARD_SIDE = 100;
 const MAX_BOARD_SIDE = 200000;
 const CAMERA_FOV = 50;
@@ -151,6 +153,7 @@ export class ArrangeApp {
     this.library.onChange(() => this.#renderLibraryList());
     this.instances.onChange(() => {
       this.#renderInstanceList();
+      this.#refreshInstanceTransformFields();
       this.#syncScene();
       saveToStorage(ARRANGEMENT_STORAGE_KEY, this.instances.toJSON());
     });
@@ -179,15 +182,17 @@ export class ArrangeApp {
    * with no button to press.
    */
   #syncLibraryFromStorage() {
-    const raw = loadFromStorage(SHAPE_LIBRARY_STORAGE_KEY);
-    const stored = Array.isArray(raw) ? raw : [];
+    const stored = LIBRARY_STORAGE_KEYS.flatMap((key) => {
+      const raw = loadFromStorage(key);
+      return Array.isArray(raw) ? raw : [];
+    });
     const storedIds = new Set(stored.map((s) => s?.id));
 
     for (const id of this.storedLibraryIds) {
       if (!storedIds.has(id)) this.library.remove(id);
     }
     const fresh = stored.filter((s) => s?.id && !this.library.findById(s.id));
-    if (fresh.length > 0) this.library.importShapes(fresh, FreeformShape);
+    if (fresh.length > 0) this.library.importShapes(fresh, AnyShape);
 
     this.storedLibraryIds = storedIds;
     if (this.armedShapeId && !this.library.findById(this.armedShapeId)) this.armedShapeId = null;
@@ -196,7 +201,7 @@ export class ArrangeApp {
   #initLibrarySync() {
     const sync = () => this.#syncLibraryFromStorage();
     window.addEventListener('storage', (event) => {
-      if (event.key === null || event.key.endsWith(SHAPE_LIBRARY_STORAGE_KEY)) sync();
+      if (event.key === null || LIBRARY_STORAGE_KEYS.some((key) => event.key.endsWith(key))) sync();
     });
     window.addEventListener('focus', sync);
     window.addEventListener('pageshow', sync);
@@ -208,7 +213,7 @@ export class ArrangeApp {
   /** Restores this board's own placed arrangement, if anything was saved for it. */
   #hydrateInstances() {
     const raw = loadFromStorage(ARRANGEMENT_STORAGE_KEY);
-    if (Array.isArray(raw)) this.instances.importInstances(raw, FreeformShape);
+    if (Array.isArray(raw)) this.instances.importInstances(raw, AnyShape);
   }
 
   /** "Clear Board" - wipes every placed instance (and this board's own persisted copy of them). Never touches the shared library key - that's owned by `/shapes/`. */
@@ -254,7 +259,7 @@ export class ArrangeApp {
       if (!file) return;
       try {
         const data = await readJsonFile(file);
-        if (Array.isArray(data)) this.library.importShapes(data, FreeformShape);
+        if (Array.isArray(data)) this.library.importShapes(data, AnyShape);
       } catch (err) {
         alert('Invalid shape library file.');
         console.error(err);
@@ -317,8 +322,7 @@ export class ArrangeApp {
       if (this.ghostLine) this.ghostLine.visible = false;
       return;
     }
-    const anchors = transformAnchors(shape.anchors, { position: hit, rotationRadians: 0, scale: this.#scaleForPlacement(shape) });
-    const outline = resampleClosedOutline(anchors, Math.max(shape.nailCount, 24));
+    const outline = ghostOutline(shape, hit, this.#scaleForPlacement(shape));
     const points = outline.map((p) => {
       const w = this.arrangeSceneSync.toWorldPosition(p, 2);
       return new THREE.Vector3(w.x, w.y, w.z);
@@ -333,6 +337,25 @@ export class ArrangeApp {
     this.scene.add(this.ghostLine);
   }
 
+  /**
+   * Deletes a shape from the library for good: from this page and from the
+   * saved library it came from (/shapes/' outlines or /cardioid/'s
+   * cardioids), so it doesn't come back on the next sync. Shapes already
+   * placed keep their own frozen copy and stay on the board.
+   */
+  #removeFromLibrary(shape) {
+    if (!confirm(`Remove "${shape.name}" from the library? Shapes already placed stay on the board.`)) return;
+    for (const key of LIBRARY_STORAGE_KEYS) {
+      const raw = loadFromStorage(key);
+      if (Array.isArray(raw) && raw.some((s) => s?.id === shape.id)) {
+        saveToStorage(key, raw.filter((s) => s?.id !== shape.id));
+      }
+    }
+    this.storedLibraryIds.delete(shape.id);
+    if (this.armedShapeId === shape.id) this.armedShapeId = null;
+    this.library.remove(shape.id);
+  }
+
   #renderLibraryList() {
     const list = document.getElementById('shapeLibraryList');
     list.innerHTML = '';
@@ -342,7 +365,25 @@ export class ArrangeApp {
       const li = document.createElement('li');
       li.style.cursor = 'pointer';
       li.style.marginBottom = '4px';
-      li.textContent = `${shape.name} (nails=${shape.nailCount}, leap=${shape.leap})`;
+      li.style.display = 'flex';
+      li.style.alignItems = 'center';
+      li.style.gap = '4px';
+      const label = document.createElement('span');
+      label.style.flex = '1';
+      label.textContent = isCardioid(shape)
+        ? `${shape.name} (cardioid, nails=${shape.nailCount}, layers=${shape.layerCount})`
+        : `${shape.name} (nails=${shape.nailCount}, leap=${shape.leap})`;
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'panel-close-btn';
+      removeBtn.style.position = 'static';
+      removeBtn.textContent = '×';
+      removeBtn.title = 'Remove from library';
+      removeBtn.setAttribute('aria-label', `Remove ${shape.name} from library`);
+      removeBtn.addEventListener('click', (event) => {
+        event.stopPropagation();
+        this.#removeFromLibrary(shape);
+      });
+      li.append(label, removeBtn);
       li.style.border = shape.id === this.armedShapeId ? '1px solid var(--accent-500)' : '1px solid transparent';
       li.addEventListener('click', () => {
         this.armedShapeId = this.armedShapeId === shape.id ? null : shape.id;
@@ -493,7 +534,7 @@ export class ArrangeApp {
       if (!file) return;
       try {
         const data = await readJsonFile(file);
-        if (Array.isArray(data)) this.instances.importInstances(data, FreeformShape);
+        if (Array.isArray(data)) this.instances.importInstances(data, AnyShape);
       } catch (err) {
         alert('Invalid arrangement file.');
         console.error(err);
@@ -531,11 +572,46 @@ export class ArrangeApp {
       if (Number.isFinite(nailScale) && nailScale > 0) this.instances.setNailScale(this.selectedInstanceId, nailScale);
     });
 
-    rotationInput.addEventListener('change', () => {
+    const rotationSlider = document.getElementById('instanceRotationSlider');
+    const setRotationDegrees = (degrees) => {
       if (!this.selectedInstanceId) return;
-      const degrees = parseFloat(rotationInput.value) || 0;
       this.instances.setRotation(this.selectedInstanceId, (degrees * Math.PI) / 180);
-    });
+    };
+    rotationInput.addEventListener('change', () => setRotationDegrees(parseFloat(rotationInput.value) || 0));
+    rotationSlider.addEventListener('input', () => setRotationDegrees(Number(rotationSlider.value)));
+
+    const positionXInput = document.getElementById('instancePositionXInput');
+    const positionYInput = document.getElementById('instancePositionYInput');
+    const setPosition = () => {
+      const instance = this.selectedInstanceId ? this.instances.findById(this.selectedInstanceId) : null;
+      if (!instance) return;
+      const x = Number(positionXInput.value);
+      const y = Number(positionYInput.value);
+      if (positionXInput.value.trim() === '' || positionYInput.value.trim() === '' || !Number.isFinite(x) || !Number.isFinite(y)) {
+        this.#refreshInstanceTransformFields();
+        return;
+      }
+      this.instances.move(instance.id, { x, y });
+    };
+    positionXInput.addEventListener('change', setPosition);
+    positionYInput.addEventListener('change', setPosition);
+
+    // Shift + wheel over the board turns the selected shape (Placement Mode, nothing armed to place).
+    window.addEventListener(
+      'wheel',
+      (event) => {
+        if (!event.shiftKey || !this.isPlacementMode || this.armedShapeId || !this.selectedInstanceId || event.target !== this.canvas) return;
+        const instance = this.instances.findById(this.selectedInstanceId);
+        if (!instance) return;
+        event.preventDefault();
+        event.stopPropagation();
+        // Some browsers turn Shift + wheel into horizontal scrolling.
+        const delta = event.deltaY || event.deltaX;
+        const step = (Math.sign(delta) * WHEEL_ROTATE_DEGREES * Math.PI) / 180;
+        this.instances.setRotation(instance.id, instance.rotationRadians + step);
+      },
+      { capture: true, passive: false }
+    );
     scaleInput.addEventListener('change', () => {
       if (!this.selectedInstanceId) return;
       const scale = parseFloat(scaleInput.value);
@@ -657,7 +733,8 @@ export class ArrangeApp {
     panel.style.display = instance ? 'block' : 'none';
     if (!instance) return;
 
-    document.getElementById('instanceRotationInput').value = String((instance.rotationRadians * 180) / Math.PI);
+    this.#refreshInstanceTransformFields();
+    document.getElementById('instanceFitLayersRow').style.display = isCardioid(instance.shapeSnapshot) ? 'none' : 'flex';
     document.getElementById('instanceScaleInput').value = String(instance.scale);
     const useGlobalHeight = instance.shapeSnapshot.height === null;
     document.getElementById('instanceUseGlobalHeightCheckbox').checked = useGlobalHeight;
@@ -675,6 +752,23 @@ export class ArrangeApp {
     document.getElementById('instanceNailScaleInput').value = String(instance.nailScale);
 
     this.#loadInstancePalette(instance.shapeSnapshot.colors);
+  }
+
+  /** Position and rotation fields of the selected shape - re-read after every change, so dragging or Shift + wheel shows up in them live. */
+  #refreshInstanceTransformFields() {
+    const instance = this.selectedInstanceId ? this.instances.findById(this.selectedInstanceId) : null;
+    if (!instance) return;
+    // Shown in -180..180 so the slider and the number agree however far it has been turned.
+    const degrees = ((((instance.rotationRadians * 180) / Math.PI + 180) % 360) + 360) % 360 - 180;
+    const rounded = Math.round(degrees * 10) / 10;
+    document.getElementById('instanceRotationInput').value = String(rounded);
+    document.getElementById('instanceRotationSlider').value = String(Math.round(degrees));
+    const x = Math.round(instance.position.x);
+    const y = Math.round(instance.position.y);
+    document.getElementById('instancePositionXInput').value = String(x);
+    document.getElementById('instancePositionYInput').value = String(y);
+    document.getElementById('instancePositionCmLabel').textContent =
+      `Centre at ${+worldToCm(x).toFixed(1)}, ${+worldToCm(y).toFixed(1)} cm from the board centre`;
   }
 
   #initCameraReset() {
@@ -710,14 +804,9 @@ export class ArrangeApp {
   }
 
   #instanceRadius(instance) {
-    const anchors = instance.shapeSnapshot.anchors;
-    const centroid = anchorsCentroid(anchors);
-    let maxDist = 0;
-    for (const anchor of anchors) {
-      maxDist = Math.max(maxDist, Math.hypot(anchor.x - centroid.x, anchor.y - centroid.y));
-    }
-    return maxDist * instance.scale;
+    return shapeRadius(instance.shapeSnapshot) * instance.scale;
   }
+
 
   #handlePointerDown = (event) => {
     const hit = this.#raycastToBoard(event.clientX, event.clientY);
@@ -729,7 +818,7 @@ export class ArrangeApp {
         this.instances.add({
           id: generateId(),
           shapeId: shape.id,
-          shapeSnapshot: FreeformShape.fromJSON(shape.toJSON()),
+          shapeSnapshot: shapeFromJSON(shape.toJSON()),
           position: hit,
           scale: this.#scaleForPlacement(shape),
         });

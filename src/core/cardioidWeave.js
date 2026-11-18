@@ -12,6 +12,13 @@
  * - A layer's chords are split into `colorCount` equal, contiguous groups by
  *   `j`: with 2 colors the first half of the start nails is color A and the
  *   second half color B; with 3, a third each; and so on.
+ * - Threads are numbered 1 .. nailCount by `j` (thread `j` joins nail `j` to
+ *   nail `multiplier * j`, nail `nailCount` being nail 0). A `range` keeps
+ *   only threads `start .. end`, e.g. 1-24 of 48 is half a cardioid and 25-36
+ *   its third quarter. `start > end` wraps past `nailCount` back to 1. Colors
+ *   stay tied to the thread number, so hiding threads never recolors the rest.
+ * - Nails sit on a circle, or an ellipse `stretch` times as wide as it is
+ *   tall, numbered clockwise or counter-clockwise from nail 0 at the top.
  *
  * No Three.js/DOM dependency, so it is directly unit-testable.
  */
@@ -28,26 +35,57 @@ function mod(value, modulus) {
  * @returns {{x:number, y:number}[]}
  */
 export function circleNailPositions(nailCount, radius) {
+  return ellipseNailPositions(nailCount, radius);
+}
+
+/**
+ * `nailCount` nails at even angle steps around an ellipse `radius` tall and
+ * `radius * stretch` wide (stretch 1 = circle, < 1 contracts, > 1 widens) -
+ * the circle pattern stretched sideways. Nail 0 is at the top; `direction`
+ * says which way the numbering runs from there on screen.
+ * @param {number} nailCount
+ * @param {number} radius
+ * @param {{stretch?: number, direction?: 'cw'|'ccw'}} [options]
+ * @returns {{x:number, y:number}[]}
+ */
+export function ellipseNailPositions(nailCount, radius, { stretch = 1, direction = 'cw' } = {}) {
+  const sign = direction === 'ccw' ? -1 : 1;
   const nails = [];
   for (let i = 0; i < nailCount; i++) {
-    const angle = (2 * Math.PI * i) / nailCount - Math.PI / 2;
-    nails.push({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) });
+    const angle = (sign * 2 * Math.PI * i) / nailCount - Math.PI / 2;
+    nails.push({ x: radius * stretch * Math.cos(angle), y: radius * Math.sin(angle) });
   }
   return nails;
 }
 
 /**
+ * Whether thread `j` (0-based offset; thread number `j`, with 0 counted as
+ * `nailCount`) is inside `range`. No range = every thread.
+ * @param {number} j
+ * @param {number} nailCount
+ * @param {{start:number, end:number} | null | undefined} range 1-based, inclusive
+ */
+export function threadInRange(j, nailCount, range) {
+  if (!range) return true;
+  const number = j === 0 ? nailCount : j;
+  return range.start <= range.end
+    ? number >= range.start && number <= range.end
+    : number >= range.start || number <= range.end;
+}
+
+/**
  * Every chord of one layer.
- * @param {{nailCount:number, multiplier:number, leap:number, layerIndex:number, colorCount:number}} params
+ * @param {{nailCount:number, multiplier:number, leap:number, layerIndex:number, colorCount:number, range?: {start:number, end:number} | null}} params
  * @returns {{fromIndex:number, toIndex:number, colorIndex:number}[]}
  *   nail indices into `circleNailPositions`, and which of the `colorCount`
  *   colors the chord uses. Chords that would join a nail to itself are
  *   dropped (nothing to draw).
  */
-export function layerChords({ nailCount, multiplier, leap, layerIndex, colorCount }) {
+export function layerChords({ nailCount, multiplier, leap, layerIndex, colorCount, range = null }) {
   const start = layerIndex * leap;
   const chords = [];
   for (let j = 0; j < nailCount; j++) {
+    if (!threadInRange(j, nailCount, range)) continue;
     const fromIndex = mod(start + j, nailCount);
     const toIndex = mod(start + multiplier * j, nailCount);
     if (fromIndex === toIndex) continue;

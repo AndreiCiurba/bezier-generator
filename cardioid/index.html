@@ -104,11 +104,44 @@
       Multiplier
       <input id="multiplierInput" type="number" min="1" step="1" style="width: 100%;" />
     </label>
+    <!-- Part cardioids: thread j joins nail j to nail (multiplier x j); only threads From..To are drawn, on every layer. -->
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Visible threads</div>
+    <div style="font-size: 10px; color: var(--panel-text-muted); margin-top: 2px;">
+      Thread j joins nail j to nail multiplier &times; j. With 48 nails, 1&ndash;24 is half a cardioid and 25&ndash;36 its
+      third quarter. From after To wraps round past the last nail.
+    </div>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      From
+      <input id="rangeStartInput" type="number" min="1" step="1" style="width: 100%;" />
+      To
+      <input id="rangeEndInput" type="number" min="1" step="1" style="width: 100%;" />
+    </label>
+    <button id="rangeAllBtn" class="menu-btn" style="margin-top: 4px;">Show all threads</button>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
+      title="Which way nails are numbered from nail 0 at the top.">
+      Count
+      <select id="directionSelect" style="width: 100%;">
+        <option value="cw">Clockwise from the top</option>
+        <option value="ccw">Counter-clockwise from the top</option>
+      </select>
+    </label>
 
     <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Size</div>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Circle radius
       <input id="radiusInput" type="number" min="100" step="100" style="width: 100%;" />
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      Shape
+      <select id="outlineSelect" style="width: 100%;">
+        <option value="circle">Circle</option>
+        <option value="ellipse">Ellipse</option>
+      </select>
+    </label>
+    <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;"
+      title="Ellipse width as a multiple of its height (the radius). Above 1 stretches it sideways, below 1 contracts it.">
+      Stretch
+      <input id="stretchInput" type="number" min="0.1" max="10" step="0.05" style="width: 100%;" />
     </label>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
       Height
@@ -149,6 +182,14 @@
     <div id="colorPickerContainer"></div>
     <button id="openFavoritesBtn" class="menu-btn" style="margin-top: 4px;">Color Schemes</button>
 
+    <!-- Saved cardioids - also listed in the Arrange page's shape library, ready to place. -->
+    <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Library</div>
+    <div style="display:flex; align-items:center; gap:4px; margin-top: 4px;">
+      <input id="cardioidNameInput" type="text" placeholder="Name" style="width: 100%;" />
+      <button id="saveCardioidBtn" class="menu-btn menu-btn--primary" style="width:auto; padding: 5px 10px;">Save to Library</button>
+    </div>
+    <ul id="cardioidLibraryList"
+      style="max-height: 150px; overflow-y: auto; padding-left: 15px; margin-top: 8px; color: var(--panel-text);"></ul>
     <div id="colorFavoritesSubmenu" class="panel hidden">
       <button id="closeColorSubmenuBtn" class="panel-close-btn">X</button>
       <div style="font-size: 11px; color: var(--panel-text); margin-top: 8px;">Your Colors</div>
