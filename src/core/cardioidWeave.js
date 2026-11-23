@@ -5,16 +5,18 @@
  * into layers.
  *
  * A layer is a stack of **runs**, each like its own pass of the times table:
- * - A run has a `rotation` (the nail its pattern starts from), a thread
- *   `range`, a color, and optionally its own multiplier and leap (otherwise
- *   the shared ones).
- * - Threads are numbered 1 .. nailCount by `j` (thread `j` joins nail
- *   `start + j` to nail `start + multiplier * j`, mod nailCount, where
- *   `start = rotation + layerIndex * leap`; thread `nailCount` is `j = 0`).
- *   E.g. with 48 nails, a run of threads 1-24 is half a cardioid and 24-47 the
- *   other half; three nephroid runs of threads 1-6 turned 0, 16 and 32 nails
- *   give 1-3 .. 6-18, 17-19 .. 22-34 and 33-35 .. 38-2. A range whose start
- *   is after its end wraps past `nailCount` back to 1.
+ * - A run has its own point 0 (`rotation`: the board nail its pattern counts
+ *   from), a thread `range`, a color, and optionally its own multiplier and
+ *   leap (otherwise the shared ones).
+ * - Threads are numbered 1 .. nailCount by `j`, counted from the run's point
+ *   0: thread `j` joins nail `start + j` to nail `start + multiplier * j`, mod
+ *   nailCount, where `start = rotation + layerIndex * leap` (thread
+ *   `nailCount` is `j = 0`). E.g. with 48 nails, threads 1-24 from point 0
+ *   give 1-2 .. 24-48 (half a cardioid), and threads 1-24 from point 0 = nail
+ *   24 give 25-26 .. 48-24: the same half turned 180 degrees, hugging it.
+ *   Three nephroid runs of threads 1-6 from points 0, 16 and 32 give
+ *   1-3 .. 6-18, 17-19 .. 22-34 and 33-35 .. 38-2. A range whose start is
+ *   after its end wraps past `nailCount` back to 1.
  * - The thread runs out and back round its nails, so every chord is two
  *   strands - except the last chord of a run, where the thread ends going one
  *   way only (`single`).
@@ -132,6 +134,24 @@ export function stackChords({ nailCount, layerCount, leap, multiplier, runs }) {
     });
   }
   return chords;
+}
+
+/** A nail's number as written on the board: 1 .. nailCount, nail 0 (the top) being `nailCount`. */
+export function nailLabel(index, nailCount) {
+  return index === 0 ? nailCount : index;
+}
+
+/**
+ * What a run strings on the bottom layer, in the board's own nail numbers -
+ * its first and last connection, e.g. `{first: '25-26', last: '48-24', count: 24}`
+ * - so it can be checked against a written plan.
+ * @returns {{first:string, last:string, count:number} | null} null when the run strings nothing
+ */
+export function runPreview({ nailCount, multiplier, rotation, range }) {
+  const chords = runChords({ nailCount, multiplier, leap: 0, layerIndex: 0, rotation, range });
+  if (chords.length === 0) return null;
+  const pair = (c) => `${nailLabel(c.fromIndex, nailCount)}-${nailLabel(c.toIndex, nailCount)}`;
+  return { first: pair(chords[0]), last: pair(chords.at(-1)), count: chords.length };
 }
 
 /** How many runs are drawn (enabled) - the height of one layer's stack. */

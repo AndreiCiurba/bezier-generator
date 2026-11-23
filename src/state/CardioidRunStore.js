@@ -29,12 +29,21 @@ export class CardioidRunStore {
     this.#notify();
   }
 
-  /** A new run on top: a copy of the top run (so it continues its settings) in the next unused color. */
+  /**
+   * A new run on top: a copy of the top run in the next unused color, whose
+   * point 0 is the nail where the top run ended - so it carries on round the
+   * board instead of lying exactly on it (half a cardioid over threads 1-24
+   * is followed by the same half from nail 24, turned 180 degrees). A full
+   * run would end where it began, so its copy starts half way round.
+   */
   add(nailCount) {
     const top = this.#runs.at(-1) ?? defaultRun(nailCount);
     const used = new Set(this.#runs.map((r) => r.color.toLowerCase()));
     const color = RUN_COLORS.find((c) => !used.has(c)) ?? RUN_COLORS[this.#runs.length % RUN_COLORS.length];
-    this.#runs.push({ ...top, color, enabled: true });
+    const mod = (v) => ((v % nailCount) + nailCount) % nailCount;
+    const span = mod(top.rangeEnd - top.rangeStart) + 1;
+    const rotation = span === nailCount ? mod(top.rotation + Math.floor(nailCount / 2)) : mod(top.rotation + span);
+    this.#runs.push({ ...top, color, enabled: true, rotation });
     this.#notify();
   }
 

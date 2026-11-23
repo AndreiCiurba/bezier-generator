@@ -124,6 +124,7 @@ export class CardioidApp {
         this.settings[field.key] = value;
         if (field.key === 'nailCount') this.runs.fitToNailCount(previousNailCount, value); // rebuilds via onChange
         if (field.refit) this.#applyDefaultCameraView();
+        this.runsUI.refreshPreviews(); // the shared multiplier shows in each run's preview
         this.#rebuild();
       });
     }
@@ -302,7 +303,10 @@ export class CardioidApp {
   /** The run stack every layer is woven from: the runs list plus "Add run". */
   #initRuns() {
     this.runs.onChange(() => this.#rebuild());
-    new CardioidRunsUI(document.getElementById('runsContainer'), this.runs, () => this.settings.nailCount).init();
+    this.runsUI = new CardioidRunsUI(document.getElementById('runsContainer'), this.runs, () => ({
+      nailCount: this.settings.nailCount, multiplier: this.settings.multiplier,
+    }));
+    this.runsUI.init();
     document.getElementById('addRunBtn').addEventListener('click', () => this.runs.add(this.settings.nailCount));
   }
 

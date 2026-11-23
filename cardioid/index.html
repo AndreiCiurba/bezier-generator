@@ -160,9 +160,11 @@
     <!-- Each layer is a stack of runs (see core/cardioidWeave.js), strung bottom first. -->
     <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Runs</div>
     <div style="font-size: 10px; color: var(--panel-text-muted); margin-top: 2px;">
-      Every layer is this stack of runs, each a part cardioid strung on top of the one before. Thread j joins
-      nail (turn + j) to nail (turn + multiplier &times; j): with 48 nails, threads 1&ndash;24 is half a cardioid.
-      The last thread of a run is strung one way only. Blank Mult./Leap use the shared values above.
+      Every layer is this stack of runs, each a part cardioid strung on top of the one before. Each run counts
+      from its own point 0: thread j joins nail (point 0 + j) to nail (point 0 + multiplier &times; j). With 48
+      nails, threads 1&ndash;24 from point 0 = 0 strings 1-2 &hellip; 24-48; from point 0 = 24 it strings
+      25-26 &hellip; 48-24, the same half turned 180&deg;. The last thread of a run is strung one way only.
+      Blank Mult./Leap use the shared values above.
     </div>
     <div id="runsContainer"></div>
     <button id="addRunBtn" class="menu-btn" style="margin-top: 6px;">Add run</button>

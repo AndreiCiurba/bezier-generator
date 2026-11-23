@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { circleNailPositions, ellipseNailPositions, runChords, stackChords, stackDepth, threadInRange, wrapArc } from './cardioidWeave.js';
+import { circleNailPositions, ellipseNailPositions, runChords, runPreview, stackChords, stackDepth, threadInRange, wrapArc } from './cardioidWeave.js';
 
 describe('circleNailPositions', () => {
   it('places every nail on the circle, with nail 0 at the top of the board', () => {
@@ -62,6 +62,13 @@ describe('run ranges and turns (part cardioids)', () => {
     expect(p.slice(-2)).toEqual(['46-44', '47-46']);
   });
 
+  it('counts a run from its own point 0, so threads 1-24 from nail 24 are the half cardioid turned 180 degrees (25-26 .. 48-24)', () => {
+    const p = pairs(runChords({ ...half, rotation: 24, range: { start: 1, end: 24 } }));
+    expect(p.slice(0, 2)).toEqual(['25-26', '26-28']);
+    expect(p.at(-1)).toBe('48-24');
+    expect(p).not.toEqual(pairs(runChords({ ...half, range: { start: 1, end: 24 } })));
+  });
+
   it('turns a run by its rotation, giving the three nephroid runs 1-3.., 17-19.., 33-35.. 38-2', () => {
     const run = (rotation) => pairs(runChords({ ...half, multiplier: 3, rotation, range: { start: 1, end: 6 } }));
     expect(run(0)).toEqual(['1-3', '2-6', '3-9', '4-12', '5-15', '6-18']);
@@ -78,6 +85,17 @@ describe('run ranges and turns (part cardioids)', () => {
     expect(threadInRange(47, 48, { start: 40, end: 5 })).toBe(true);
     expect(threadInRange(0, 48, { start: 40, end: 5 })).toBe(true); // thread 48
     expect(threadInRange(20, 48, { start: 40, end: 5 })).toBe(false);
+  });
+});
+
+describe('runPreview', () => {
+  it("names a run's first and last connection in board nail numbers, nail 0 written as the last nail, to check against a plan", () => {
+    expect(runPreview({ nailCount: 48, multiplier: 2, rotation: 24, range: { start: 1, end: 24 } }))
+      .toEqual({ first: '25-26', last: '48-24', count: 24 });
+  });
+
+  it('is null when a run strings nothing', () => {
+    expect(runPreview({ nailCount: 48, multiplier: 1, rotation: 0, range: { start: 1, end: 5 } })).toBeNull();
   });
 });
 

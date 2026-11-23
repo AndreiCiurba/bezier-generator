@@ -16,10 +16,23 @@ describe('CardioidRunStore', () => {
     expect(store.runs[1].color).not.toBe(store.runs[0].color);
   });
 
+  it("starts an added run at the nail where the top run ended, so it doesn't lie exactly on it", () => {
+    const store = new CardioidRunStore(48);
+    store.update(0, { rangeEnd: 24 });
+    store.add(48);
+    expect(store.runs[1].rotation).toBe(24); // threads 1-24 again, from nail 24: turned 180 degrees
+  });
+
+  it('starts a copy of a full run half way round, since a full run ends where it began', () => {
+    const store = new CardioidRunStore(48);
+    store.add(48);
+    expect(store.runs[1].rotation).toBe(24);
+  });
+
   it('moves a run up and down the stack, which decides which thread lies on top', () => {
     const store = new CardioidRunStore(48);
     store.add(48);
-    const [first, second] = store.runs;
+    const [first, second] = store.runs; // differ in color and point 0
     store.move(1, -1);
     expect(store.runs).toEqual([second, first]);
     store.move(0, -1); // already lowest: nothing happens

@@ -1,8 +1,12 @@
+import { runPreview } from '../core/cardioidWeave.js';
+
 /**
  * The Cardioid page's "Runs" list: one card per run of the stack, in stack
- * order (first = lowest, strung first). Each card has show/color, its thread
- * range, its start nail (turn), and its own multiplier and leap (blank = the
- * shared ones), plus buttons to move it lower/higher, copy or delete it.
+ * order (first = lowest, strung first). Each card has show/color, its point 0
+ * (the board nail its threads count from), its thread range, and its own
+ * multiplier and leap (blank = the shared ones), plus buttons to move it
+ * lower/higher, copy or delete it, and a line showing the first and last
+ * connection it strings in board nail numbers (e.g. 25-26 ... 48-24).
  *
  * Holds no state: every edit goes straight to the `CardioidRunStore`. The
  * list is redrawn on every store change except edits typed into its own
@@ -14,12 +18,13 @@ export class CardioidRunsUI {
   /**
    * @param {HTMLElement} container
    * @param {import('../state/CardioidRunStore.js').CardioidRunStore} store
-   * @param {() => number} getNailCount
+   * @param {() => {nailCount:number, multiplier:number}} getShared the page's nail count and shared multiplier
    */
-  constructor(container, store, getNailCount) {
+  constructor(container, store, getShared) {
     this.container = container;
     this.store = store;
-    this.getNailCount = getNailCount;
+    this.getShared = getShared;
+    this.previews = [];
   }
 
   init() {
@@ -31,6 +36,7 @@ export class CardioidRunsUI {
 
   render() {
     this.container.innerHTML = '';
+    this.previews = [];
     const runs = this.store.runs;
     runs.forEach((run, index) => this.container.appendChild(this.#card(run, index, runs.length)));
     if (runs.length === 0) {
@@ -72,15 +78,21 @@ export class CardioidRunsUI {
       button('×', 'Delete this run', false, () => this.store.remove(index)),
     );
 
-    const nailCount = this.getNailCount();
+    const { nailCount } = this.getShared();
+    const start = row();
+    start.append(
+      label('Point 0 at nail'),
+      this.#intField(run.rotation, { min: 0, max: nailCount - 1 }, (v) => ({ rotation: v }), index,
+        'The board nail this run counts from: its thread j joins nail (point 0 + j) to nail (point 0 + multiplier x j). '
+        + 'E.g. with 48 nails, point 0 = 24 makes thread 1 join 25-26: the cardioid turned 180 degrees.'),
+    );
+
     const threads = row();
     threads.append(
       label('Threads'),
-      this.#intField(run.rangeStart, { min: 1, max: nailCount }, (v) => ({ rangeStart: v }), index, 'First thread of the run (thread j joins nail j to nail multiplier x j)'),
+      this.#intField(run.rangeStart, { min: 1, max: nailCount }, (v) => ({ rangeStart: v }), index, 'First thread of the run, counted from its point 0'),
       label('–'),
       this.#intField(run.rangeEnd, { min: 1, max: nailCount }, (v) => ({ rangeEnd: v }), index, 'Last thread of the run - strung one way only. Before the first = wraps past the last nail.'),
-      label('Turn'),
-      this.#intField(run.rotation, { min: 0, max: 1000 }, (v) => ({ rotation: v }), index, 'Nails this run is turned by: it starts from this nail instead of nail 0.'),
     );
 
     const overrides = row();
@@ -91,8 +103,31 @@ export class CardioidRunsUI {
       this.#intField(run.leap, { min: 0, max: 1000, optional: true }, (v) => ({ leap: v }), index, 'Own leap between layers. Blank = the shared one.'),
     );
 
-    card.append(head, threads, overrides);
+    const preview = document.createElement('div');
+    preview.style.cssText = 'font-size: 10px; color: var(--panel-text-muted, #888); margin-top: 3px;';
+    this.previews[index] = preview;
+    this.#showPreview(index);
+
+    card.append(head, start, threads, overrides, preview);
     return card;
+  }
+
+  /** Refreshes each card's "Strings 25-26 ... 48-24" line, e.g. after the shared multiplier changes. */
+  refreshPreviews() {
+    this.previews.forEach((_, index) => this.#showPreview(index));
+  }
+
+  #showPreview(index) {
+    const element = this.previews[index];
+    const run = this.store.runs[index];
+    if (!element || !run) return;
+    const { nailCount, multiplier } = this.getShared();
+    const preview = runPreview({
+      nailCount, multiplier: run.multiplier ?? multiplier, rotation: run.rotation, range: { start: run.rangeStart, end: run.rangeEnd },
+    });
+    element.textContent = preview
+      ? `Strings ${preview.first} … ${preview.last} (${preview.count} threads)`
+      : 'Strings nothing (every thread joins a nail to itself).';
   }
 
   /** A whole-number field; anything out of range snaps back. `optional` fields may be left blank (= null, the shared value). */
@@ -130,6 +165,7 @@ export class CardioidRunsUI {
     } finally {
       this.#fromField = false;
     }
+    this.#showPreview(index);
   }
 }
 
