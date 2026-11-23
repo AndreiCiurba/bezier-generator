@@ -35,14 +35,16 @@ export function placedNails(instance) {
 /**
  * Every string of the instance in board space, before thread wrapping.
  * `layerIndex` is the stacking layer: for an outline it's the color layer, for
- * a cardioid the cardioid's own layer.
+ * a cardioid the cardioid's own layer, with `stackIndex` (which run of the
+ * layer's stack, 0 = lowest) and `single` (the last chord of a run, strung
+ * one way only).
  * @returns {{from:{x:number,y:number}, to:{x:number,y:number}, color:string, layerIndex:number}[]}
  */
 export function placedSegments(instance, nails = placedNails(instance)) {
   const shape = instance.shapeSnapshot;
   if (isCardioid(shape)) {
-    return shape.chords().map(({ fromIndex, toIndex, color, layerIndex }) => ({
-      from: nails[fromIndex], to: nails[toIndex], color, layerIndex,
+    return shape.chords().map(({ fromIndex, toIndex, color, layerIndex, stackIndex, single }) => ({
+      from: nails[fromIndex], to: nails[toIndex], color, layerIndex, stackIndex, single,
     }));
   }
   return closedWeaveSegmentsForCurve(nails, 0, shape.leap, shape.colors, shape.weaveRule);

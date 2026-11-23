@@ -1,13 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CardioidSceneSync } from './CardioidSceneSync.js';
-import { StrokePalette } from '../state/StrokePalette.js';
-import { FavoritesStore } from '../state/FavoritesStore.js';
-import { ColorPickerUI } from '../ui/ColorPickerUI.js';
-import { PickerModeUI } from '../ui/PickerModeUI.js';
-import { FavoritesUI } from '../ui/FavoritesUI.js';
-import { ColorCountUI } from '../ui/ColorCountUI.js';
-import { PanelGroup } from '../ui/PanelGroup.js';
+import { CardioidRunStore } from '../state/CardioidRunStore.js';
+import { CardioidRunsUI } from '../ui/CardioidRunsUI.js';
+import { DEFAULT_RUN_GAP_MM } from '../models/cardioidRun.js';
 import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
@@ -35,10 +31,8 @@ const FIELDS = [
   { id: 'multiplierInput', key: 'multiplier', integer: true, min: 1, max: 100 },
   { id: 'radiusInput', key: 'radius', min: 100, max: 20000, refit: true },
   { id: 'stretchInput', key: 'stretch', min: 0.1, max: 10, refit: true },
-  // Thread numbers run 1 .. nailCount, so their max follows the nail count.
-  { id: 'rangeStartInput', key: 'rangeStart', integer: true, min: 1, max: (s) => s.nailCount },
-  { id: 'rangeEndInput', key: 'rangeEnd', integer: true, min: 1, max: (s) => s.nailCount },
   { id: 'heightInput', key: 'height', min: 10, max: 5000 },
+  { id: 'runGapInput', key: 'runGapMm', min: 0, max: 10 },
 ];
 
 /**
@@ -47,8 +41,9 @@ const FIELDS = [
  * are each the same pattern rotated by `leap` nails. Thread and nails are
  * real-size (10 world units = 1 mm), sharing Arrange's thread width, nail
  * width and 8/O wrap (see `ui/ThreadSettingsUI.js`). Every number in the weave is a field
- * in the menu; the layer's colors are split into equal arcs of the circle
- * (see `core/cardioidWeave.js`).
+ * in the menu. Each layer is a stack of runs - part cardioids with their own
+ * range, start nail, color and optional multiplier/leap, strung one on top
+ * of the other (see `core/cardioidWeave.js`).
  *
  * Same Three.js scaffolding as `ArrangeApp.js` (scene/camera/orbit/
  * lighting/gizmo), minus anything about placing shapes.
@@ -67,15 +62,12 @@ export class CardioidApp {
       outline: 'circle', // or 'ellipse', which applies `stretch`
       stretch: 1.5,
       direction: 'cw',
-      rangeStart: 1, // visible threads, 1-based and inclusive; 1 .. nailCount = all
-      rangeEnd: 48,
+      runGapMm: DEFAULT_RUN_GAP_MM, // how far each run of a layer's stack sits above the one before
     };
     // Real thread width / nail width / 8-or-O wrap in mm, shared with Arrange.
     this.thread = loadThreadSettings();
     this.library = new ShapeLibraryStore();
-    this.palette = new StrokePalette(); // one slot per color group a layer is split into
-    this.palette.resize(2);
-    this.palette.setColor(1, '#ffffff'); // second color defaults to white
+    this.runs = new CardioidRunStore(this.settings.nailCount);
   }
 
   init() {
@@ -107,7 +99,7 @@ export class CardioidApp {
     this.#initNailsToggle();
     this.#initWrapToggle();
     this.#initThreadSettings();
-    this.#initColors();
+    this.#initRuns();
     document.getElementById('resetCameraBtn').addEventListener('click', () => this.#applyDefaultCameraView());
 
     window.addEventListener('resize', this.#handleResize);
@@ -130,20 +122,11 @@ export class CardioidApp {
         }
         const previousNailCount = this.settings.nailCount;
         this.settings[field.key] = value;
-        if (field.key === 'nailCount') this.#fitRangeToNailCount(previousNailCount);
+        if (field.key === 'nailCount') this.runs.fitToNailCount(previousNailCount, value); // rebuilds via onChange
         if (field.refit) this.#applyDefaultCameraView();
         this.#rebuild();
       });
     }
-  }
-
-  /** A full range stays full when the nail count changes; a part range is kept, clipped to the new count. */
-  #fitRangeToNailCount(previousNailCount) {
-    const nailCount = this.settings.nailCount;
-    const wasFull = this.settings.rangeStart === 1 && this.settings.rangeEnd === previousNailCount;
-    this.settings.rangeStart = Math.min(this.settings.rangeStart, nailCount);
-    this.settings.rangeEnd = wasFull ? nailCount : Math.min(this.settings.rangeEnd, nailCount);
-    this.#showSettingsInFields();
   }
 
   /** Writes every setting back into its menu field - after loading a saved cardioid, or when one setting moves another. */
@@ -154,14 +137,8 @@ export class CardioidApp {
     document.getElementById('stretchInput').disabled = this.settings.outline !== 'ellipse';
   }
 
-  /** Thread range "Show all", counting direction, and circle/ellipse. */
+  /** Counting direction, and circle/ellipse. */
   #initPartAndOutline() {
-    document.getElementById('rangeAllBtn').addEventListener('click', () => {
-      this.settings.rangeStart = 1;
-      this.settings.rangeEnd = this.settings.nailCount;
-      this.#showSettingsInFields();
-      this.#rebuild();
-    });
     const directionSelect = document.getElementById('directionSelect');
     directionSelect.addEventListener('change', () => {
       this.settings.direction = directionSelect.value === 'ccw' ? 'ccw' : 'cw';
@@ -180,12 +157,6 @@ export class CardioidApp {
   /** Ellipse stretch actually in effect (1 for a circle). */
   get #stretch() {
     return this.settings.outline === 'ellipse' ? this.settings.stretch : 1;
-  }
-
-  /** Visible thread range, or null when every thread shows. */
-  get #range() {
-    const { rangeStart, rangeEnd, nailCount } = this.settings;
-    return rangeStart === 1 && rangeEnd === nailCount ? null : { start: rangeStart, end: rangeEnd };
   }
 
   /**
@@ -210,7 +181,6 @@ export class CardioidApp {
 
     const nameInput = document.getElementById('cardioidNameInput');
     document.getElementById('saveCardioidBtn').addEventListener('click', () => {
-      const range = this.#range;
       const shape = new CardioidShape({
         id: generateId(),
         name: nameInput.value.trim() || `Cardioid_${this.library.count + 1}`,
@@ -221,9 +191,8 @@ export class CardioidApp {
         radius: this.settings.radius,
         stretch: this.#stretch,
         direction: this.settings.direction,
-        rangeStart: range ? range.start : null,
-        rangeEnd: range ? range.end : null,
-        colors: this.palette.snapshot(),
+        runs: this.runs.runs,
+        runGapMm: this.settings.runGapMm,
         // Arrange sizes it with its own placement size and global height.
         height: null,
       });
@@ -242,8 +211,7 @@ export class CardioidApp {
       li.title = 'Load these settings';
       const label = document.createElement('span');
       label.style.flex = '1';
-      const part = shape.range ? `, threads ${shape.range.start}-${shape.range.end}` : '';
-      label.textContent = `${shape.name} (nails=${shape.nailCount}, layers=${shape.layerCount}${part})`;
+      label.textContent = `${shape.name} (nails=${shape.nailCount}, layers=${shape.layerCount}, runs=${shape.runs.length})`;
       const removeBtn = document.createElement('button');
       removeBtn.className = 'panel-close-btn';
       removeBtn.style.position = 'static';
@@ -267,7 +235,7 @@ export class CardioidApp {
     }
   }
 
-  /** Puts a saved cardioid's settings and colors back on the page. */
+  /** Puts a saved cardioid's settings and runs back on the page. */
   #loadShape(shape) {
     Object.assign(this.settings, {
       nailCount: shape.nailCount,
@@ -278,21 +246,11 @@ export class CardioidApp {
       outline: shape.stretch === 1 ? 'circle' : 'ellipse',
       stretch: shape.stretch === 1 ? this.settings.stretch : shape.stretch,
       direction: shape.direction,
-      rangeStart: shape.range ? shape.range.start : 1,
-      rangeEnd: shape.range ? shape.range.end : shape.nailCount,
+      runGapMm: shape.runGapMm,
     });
     this.#showSettingsInFields();
-    if (shape.colors.length > 0) {
-      this.palette.resize(shape.colors.length);
-      shape.colors.forEach((c, i) => {
-        this.palette.setColor(i, c.color);
-        if (this.palette.getSlot(i).enabled !== Boolean(c.enabled)) this.palette.toggleEnabled(i);
-      });
-      this.colorPickerUI.rebuild();
-      this.colorCountUI.setCount(shape.colors.length);
-    }
     this.#applyDefaultCameraView();
-    this.#rebuild();
+    this.runs.setAll(shape.runs, shape.nailCount); // rebuilds via onChange
   }
 
   #initNailsToggle() {
@@ -341,58 +299,16 @@ export class CardioidApp {
       `Nail ring ${across}, layers ${cm(height)} cm tall (10 units = 1 mm).`;
   }
 
-  /** The colors a layer is split into: swatches, a count field, Default/Custom picker mode, and saved color schemes - the same UI classes the other pages use. */
-  #initColors() {
-    this.palette.onChange(() => this.#rebuild());
-
-    this.colorPickerUI = new ColorPickerUI(document.getElementById('colorPickerContainer'), this.palette);
-    this.colorPickerUI.init();
-    new PickerModeUI(
-      { defaultBtn: document.getElementById('pickerModeDefaultBtn'), customBtn: document.getElementById('pickerModeCustomBtn') },
-      this.colorPickerUI
-    ).init();
-
-    const colorCountUI = (this.colorCountUI = new ColorCountUI(
-      { input: document.getElementById('colorCountInput'), applyBtn: document.getElementById('applyColorCountBtn') },
-      this.palette.size,
-      (count) => {
-        this.palette.resize(count);
-        this.colorPickerUI.rebuild();
-      }
-    ));
-    colorCountUI.init();
-
-    // The schemes flyout is `position: fixed` (see cardioid/index.html) so the
-    // scrolling main menu can't clip it - line it up just right of that menu
-    // each time it's opened.
-    const schemesPanel = document.getElementById('colorFavoritesSubmenu');
-    document.getElementById('openFavoritesBtn').addEventListener('click', () => {
-      const menu = document.getElementById('ui').getBoundingClientRect();
-      schemesPanel.style.top = `${menu.top}px`;
-      schemesPanel.style.left = `${menu.right + 10}px`;
-    });
-    new FavoritesUI(
-      {
-        panelEl: schemesPanel,
-        openBtn: document.getElementById('openFavoritesBtn'),
-        closeBtn: document.getElementById('closeColorSubmenuBtn'),
-        saveBtn: document.getElementById('saveCurrentColorBtn'),
-        exportBtn: document.getElementById('exportColorsBtn'),
-        importBtn: document.getElementById('importColorsBtn'),
-        importInput: document.getElementById('importColorsInput'),
-        bundlesContainer: document.getElementById('favoriteBundlesContainer'),
-      },
-      new FavoritesStore(),
-      this.palette,
-      this.colorPickerUI,
-      new PanelGroup(),
-      (count) => colorCountUI.setCount(count)
-    ).init();
+  /** The run stack every layer is woven from: the runs list plus "Add run". */
+  #initRuns() {
+    this.runs.onChange(() => this.#rebuild());
+    new CardioidRunsUI(document.getElementById('runsContainer'), this.runs, () => this.settings.nailCount).init();
+    document.getElementById('addRunBtn').addEventListener('click', () => this.runs.add(this.settings.nailCount));
   }
 
   #rebuild() {
     this.sceneSync.rebuild({
-      ...this.settings, stretch: this.#stretch, range: this.#range, colors: this.palette.getEnabledColors(), thread: this.thread,
+      ...this.settings, stretch: this.#stretch, runs: this.runs.runs, thread: this.thread,
     });
     this.#showRealSize();
     this.sceneSync.setViewportSize(window.innerWidth, window.innerHeight);

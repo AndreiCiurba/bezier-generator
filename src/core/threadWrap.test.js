@@ -69,6 +69,11 @@ describe('expandToStrands', () => {
     expect(strands).toHaveLength(2);
     expect(strands.every((s) => s.color === '#f00' && s.layerIndex === 2)).toBe(true);
   });
+
+  it('keeps one strand for a single segment, where the thread ends going one way at the end of a cardioid run', () => {
+    const strands = expandToStrands([{ from: { x: 0, y: 0 }, to: { x: 100, y: 0 }, single: true }], 5, '8');
+    expect(strands).toHaveLength(1);
+  });
 });
 
 describe('normalizeThreadSettings', () => {

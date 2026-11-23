@@ -39,8 +39,12 @@ export function arrangeExportGeometry(instances, threadSettings) {
     const thread = threadGeometry(threadSettings, instance.nailScale ?? 1);
     let segments = placedSegments(instance, nails);
     // The export draws higher layerIndex first (underneath). A cardioid's
-    // layer 0 sits at the board, i.e. underneath, so flip its numbering here.
-    if (isCardioid(shape)) segments = segments.map((s) => ({ ...s, layerIndex: shape.layerCount - 1 - s.layerIndex }));
+    // layer 0 sits at the board, i.e. underneath, so flip its numbering here -
+    // and within a layer its first run is lowest, so it goes under the rest.
+    if (isCardioid(shape)) {
+      const depth = Math.max(1, ...segments.map((s) => s.stackIndex + 1));
+      segments = segments.map((s) => ({ ...s, layerIndex: shape.layerCount - 1 - s.layerIndex + (depth - 1 - s.stackIndex) / depth }));
+    }
     return {
       nails,
       segments: expandToStrands(segments, thread.wrapRadius, thread.technique),

@@ -370,7 +370,7 @@ export class ArrangeApp {
       const label = document.createElement('span');
       label.style.flex = '1';
       label.textContent = isCardioid(shape)
-        ? `${shape.name} (cardioid, nails=${shape.nailCount}, layers=${shape.layerCount})`
+        ? `${shape.name} (cardioid, nails=${shape.nailCount}, layers=${shape.layerCount}, runs=${shape.runs.length})`
         : `${shape.name} (nails=${shape.nailCount}, leap=${shape.leap})`;
       const removeBtn = document.createElement('button');
       removeBtn.className = 'panel-close-btn';

@@ -4,7 +4,7 @@ import {
   DEFAULT_BOARD_THICKNESS, DEFAULT_BOARD_COLOR, BOARD_TOP_Y, DEFAULT_NAIL_COLOR, SHAFT_RADIUS, HEAD_RADIUS, buildNailGeometry,
 } from '../three-page/SceneSync.js';
 import { buildClosedWeaveLineObject, assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
-import { threadGeometry, wrapStrands } from '../core/threadWrap.js';
+import { threadGeometry, connectionStrands, mmToWorld } from '../core/threadWrap.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { isCardioid } from '../models/shapeFromJSON.js';
 import { placedNails, placedSegments } from './placedShape.js';
@@ -112,16 +112,22 @@ export class ArrangeSceneSync {
     return { lines, nails: nailMesh };
   }
 
-  /** A placed cardioid: each of its layers at its own height (layer 0 at the board, like the Cardioid page), every thread as its two real strands. */
+  /**
+   * A placed cardioid: each of its layers at its own height (layer 0 at the
+   * board, like the Cardioid page), each run of a layer's stack `runGapMm`
+   * above the one before, every thread as its two real strands (one at the
+   * end of a run).
+   */
   #buildCardioidLines(instance, nails, maxHeight, thread) {
-    const layerCount = instance.shapeSnapshot.layerCount;
+    const { layerCount, runGapMm } = instance.shapeSnapshot;
+    const runGap = mmToWorld(runGapMm);
     const positions = [];
     const vertexColors = [];
     const color = new THREE.Color();
-    for (const { from, to, color: hex, layerIndex } of placedSegments(instance, nails)) {
-      const y = worldColorLayerHeight(layerIndex, layerCount, 0, maxHeight);
+    for (const { from, to, color: hex, layerIndex, stackIndex, single } of placedSegments(instance, nails)) {
+      const y = worldColorLayerHeight(layerIndex, layerCount, 0, maxHeight) + stackIndex * runGap;
       color.set(hex);
-      for (const strand of wrapStrands(from, to, thread.wrapRadius, thread.technique)) {
+      for (const strand of connectionStrands(from, to, thread.wrapRadius, thread.technique, single)) {
         const a = this.toWorldPosition(strand.from, y);
         const b = this.toWorldPosition(strand.to, y);
         positions.push(a.x, a.y, a.z, b.x, b.y, b.z);

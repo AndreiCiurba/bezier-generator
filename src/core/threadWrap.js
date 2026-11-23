@@ -101,11 +101,20 @@ export function wrapStrands(from, to, wrapRadius, technique) {
   return [strand(1), strand(-1)];
 }
 
-/** Every segment replaced by its two strands, keeping each segment's other fields (color, layerIndex, ...). */
+/**
+ * The strands actually strung for one connection: both, or - for a `single`
+ * connection, where the thread ends going one way - just the first.
+ */
+export function connectionStrands(from, to, wrapRadius, technique, single = false) {
+  const strands = wrapStrands(from, to, wrapRadius, technique);
+  return single ? strands.slice(0, 1) : strands;
+}
+
+/** Every segment replaced by its strands (two, or one when `single`), keeping each segment's other fields (color, layerIndex, ...). */
 export function expandToStrands(segments, wrapRadius, technique) {
   const strands = [];
   for (const segment of segments) {
-    for (const { from, to } of wrapStrands(segment.from, segment.to, wrapRadius, technique)) {
+    for (const { from, to } of connectionStrands(segment.from, segment.to, wrapRadius, technique, segment.single)) {
       strands.push({ ...segment, from, to });
     }
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { arrangeExportGeometry, exportBounds, exportLayout, EXPORT_MAX_SIZE_PX } from './arrangeExport.js';
 import { FreeformShape } from '../models/FreeformShape.js';
+import { CardioidShape } from '../models/CardioidShape.js';
 import { rectAnchors } from '../core/shapePresets.js';
 
 const thread = { threadWidthMm: 0.25, nailDiameterMm: 1.5, technique: '8' };
@@ -39,6 +40,26 @@ describe('arrangeExportGeometry', () => {
 describe('exportBounds', () => {
   it('is null with nothing placed, which lets the caller skip an empty export', () => {
     expect(exportBounds([])).toBeNull();
+  });
+});
+
+describe('arrangeExportGeometry with a cardioid run stack', () => {
+  const run = (color, changes = {}) => ({ color, enabled: true, rangeStart: 1, rangeEnd: 6, rotation: 0, multiplier: null, leap: null, ...changes });
+  const shapeSnapshot = new CardioidShape({
+    id: 'c', name: 'C', nailCount: 48, layerCount: 2, leap: 1, multiplier: 3, radius: 1000,
+    runs: [run('#a'), run('#b', { rotation: 16 })],
+  });
+  const [entry] = arrangeExportGeometry([{ shapeSnapshot, position: { x: 0, y: 0 }, rotationRadians: 0, scale: 1 }], thread);
+  const drawOrder = [...entry.segments].sort((a, b) => b.layerIndex - a.layerIndex);
+
+  it('draws layer 0 first and, within a layer, its first run under the later ones', () => {
+    const firstLayer0 = drawOrder.findIndex((s) => s.color === '#a');
+    expect(drawOrder.slice(0, 11).every((s) => s.color === '#a')).toBe(true); // 6 chords, the last one single
+    expect(drawOrder[firstLayer0 + 11].color).toBe('#b');
+  });
+
+  it('strings the last chord of each run once: 5 doubled + 1 single per run per layer', () => {
+    expect(entry.segments).toHaveLength((5 * 2 + 1) * 2 * 2);
   });
 });
 

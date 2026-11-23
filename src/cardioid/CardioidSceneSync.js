@@ -5,14 +5,15 @@ import {
 } from '../three-page/SceneSync.js';
 import { assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
-import { ellipseNailPositions, layerChords, wrapArc } from '../core/cardioidWeave.js';
-import { threadGeometry, wrapStrands } from '../core/threadWrap.js';
+import { ellipseNailPositions, stackChords, wrapArc } from '../core/cardioidWeave.js';
+import { threadGeometry, connectionStrands, mmToWorld } from '../core/threadWrap.js';
 
 const BOARD_MARGIN = 1.3; // board half-extent as a multiple of the circle radius
 
 /**
  * Owns every Three.js object on the Cardioid board: a flat square board, one
- * standing nail per circle nail, and one `LineSegments2` per layer, built
+ * standing nail per circle nail, and one `LineSegments2` per layer (holding
+ * every run of its stack, each `runGapMm` above the one before), built
  * with the same `assembleWeaveLineObject` the grid and Arrange pages use.
  * Thread and nails are drawn at their real size (10 world units = 1 mm, see
  * `core/threadWrap.js`), exactly like the Arrange board. Everything is
@@ -44,10 +45,10 @@ export class CardioidSceneSync {
    * @param {{
    *   nailCount:number, layerCount:number, leap:number, multiplier:number, radius:number,
    *   height:number,
-   *   stretch:number, direction:'cw'|'ccw', range: {start:number, end:number} | null,
-   *   colors: string[], nailsVisible:boolean, showWrap:boolean,
+   *   stretch:number, direction:'cw'|'ccw', runGapMm:number,
+   *   runs: import('../models/cardioidRun.js').CardioidRun[], nailsVisible:boolean, showWrap:boolean,
    *   thread: {threadWidthMm:number, nailDiameterMm:number, technique:string}
-   * }} settings `colors` are the enabled palette colors, one per color group
+   * }} settings
    */
   rebuild(settings) {
     this.#disposeContent();
@@ -87,52 +88,55 @@ export class CardioidSceneSync {
   }
 
   #buildLayers(nails, settings, thread) {
-    const { nailCount, layerCount, leap, multiplier, height, colors, showWrap, range } = settings;
-    if (colors.length === 0) return;
-    const threeColors = colors.map((c) => new THREE.Color(c));
+    const { nailCount, layerCount, leap, multiplier, height, runs, runGapMm, showWrap } = settings;
+    const runGap = mmToWorld(runGapMm);
+    const byLayer = Array.from({ length: layerCount }, () => []);
+    for (const chord of stackChords({ nailCount, layerCount, leap, multiplier, runs })) byLayer[chord.layerIndex].push(chord);
+    const color = new THREE.Color();
 
-    for (let layerIndex = 0; layerIndex < layerCount; layerIndex++) {
-      const y = worldColorLayerHeight(layerIndex, layerCount, 0, height);
+    byLayer.forEach((chords, layerIndex) => {
+      const layerY = worldColorLayerHeight(layerIndex, layerCount, 0, height);
       const positions = [];
       const vertexColors = [];
-      const leaving = new Map(); // nail index -> { directions, colorIndex } for the thread wrapped round it
-      for (const { fromIndex, toIndex, colorIndex } of layerChords({ nailCount, multiplier, leap, layerIndex, colorCount: colors.length, range })) {
-        const c = threeColors[colorIndex];
+      const push = (a, b, y, hex) => {
+        const from = to3D(a, y);
+        const to = to3D(b, y);
+        color.set(hex);
+        positions.push(from.x, from.y, from.z, to.x, to.y, to.z);
+        vertexColors.push(color.r, color.g, color.b, color.r, color.g, color.b);
+      };
+      // Per run of the stack: nail index -> { directions, color } for the thread wrapped round it.
+      const leaving = new Map();
+      for (const { fromIndex, toIndex, color: hex, stackIndex, single } of chords) {
+        const y = layerY + stackIndex * runGap;
         // The thread wraps around its nails, so each chord is two strands -
-        // crossing (8) or parallel (O) - rather than one through the centers.
-        for (const string of wrapStrands(nails[fromIndex], nails[toIndex], thread.wrapRadius, thread.technique)) {
-          const from = to3D(string.from, y);
-          const to = to3D(string.to, y);
-          positions.push(from.x, from.y, from.z, to.x, to.y, to.z);
-          vertexColors.push(c.r, c.g, c.b, c.r, c.g, c.b);
+        // crossing (8) or parallel (O) - rather than one through the centers;
+        // the last chord of a run is the thread's end, strung one way only.
+        for (const string of connectionStrands(nails[fromIndex], nails[toIndex], thread.wrapRadius, thread.technique, single)) {
+          push(string.from, string.to, y, hex);
         }
         if (showWrap) {
           const a = nails[fromIndex];
           const b = nails[toIndex];
           const note = (index, dx, dy) => {
-            if (!leaving.has(index)) leaving.set(index, { directions: [], colorIndex });
-            leaving.get(index).directions.push({ x: dx, y: dy });
+            const key = `${stackIndex}:${index}`;
+            if (!leaving.has(key)) leaving.set(key, { index, y, hex, directions: [] });
+            leaving.get(key).directions.push({ x: dx, y: dy });
           };
           note(fromIndex, b.x - a.x, b.y - a.y);
           note(toIndex, a.x - b.x, a.y - b.y);
         }
       }
       // Where the thread turns round a nail: an arc of the nail's circle.
-      for (const [index, { directions, colorIndex }] of leaving) {
+      for (const { index, y, hex, directions } of leaving.values()) {
         const arc = wrapArc(nails[index], thread.wrapRadius, directions);
-        const c = threeColors[colorIndex];
-        for (let i = 0; i + 1 < arc.length; i++) {
-          const from = to3D(arc[i], y);
-          const to = to3D(arc[i + 1], y);
-          positions.push(from.x, from.y, from.z, to.x, to.y, to.z);
-          vertexColors.push(c.r, c.g, c.b, c.r, c.g, c.b);
-        }
+        for (let i = 0; i + 1 < arc.length; i++) push(arc[i], arc[i + 1], y, hex);
       }
       const line = assembleWeaveLineObject(positions, vertexColors, 1, this.lineResolution, 1, thread.lineWidth);
-      if (!line) continue;
+      if (!line) return;
       this.scene.add(line);
       this.layerLines.push(line);
-    }
+    });
   }
 
   #disposeContent() {

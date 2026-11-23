@@ -4,19 +4,24 @@
  * default multiplier 2 envelopes a cardioid; 3 gives a nephroid, ...), stacked
  * into layers.
  *
- * Each layer is the same weave, rotated around the circle:
- * - Layer `k` starts at nail `k * leap`. Counting from that start nail,
- *   offset `j` (0 .. nailCount - 1) joins nail `start + j` to nail
- *   `start + multiplier * j` (mod nailCount) - i.e. the layer is the layer-0
- *   pattern turned by `k * leap` nails. `leap = 0` stacks identical layers.
- * - A layer's chords are split into `colorCount` equal, contiguous groups by
- *   `j`: with 2 colors the first half of the start nails is color A and the
- *   second half color B; with 3, a third each; and so on.
- * - Threads are numbered 1 .. nailCount by `j` (thread `j` joins nail `j` to
- *   nail `multiplier * j`, nail `nailCount` being nail 0). A `range` keeps
- *   only threads `start .. end`, e.g. 1-24 of 48 is half a cardioid and 25-36
- *   its third quarter. `start > end` wraps past `nailCount` back to 1. Colors
- *   stay tied to the thread number, so hiding threads never recolors the rest.
+ * A layer is a stack of **runs**, each like its own pass of the times table:
+ * - A run has a `rotation` (the nail its pattern starts from), a thread
+ *   `range`, a color, and optionally its own multiplier and leap (otherwise
+ *   the shared ones).
+ * - Threads are numbered 1 .. nailCount by `j` (thread `j` joins nail
+ *   `start + j` to nail `start + multiplier * j`, mod nailCount, where
+ *   `start = rotation + layerIndex * leap`; thread `nailCount` is `j = 0`).
+ *   E.g. with 48 nails, a run of threads 1-24 is half a cardioid and 24-47 the
+ *   other half; three nephroid runs of threads 1-6 turned 0, 16 and 32 nails
+ *   give 1-3 .. 6-18, 17-19 .. 22-34 and 33-35 .. 38-2. A range whose start
+ *   is after its end wraps past `nailCount` back to 1.
+ * - The thread runs out and back round its nails, so every chord is two
+ *   strands - except the last chord of a run, where the thread ends going one
+ *   way only (`single`).
+ * - Layer `k` repeats the whole stack, each run turned by `k * leap` nails
+ *   (its own leap, or the shared one). `leap = 0` stacks identical layers.
+ * - Within a layer, runs sit one above the other in stack order
+ *   (`stackIndex`, 0 = against the layer below).
  * - Nails sit on a circle, or an ellipse `stretch` times as wide as it is
  *   tall, numbered clockwise or counter-clockwise from nail 0 at the top.
  *
@@ -74,24 +79,64 @@ export function threadInRange(j, nailCount, range) {
 }
 
 /**
- * Every chord of one layer.
- * @param {{nailCount:number, multiplier:number, leap:number, layerIndex:number, colorCount:number, range?: {start:number, end:number} | null}} params
- * @returns {{fromIndex:number, toIndex:number, colorIndex:number}[]}
- *   nail indices into `circleNailPositions`, and which of the `colorCount`
- *   colors the chord uses. Chords that would join a nail to itself are
- *   dropped (nothing to draw).
+ * The chords of one run on one layer, in the order they are strung (thread
+ * `range.start` first, up to `range.end`). Chords that would join a nail to
+ * itself are dropped (nothing to draw). The last chord is marked `single`:
+ * the thread ends there, so it crosses once instead of out and back.
+ * @param {{nailCount:number, multiplier:number, leap:number, layerIndex:number, rotation?:number, range?: {start:number, end:number} | null}} params
+ * @returns {{fromIndex:number, toIndex:number, thread:number, single:boolean}[]} nail indices into `ellipseNailPositions`
  */
-export function layerChords({ nailCount, multiplier, leap, layerIndex, colorCount, range = null }) {
-  const start = layerIndex * leap;
+export function runChords({ nailCount, multiplier, leap, layerIndex, rotation = 0, range = null }) {
+  const start = rotation + layerIndex * leap;
+  const first = range ? range.start : 1;
+  const count = range ? mod(range.end - range.start, nailCount) + 1 : nailCount;
   const chords = [];
-  for (let j = 0; j < nailCount; j++) {
-    if (!threadInRange(j, nailCount, range)) continue;
+  for (let k = 0; k < count; k++) {
+    const thread = mod(first - 1 + k, nailCount) + 1;
+    const j = thread % nailCount;
     const fromIndex = mod(start + j, nailCount);
     const toIndex = mod(start + multiplier * j, nailCount);
     if (fromIndex === toIndex) continue;
-    chords.push({ fromIndex, toIndex, colorIndex: Math.min(colorCount - 1, Math.floor((j * colorCount) / nailCount)) });
+    chords.push({ fromIndex, toIndex, thread, single: false });
+  }
+  if (chords.length > 0) chords[chords.length - 1].single = true;
+  return chords;
+}
+
+/**
+ * Every chord of every layer of a run stack. Hidden runs (`enabled: false`)
+ * are skipped and leave no gap in the stack.
+ * @param {{
+ *   nailCount:number, layerCount:number, leap:number, multiplier:number,
+ *   runs: {color:string, enabled:boolean, rangeStart:number, rangeEnd:number, rotation:number, multiplier:number|null, leap:number|null}[],
+ * }} params a run's `multiplier`/`leap` of null means the shared one
+ * @returns {{fromIndex:number, toIndex:number, color:string, layerIndex:number, stackIndex:number, runIndex:number, single:boolean}[]}
+ */
+export function stackChords({ nailCount, layerCount, leap, multiplier, runs }) {
+  const chords = [];
+  for (let layerIndex = 0; layerIndex < layerCount; layerIndex++) {
+    let stackIndex = 0;
+    runs.forEach((run, runIndex) => {
+      if (!run.enabled) return;
+      for (const chord of runChords({
+        nailCount,
+        multiplier: run.multiplier ?? multiplier,
+        leap: run.leap ?? leap,
+        layerIndex,
+        rotation: run.rotation,
+        range: { start: run.rangeStart, end: run.rangeEnd },
+      })) {
+        chords.push({ fromIndex: chord.fromIndex, toIndex: chord.toIndex, color: run.color, layerIndex, stackIndex, runIndex, single: chord.single });
+      }
+      stackIndex++;
+    });
   }
   return chords;
+}
+
+/** How many runs are drawn (enabled) - the height of one layer's stack. */
+export function stackDepth(runs) {
+  return runs.filter((r) => r.enabled).length;
 }
 
 /**
