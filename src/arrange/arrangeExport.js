@@ -1,6 +1,5 @@
 import { isCardioid } from '../models/shapeFromJSON.js';
 import { placedNails, placedSegments } from './placedShape.js';
-import { controlPointDiameterForColorCount } from '../core/nailDotSize.js';
 import { threadGeometry, expandToStrands } from '../core/threadWrap.js';
 
 /**
@@ -18,9 +17,9 @@ export const EXPORT_MAX_SIZE_PX = 2400;
 const EXPORT_PADDING_FRACTION = 0.05;
 const BACKGROUND_COLOR = '#ffffff';
 const DOT_COLOR = '#000000';
-// The shared nail-dot sizes are tuned for a ~900px canvas; this image is 2400px
-// across, so they need widening to stay visible.
-const NAIL_DOT_SCALE = 3;
+// Each nail is marked by a small exact point at its centre (not a fat dot),
+// so its position can be marked precisely on the real board.
+export const NAIL_POINT_RADIUS_PX = 1.5;
 // Strings are drawn at the real thread width scaled into the image, the same
 // as on the board - but never thinner than this, or they would vanish.
 const MIN_LINE_WIDTH_PX = 0.75;
@@ -30,7 +29,7 @@ const MIN_LINE_WIDTH_PX = 0.75;
  * @param {{shapeSnapshot: import('../models/FreeformShape.js').FreeformShape, position:{x:number,y:number}, rotationRadians:number, scale:number}[]} instances
  * Each connection becomes its two real strands (see core/threadWrap.js).
  * @param {{threadWidthMm:number, nailDiameterMm:number, technique:string}} threadSettings
- * @returns {{nails: {x:number,y:number}[], segments: {from:{x:number,y:number}, to:{x:number,y:number}, color:string, layerIndex:number}[], lineWidth: number, colorCount: number}[]}
+ * @returns {{nails: {x:number,y:number}[], segments: {from:{x:number,y:number}, to:{x:number,y:number}, color:string, layerIndex:number}[], lineWidth: number}[]}
  */
 export function arrangeExportGeometry(instances, threadSettings) {
   return instances.map((instance) => {
@@ -49,7 +48,6 @@ export function arrangeExportGeometry(instances, threadSettings) {
       nails,
       segments: expandToStrands(segments, thread.wrapRadius, thread.technique),
       lineWidth: thread.lineWidth,
-      colorCount: shape.colors.length,
     };
   });
 }
@@ -132,11 +130,10 @@ export function renderArrangeExport(geometry, { withStrings }) {
   }
 
   ctx.fillStyle = DOT_COLOR;
-  for (const { nails, colorCount } of geometry) {
-    const radius = (controlPointDiameterForColorCount(colorCount) * NAIL_DOT_SCALE) / 2;
+  for (const { nails } of geometry) {
     for (const p of nails) {
       ctx.beginPath();
-      ctx.arc(toX(p.x), toY(p.y), radius, 0, Math.PI * 2);
+      ctx.arc(toX(p.x), toY(p.y), NAIL_POINT_RADIUS_PX, 0, Math.PI * 2);
       ctx.fill();
     }
   }

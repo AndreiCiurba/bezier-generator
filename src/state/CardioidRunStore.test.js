@@ -58,4 +58,23 @@ describe('CardioidRunStore', () => {
     expect(calls).toBe(2);
     expect(store.runs[0]).toMatchObject({ rotation: 16, rangeEnd: 60 });
   });
+
+  it('changes the threads of every linked run at once, so "threads 1-24" applies to the whole stack', () => {
+    const store = new CardioidRunStore(48);
+    store.add(48);
+    store.add(48);
+    store.update(1, { rangeStart: 1, rangeEnd: 24 });
+    expect(store.runs.map((r) => [r.rangeStart, r.rangeEnd])).toEqual([[1, 24], [1, 24], [1, 24]]);
+  });
+
+  it('leaves a run with its own threads alone, and links it back to the shared threads when unticked', () => {
+    const store = new CardioidRunStore(48);
+    store.add(48);
+    store.setOwnRange(1, true);
+    store.update(1, { rangeEnd: 6 });
+    store.update(0, { rangeEnd: 24 });
+    expect(store.runs.map((r) => r.rangeEnd)).toEqual([24, 6]);
+    store.setOwnRange(1, false);
+    expect(store.runs[1].rangeEnd).toBe(24);
+  });
 });

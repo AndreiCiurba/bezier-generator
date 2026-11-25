@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_VIEW_DIRECTION, framingDistance, defaultCameraPosition, orthographicHalfExtents } from './cameraFraming.js';
+import { DEFAULT_VIEW_DIRECTION, framingDistance, defaultCameraPosition, orthographicHalfExtents, topCameraPosition } from './cameraFraming.js';
 
 describe('DEFAULT_VIEW_DIRECTION', () => {
   it('is a unit vector', () => {
@@ -85,5 +85,15 @@ describe('orthographicHalfExtents', () => {
     const { halfWidth, halfHeight } = orthographicHalfExtents(900, 400, 1300, 700, 1.1);
     expect(halfWidth).toBeGreaterThanOrEqual(boardHalfWidth - 1e-9);
     expect(halfHeight).toBeGreaterThanOrEqual(boardHalfDepth - 1e-9);
+  });
+});
+
+describe('topCameraPosition', () => {
+  it('looks (almost) straight down from above the board centre, far enough to see all of it', () => {
+    const p = topCameraPosition(12000, 6000, 50);
+    expect(p.x).toBe(0);
+    expect(p.y).toBeGreaterThan(Math.hypot(6000, 3000));
+    expect(p.z / p.y).toBeLessThan(0.001); // a hair off vertical, so OrbitControls keeps its "up"
+    expect(p.z).toBeGreaterThan(0); // board top (-Z) stays at the top of the screen
   });
 });

@@ -74,7 +74,10 @@
       by leap nails from the layer below and stacked up the board.
     </div>
 
-    <button id="resetCameraBtn" class="menu-btn" style="margin-top: 8px;">Reset Camera</button>
+    <div style="display:flex; gap:4px; margin-top: 8px;">
+      <button id="resetCameraBtn" class="menu-btn" style="width:auto; flex:1;" title="Straight down onto the board">Reset Camera (top view)</button>
+      <button id="angledViewBtn" class="menu-btn" style="width:auto; flex:1;" title="Oblique three-quarter view">Angled view</button>
+    </div>
 
     <div style="font-size: 11px; color: var(--panel-text); margin-top: 10px;">Weave</div>
     <label style="font-size: 11px; color: var(--panel-text); display:flex; align-items:center; gap:4px; margin-top: 4px;">
@@ -164,7 +167,9 @@
       from its own point 0: thread j joins nail (point 0 + j) to nail (point 0 + multiplier &times; j). With 48
       nails, threads 1&ndash;24 from point 0 = 0 strings 1-2 &hellip; 24-48; from point 0 = 24 it strings
       25-26 &hellip; 48-24, the same half turned 180&deg;. The last thread of a run is strung one way only.
-      Blank Mult./Leap use the shared values above.
+      Threads are shared: changing them on one run changes every run without &ldquo;own&rdquo; ticked.
+      Blank Mult./Leap use the shared values above. Click a run's swatch for the thread palette, or the small
+      picker beside it for any color.
     </div>
     <div id="runsContainer"></div>
     <button id="addRunBtn" class="menu-btn" style="margin-top: 6px;">Add run</button>

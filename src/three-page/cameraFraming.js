@@ -54,6 +54,20 @@ export function defaultCameraPosition(boardWidth, boardDepth, fovDegrees) {
 }
 
 /**
+ * Straight down onto the board, framing all of it, with the board's 2D top
+ * (negative y = world -Z) at the top of the screen. Nudged a hair off the
+ * vertical so OrbitControls keeps a well-defined "up".
+ * @param {number} boardWidth
+ * @param {number} boardDepth
+ * @param {number} fovDegrees
+ * @returns {{x:number, y:number, z:number}}
+ */
+export function topCameraPosition(boardWidth, boardDepth, fovDegrees) {
+  const distance = framingDistance(boardWidth, boardDepth, fovDegrees, 1.1);
+  return { x: 0, y: distance, z: distance * 1e-4 };
+}
+
+/**
  * The half-width/half-height an orthographic camera's frustum needs to
  * contain the whole `boardWidth` x `boardDepth` board (plus padding),
  * letterboxed/pillarboxed to the actual `viewportWidth`/`viewportHeight`

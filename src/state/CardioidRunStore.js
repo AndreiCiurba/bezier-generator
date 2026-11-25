@@ -4,6 +4,10 @@ import { defaultRun, normalizeRun, fitRunToNailCount, RUN_COLORS } from '../mode
  * The Cardioid page's run stack: the runs every layer is woven from, in
  * stack order (index 0 lies against the layer below, each later run on top
  * of it). Same small pub-sub shape as the other `src/state/` stores.
+ *
+ * Thread ranges are linked: changing the threads of one run changes them on
+ * every run that hasn't been given its own range (`ownRange`), so e.g.
+ * "threads 1-24" applies to the whole stack at once.
  */
 export class CardioidRunStore {
   #runs;
@@ -70,9 +74,36 @@ export class CardioidRunStore {
     this.#notify();
   }
 
+  /** Changes run `index`; a thread range change also reaches every other linked run (see this class's doc). */
   update(index, changes) {
-    if (!this.#runs[index]) return;
-    Object.assign(this.#runs[index], changes);
+    const run = this.#runs[index];
+    if (!run) return;
+    Object.assign(run, changes);
+    if (!run.ownRange && ('rangeStart' in changes || 'rangeEnd' in changes)) {
+      for (const other of this.#runs) {
+        if (other.ownRange) continue;
+        other.rangeStart = run.rangeStart;
+        other.rangeEnd = run.rangeEnd;
+      }
+    }
+    this.#notify();
+  }
+
+  /**
+   * Gives run `index` its own thread range (`own` true), or links it back to
+   * the shared one - taking the range the other linked runs already have.
+   */
+  setOwnRange(index, own) {
+    const run = this.#runs[index];
+    if (!run) return;
+    run.ownRange = own;
+    if (!own) {
+      const linked = this.#runs.find((r) => r !== run && !r.ownRange);
+      if (linked) {
+        run.rangeStart = linked.rangeStart;
+        run.rangeEnd = linked.rangeEnd;
+      }
+    }
     this.#notify();
   }
 

@@ -28,6 +28,14 @@ export const MAX_THREAD_WIDTH_MM = 10;
 export const MIN_NAIL_DIAMETER_MM = 0.1;
 export const MAX_NAIL_DIAMETER_MM = 50;
 
+// Nails this wide or wider are plain rods: drawn without a head.
+export const HEADLESS_NAIL_DIAMETER_MM = 3;
+
+/** Whether a nail of this real diameter has a head (thinner ones do; 3 mm and up are plain rods). */
+export function nailHasHead(diameterMm) {
+  return diameterMm < HEADLESS_NAIL_DIAMETER_MM;
+}
+
 export function mmToWorld(mm) {
   return mm * WORLD_UNITS_PER_MM;
 }

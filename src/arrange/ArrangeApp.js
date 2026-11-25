@@ -9,7 +9,7 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { NailHeightUI } from '../three-page/NailHeightUI.js';
-import { worldToCm } from '../core/threadWrap.js';
+import { worldToCm, mmToWorld, WORLD_UNITS_PER_MM } from '../core/threadWrap.js';
 import { ThreadSettingsUI, loadThreadSettings } from '../ui/ThreadSettingsUI.js';
 import { StrokePalette } from '../state/StrokePalette.js';
 import { FavoritesStore } from '../state/FavoritesStore.js';
@@ -18,7 +18,10 @@ import { PickerModeUI } from '../ui/PickerModeUI.js';
 import { FavoritesUI } from '../ui/FavoritesUI.js';
 import { PanelGroup } from '../ui/PanelGroup.js';
 import { OrientationGizmo } from '../three-page/OrientationGizmo.js';
-import { defaultCameraPosition } from '../three-page/cameraFraming.js';
+import { defaultCameraPosition, topCameraPosition } from '../three-page/cameraFraming.js';
+import { cameraSnapshot, restoreCamera } from '../three-page/cameraMemory.js';
+import { mergeSavedSettings } from '../io/mergeSavedSettings.js';
+import { DEFAULT_BOARD_COLOR, DEFAULT_BOARD_THICKNESS } from '../three-page/SceneSync.js';
 import { fromWorld3 } from '../three-page/axisMapping.js';
 import { downloadJson, readJsonFile } from '../io/JsonFile.js';
 import { downloadCanvasPng } from '../io/PngFile.js';
@@ -26,7 +29,9 @@ import { arrangeExportGeometry, renderArrangeExport } from './arrangeExport.js';
 import { shapeExtent, scaleForTargetSize } from './placementSize.js';
 import { generateId } from '../utils/id.js';
 import { saveToStorage, loadFromStorage, clearFromStorage } from '../io/BrowserStorage.js';
-import { SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY } from '../io/storageKeys.js';
+import {
+  SHAPE_LIBRARY_STORAGE_KEY, CARDIOID_LIBRARY_STORAGE_KEY, ARRANGEMENT_STORAGE_KEY, ARRANGE_SETTINGS_STORAGE_KEY,
+} from '../io/storageKeys.js';
 
 // Scaled 10x (was 1200) for the same reason as the Shapes page's own
 // PRESET_RADIUS (see ShapeDesignerApp.js) - real room for a thin
@@ -59,6 +64,18 @@ const DEFAULT_ARRANGE_HEIGHT = 1000;
 // length for its longest side instead (see placementSize.js) - chosen with the
 // "Placement Size" slider, still freely editable per instance afterwards.
 const DEFAULT_PLACEMENT_SIZE = 1500;
+const MIN_BOARD_THICKNESS_MM = 0.5;
+const MAX_BOARD_THICKNESS_MM = 200;
+// Everything on this board that is remembered between visits (see #saveSettings).
+const DEFAULT_SETTINGS = {
+  boardWidth: DEFAULT_BOARD_WIDTH,
+  boardDepth: DEFAULT_BOARD_DEPTH,
+  boardColor: DEFAULT_BOARD_COLOR,
+  boardThicknessMm: DEFAULT_BOARD_THICKNESS / WORLD_UNITS_PER_MM,
+  globalHeight: DEFAULT_ARRANGE_HEIGHT,
+  globalNailsVisible: true,
+  placementSize: DEFAULT_PLACEMENT_SIZE,
+};
 
 /**
  * The Arrange board page, wired together: a flat Three.js board (no nail
@@ -99,12 +116,21 @@ export class ArrangeApp {
     this.library = new ShapeLibraryStore(); // shapes imported from the Shape Designer, available to place
     this.instances = new ArrangedShapeStore(); // shapes actually placed on this board
 
-    this.globalHeight = DEFAULT_ARRANGE_HEIGHT;
+    // The board as it was last left (size, color, thickness, height, nails,
+    // placement size, camera), else the defaults.
+    this.savedSettings = loadFromStorage(ARRANGE_SETTINGS_STORAGE_KEY);
+    const settings = mergeSavedSettings(DEFAULT_SETTINGS, this.savedSettings?.settings);
+    const side = (value, fallback) => (value >= MIN_BOARD_SIDE && value <= MAX_BOARD_SIDE ? value : fallback);
+    this.globalHeight = settings.globalHeight;
     // Real thread width / nail width / 8-or-O wrap, in mm (10 world units = 1 mm) - see core/threadWrap.js.
     this.threadSettings = loadThreadSettings();
-    this.globalNailsVisible = true;
-    this.boardWidth = DEFAULT_BOARD_WIDTH;
-    this.boardDepth = DEFAULT_BOARD_DEPTH;
+    this.globalNailsVisible = settings.globalNailsVisible;
+    this.boardWidth = side(settings.boardWidth, DEFAULT_BOARD_WIDTH);
+    this.boardDepth = side(settings.boardDepth, DEFAULT_BOARD_DEPTH);
+    this.boardColor = /^#[0-9a-f]{6}$/i.test(settings.boardColor) ? settings.boardColor : DEFAULT_BOARD_COLOR;
+    this.boardThicknessMm = settings.boardThicknessMm >= MIN_BOARD_THICKNESS_MM && settings.boardThicknessMm <= MAX_BOARD_THICKNESS_MM
+      ? settings.boardThicknessMm : DEFAULT_SETTINGS.boardThicknessMm;
+    this.placementSize = settings.placementSize > 0 ? settings.placementSize : DEFAULT_PLACEMENT_SIZE;
     this.armedShapeId = null; // library shape id selected for the next placement click
     this.selectedInstanceId = null; // placed instance id currently shown in the edit panel
     this.dragState = null; // { id } while a placed instance is being dragged
@@ -123,10 +149,15 @@ export class ArrangeApp {
 
     this.canvas = document.getElementById('arrange-canvas');
     this.#createScene();
-    this.arrangeSceneSync = new ArrangeSceneSync(this.scene, this.boardWidth, this.boardDepth);
+    this.arrangeSceneSync = new ArrangeSceneSync(this.scene, this.boardWidth, this.boardDepth, {
+      color: this.boardColor, thickness: mmToWorld(this.boardThicknessMm),
+    });
     this.#createCamera();
     this.#createRenderer();
     this.#createControls();
+    if (!restoreCamera(this.camera, this.controls, this.savedSettings?.camera)) this.#applyDefaultCameraView();
+    this.controls.addEventListener('end', () => this.#saveSettings());
+    window.addEventListener('pagehide', () => this.#saveSettings());
     this.#createLighting();
     this.gizmo = new OrientationGizmo();
 
@@ -209,6 +240,23 @@ export class ArrangeApp {
     });
   }
 
+  /** Remembers this board's own settings and camera, so coming back from another page finds it exactly as it was left. */
+  #saveSettings() {
+    if (!this.controls) return;
+    saveToStorage(ARRANGE_SETTINGS_STORAGE_KEY, {
+      settings: {
+        boardWidth: this.boardWidth,
+        boardDepth: this.boardDepth,
+        boardColor: this.boardColor,
+        boardThicknessMm: this.boardThicknessMm,
+        globalHeight: this.globalHeight,
+        globalNailsVisible: this.globalNailsVisible,
+        placementSize: this.placementSize,
+      },
+      camera: cameraSnapshot(this.camera, this.controls),
+    });
+  }
+
   /** Restores this board's own placed arrangement, if anything was saved for it. */
   #hydrateInstances() {
     const raw = loadFromStorage(ARRANGEMENT_STORAGE_KEY);
@@ -269,7 +317,6 @@ export class ArrangeApp {
 
   /** The "Placement Size" slider: how long the next placed shape's longest side will be, with a ghost outline at the cursor showing it. */
   #initPlacementSize() {
-    this.placementSize = DEFAULT_PLACEMENT_SIZE;
     this.ghostLine = null;
     this.lastHit = null;
     const slider = document.getElementById('placementSizeSlider');
@@ -279,6 +326,7 @@ export class ArrangeApp {
       this.#updatePlacementSizeLabel();
       this.#updateGhost(this.lastHit);
     });
+    slider.addEventListener('change', () => this.#saveSettings());
     this.#updatePlacementSizeLabel();
 
     // Ctrl + wheel over the board, in placement mode, resizes the shape about to
@@ -298,6 +346,7 @@ export class ArrangeApp {
         slider.value = String(this.placementSize);
         this.#updatePlacementSizeLabel();
         this.#updateGhost(this.lastHit);
+        this.#saveSettings();
       },
       { capture: true, passive: false }
     );
@@ -306,11 +355,18 @@ export class ArrangeApp {
   #updatePlacementSizeLabel() {
     document.getElementById('placementSizeLabel').textContent =
       `Next shape: ${Math.round(this.placementSize)} units = ${+worldToCm(this.placementSize).toFixed(1)} cm long ` +
-      `(board is ${+worldToCm(this.boardWidth).toFixed(1)} x ${+worldToCm(this.boardDepth).toFixed(1)} cm)`;
+      `(board is ${+worldToCm(this.boardWidth).toFixed(1)} x ${+worldToCm(this.boardDepth).toFixed(1)} cm). ` +
+      'Cardioids are placed at the real size they were saved with.';
   }
 
-  /** Scale that makes `shape` come out `placementSize` long on its longest side. */
+  /**
+   * Scale that makes `shape` come out `placementSize` long on its longest
+   * side - except a cardioid, which was saved at real measurements on the
+   * Cardioid page (radius in board units, 10 = 1 mm) and is placed at exactly
+   * that size.
+   */
   #scaleForPlacement(shape) {
+    if (isCardioid(shape)) return 1;
     return scaleForTargetSize(shapeExtent(shape.resampledOutline()), this.placementSize);
   }
 
@@ -406,6 +462,7 @@ export class ArrangeApp {
       (height) => {
         this.globalHeight = height;
         this.#syncScene();
+        this.#saveSettings();
       }
     ).init();
   }
@@ -452,6 +509,30 @@ export class ArrangeApp {
       this.arrangeSceneSync.setBoardSize(width, depth);
       this.#applyDefaultCameraView();
       this.#updatePlacementSizeLabel();
+      this.#saveSettings();
+    });
+
+    // Board color and thickness apply as soon as they change.
+    const colorInput = document.getElementById('boardColorInput');
+    const thicknessInput = document.getElementById('boardThicknessInput');
+    colorInput.value = this.boardColor;
+    thicknessInput.value = String(this.boardThicknessMm);
+    const applyAppearance = () => {
+      this.arrangeSceneSync.setBoardAppearance(this.boardColor, mmToWorld(this.boardThicknessMm));
+      this.#saveSettings();
+    };
+    colorInput.addEventListener('input', () => {
+      this.boardColor = colorInput.value;
+      applyAppearance();
+    });
+    thicknessInput.addEventListener('change', () => {
+      const mm = Number(thicknessInput.value);
+      if (thicknessInput.value.trim() === '' || !(mm >= MIN_BOARD_THICKNESS_MM && mm <= MAX_BOARD_THICKNESS_MM)) {
+        thicknessInput.value = String(this.boardThicknessMm);
+        return;
+      }
+      this.boardThicknessMm = mm;
+      applyAppearance();
     });
     document.getElementById('resetBoardSizeBtn').addEventListener('click', () => {
       widthInput.value = String(DEFAULT_BOARD_WIDTH);
@@ -466,6 +547,7 @@ export class ArrangeApp {
     checkbox.addEventListener('change', () => {
       this.globalNailsVisible = checkbox.checked;
       this.#syncScene();
+      this.#saveSettings();
     });
   }
 
@@ -750,7 +832,14 @@ export class ArrangeApp {
   }
 
   #initCameraReset() {
-    document.getElementById('resetCameraBtn').addEventListener('click', () => this.#applyDefaultCameraView());
+    document.getElementById('resetCameraBtn').addEventListener('click', () => {
+      this.#applyDefaultCameraView();
+      this.#saveSettings();
+    });
+    document.getElementById('angledViewBtn').addEventListener('click', () => {
+      this.#placeCamera(defaultCameraPosition(this.boardWidth, this.boardDepth, CAMERA_FOV));
+      this.#saveSettings();
+    });
   }
 
   #syncScene() {
@@ -832,11 +921,14 @@ export class ArrangeApp {
   #createCamera() {
     const aspect = window.innerWidth / window.innerHeight;
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, aspect, CAMERA_NEAR, CAMERA_FAR);
-    this.#applyDefaultCameraView();
   }
 
+  /** "Reset Camera": straight down onto the whole board. */
   #applyDefaultCameraView() {
-    const position = defaultCameraPosition(this.boardWidth, this.boardDepth, CAMERA_FOV);
+    this.#placeCamera(topCameraPosition(this.boardWidth, this.boardDepth, CAMERA_FOV));
+  }
+
+  #placeCamera(position) {
     this.camera.position.set(position.x, position.y, position.z);
     this.camera.lookAt(ORBIT_TARGET.x, ORBIT_TARGET.y, ORBIT_TARGET.z);
     if (this.controls) {

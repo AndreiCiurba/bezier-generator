@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  mmToWorld, worldToCm, threadGeometry, wrapStrands, expandToStrands, normalizeThreadSettings,
+  mmToWorld, worldToCm, threadGeometry, wrapStrands, expandToStrands, normalizeThreadSettings, nailHasHead,
   DEFAULT_THREAD_WIDTH_MM, DEFAULT_NAIL_DIAMETER_MM,
 } from './threadWrap.js';
 
@@ -86,5 +86,14 @@ describe('normalizeThreadSettings', () => {
   it('keeps valid saved values so the physical setup survives a reload', () => {
     expect(normalizeThreadSettings({ threadWidthMm: 0.4, nailDiameterMm: 4, technique: 'O' }))
       .toEqual({ threadWidthMm: 0.4, nailDiameterMm: 4, technique: 'O' });
+  });
+});
+
+describe('nailHasHead', () => {
+  it('gives thin nails a head but draws 3 mm and wider nails as plain rods, like the real ones', () => {
+    expect(nailHasHead(1.5)).toBe(true);
+    expect(nailHasHead(2.99)).toBe(true);
+    expect(nailHasHead(3)).toBe(false);
+    expect(nailHasHead(5)).toBe(false);
   });
 });

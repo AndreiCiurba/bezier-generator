@@ -6,7 +6,7 @@ import {
 import { assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { ellipseNailPositions, stackChords, wrapArc } from '../core/cardioidWeave.js';
-import { threadGeometry, connectionStrands, mmToWorld } from '../core/threadWrap.js';
+import { threadGeometry, connectionStrands, mmToWorld, nailHasHead } from '../core/threadWrap.js';
 
 const BOARD_MARGIN = 1.3; // board half-extent as a multiple of the circle radius
 
@@ -28,6 +28,7 @@ export class CardioidSceneSync {
     this.nailMesh = null;
     this.boardMesh = null;
     this.nailGeometry = buildNailGeometry(SHAFT_RADIUS, HEAD_RADIUS);
+    this.headlessNailGeometry = buildNailGeometry(SHAFT_RADIUS, SHAFT_RADIUS); // 3 mm and wider: plain rods
     this.nailMaterial = new THREE.MeshStandardMaterial({ color: DEFAULT_NAIL_COLOR });
   }
 
@@ -68,8 +69,9 @@ export class CardioidSceneSync {
     this.scene.add(this.boardMesh);
   }
 
-  #buildNails(nails, { height, nailsVisible }, thread) {
-    const mesh = new THREE.InstancedMesh(this.nailGeometry, this.nailMaterial, nails.length);
+  #buildNails(nails, { height, nailsVisible, thread: threadSettings }, thread) {
+    const geometry = nailHasHead(threadSettings.nailDiameterMm) ? this.nailGeometry : this.headlessNailGeometry;
+    const mesh = new THREE.InstancedMesh(geometry, this.nailMaterial, nails.length);
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
     const widthScale = thread.nailRadius / SHAFT_RADIUS; // the nail model's shaft is SHAFT_RADIUS round
@@ -162,6 +164,7 @@ export class CardioidSceneSync {
   dispose() {
     this.#disposeContent();
     this.nailGeometry.dispose();
+    this.headlessNailGeometry.dispose();
     this.nailMaterial.dispose();
   }
 }

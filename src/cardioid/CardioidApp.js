@@ -8,11 +8,13 @@ import { MenuUI } from '../ui/MenuUI.js';
 import { initPanelResizers } from '../ui/PanelResizer.js';
 import { initThemeToggle } from '../three-page/ThemeToggle.js';
 import { OrientationGizmo } from '../three-page/OrientationGizmo.js';
-import { defaultCameraPosition } from '../three-page/cameraFraming.js';
+import { defaultCameraPosition, topCameraPosition } from '../three-page/cameraFraming.js';
 import { CardioidShape } from '../models/CardioidShape.js';
 import { ShapeLibraryStore } from '../state/ShapeLibraryStore.js';
 import { saveToStorage, loadFromStorage } from '../io/BrowserStorage.js';
-import { CARDIOID_LIBRARY_STORAGE_KEY } from '../io/storageKeys.js';
+import { CARDIOID_LIBRARY_STORAGE_KEY, CARDIOID_PAGE_STORAGE_KEY } from '../io/storageKeys.js';
+import { mergeSavedSettings } from '../io/mergeSavedSettings.js';
+import { cameraSnapshot, restoreCamera } from '../three-page/cameraMemory.js';
 import { generateId } from '../utils/id.js';
 import { ThreadSettingsUI, loadThreadSettings } from '../ui/ThreadSettingsUI.js';
 import { worldToCm } from '../core/threadWrap.js';
@@ -50,7 +52,7 @@ const FIELDS = [
  */
 export class CardioidApp {
   constructor() {
-    this.settings = {
+    const defaults = {
       nailCount: 48,
       layerCount: 48,
       leap: 1,
@@ -64,10 +66,14 @@ export class CardioidApp {
       direction: 'cw',
       runGapMm: DEFAULT_RUN_GAP_MM, // how far each run of a layer's stack sits above the one before
     };
+    // Everything as it was last left on this page (settings, runs, camera), else the defaults.
+    this.saved = loadFromStorage(CARDIOID_PAGE_STORAGE_KEY);
+    this.settings = mergeSavedSettings(defaults, this.saved?.settings);
     // Real thread width / nail width / 8-or-O wrap in mm, shared with Arrange.
     this.thread = loadThreadSettings();
     this.library = new ShapeLibraryStore();
     this.runs = new CardioidRunStore(this.settings.nailCount);
+    if (Array.isArray(this.saved?.runs)) this.runs.setAll(this.saved.runs, this.settings.nailCount);
   }
 
   init() {
@@ -81,7 +87,9 @@ export class CardioidApp {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
-    this.#applyDefaultCameraView();
+    if (!restoreCamera(this.camera, this.controls, this.saved?.camera)) this.#applyTopView();
+    this.controls.addEventListener('end', () => this.#saveState());
+    window.addEventListener('pagehide', () => this.#saveState());
 
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const directional = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -100,7 +108,14 @@ export class CardioidApp {
     this.#initWrapToggle();
     this.#initThreadSettings();
     this.#initRuns();
-    document.getElementById('resetCameraBtn').addEventListener('click', () => this.#applyDefaultCameraView());
+    document.getElementById('resetCameraBtn').addEventListener('click', () => {
+      this.#applyTopView();
+      this.#saveState();
+    });
+    document.getElementById('angledViewBtn').addEventListener('click', () => {
+      this.#applyAngledView();
+      this.#saveState();
+    });
 
     window.addEventListener('resize', this.#handleResize);
     this.#handleResize();
@@ -316,11 +331,34 @@ export class CardioidApp {
     });
     this.#showRealSize();
     this.sceneSync.setViewportSize(window.innerWidth, window.innerHeight);
+    this.#saveState();
   }
 
+  /** Remembers the page exactly as it is (settings, runs, camera), so coming back from another page finds it unchanged. */
+  #saveState() {
+    if (!this.controls) return;
+    saveToStorage(CARDIOID_PAGE_STORAGE_KEY, {
+      settings: this.settings, runs: this.runs.runs, camera: cameraSnapshot(this.camera, this.controls),
+    });
+  }
+
+  /** "Reset Camera": straight down onto the board, all of it in view. Also used whenever the board's size changes. */
   #applyDefaultCameraView() {
+    this.#applyTopView();
+  }
+
+  #applyTopView() {
     const size = CardioidSceneSync.boardSizeFor(this.settings.radius, this.#stretch);
-    const position = defaultCameraPosition(size, size, CAMERA_FOV);
+    this.#placeCamera(topCameraPosition(size, size, CAMERA_FOV));
+  }
+
+  /** The oblique three-quarter view. */
+  #applyAngledView() {
+    const size = CardioidSceneSync.boardSizeFor(this.settings.radius, this.#stretch);
+    this.#placeCamera(defaultCameraPosition(size, size, CAMERA_FOV));
+  }
+
+  #placeCamera(position) {
     this.camera.position.set(position.x, position.y, position.z);
     this.camera.lookAt(ORBIT_TARGET.x, ORBIT_TARGET.y, ORBIT_TARGET.z);
     this.controls.target.set(ORBIT_TARGET.x, ORBIT_TARGET.y, ORBIT_TARGET.z);

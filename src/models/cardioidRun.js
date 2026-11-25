@@ -1,21 +1,24 @@
 import { threadInRange } from '../core/cardioidWeave.js';
+import { CATEGORY_LEAD_COLORS } from '../data/categoryLeadColors.js';
 
 /**
  * One run of a cardioid's stack (see `core/cardioidWeave.js`): like its own
  * pass of the times table, with its own start nail (`rotation`), thread
- * range, color and - when not null - its own multiplier and leap.
- * @typedef {{color:string, enabled:boolean, rangeStart:number, rangeEnd:number, rotation:number, multiplier:number|null, leap:number|null}} CardioidRun
+ * range, color and - when not null - its own multiplier and leap. Runs share
+ * one thread range unless `ownRange` is set (see `CardioidRunStore`).
+ * @typedef {{color:string, enabled:boolean, rangeStart:number, rangeEnd:number, rotation:number, multiplier:number|null, leap:number|null, ownRange:boolean}} CardioidRun
  */
 
-// Colors handed to new runs in turn, so stacked runs are told apart at a glance.
-export const RUN_COLORS = ['#e63946', '#ffffff', '#f4a261', '#2a9d8f', '#457b9d', '#e9c46a', '#8338ec', '#06d6a0'];
+// Colors handed to new runs in turn - the custom palette's category lead
+// colors, so stacked runs start out as real thread colors and differ at a glance.
+export const RUN_COLORS = [...CATEGORY_LEAD_COLORS];
 
 /** Gap between two stacked runs of one layer: one thread lies on the other. */
 export const DEFAULT_RUN_GAP_MM = 0.5;
 
 /** A run over every thread, unturned, using the shared multiplier and leap. */
 export function defaultRun(nailCount, color = RUN_COLORS[0]) {
-  return { color, enabled: true, rangeStart: 1, rangeEnd: nailCount, rotation: 0, multiplier: null, leap: null };
+  return { color, enabled: true, rangeStart: 1, rangeEnd: nailCount, rotation: 0, multiplier: null, leap: null, ownRange: false };
 }
 
 const intIn = (value, min, max) => Number.isInteger(value) && value >= min && value <= max;
@@ -35,6 +38,7 @@ export function normalizeRun(raw, nailCount) {
     rotation: Number.isInteger(raw?.rotation) ? raw.rotation : 0,
     multiplier: intIn(raw?.multiplier, 1, 100) ? raw.multiplier : null,
     leap: intIn(raw?.leap, 0, 1000) ? raw.leap : null,
+    ownRange: raw?.ownRange === true,
   };
 }
 
@@ -75,7 +79,8 @@ export function runsFromLegacy({ nailCount, colors = [], rangeStart = null, rang
     if (current && current.colorIndex === colorIndex) {
       current.run.rangeEnd = thread;
     } else {
-      current = { colorIndex, run: { ...defaultRun(nailCount, enabled[colorIndex]), rangeStart: thread, rangeEnd: thread } };
+      // Each color arc had its own threads, so these keep their own range.
+      current = { colorIndex, run: { ...defaultRun(nailCount, enabled[colorIndex]), rangeStart: thread, rangeEnd: thread, ownRange: true } };
       runs.push(current.run);
     }
   }

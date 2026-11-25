@@ -23,3 +23,9 @@ export const THREAD_STORAGE_KEY = 'arrangeThread:v1';
 
 /** Cardioids saved on `/cardioid/` - read (and deletable) on `/arrange/` alongside the Shape Designer library. */
 export const CARDIOID_LIBRARY_STORAGE_KEY = 'cardioidLibrary:v1';
+
+/** The Arrange board's own settings (board size/color/thickness, height, nails, placement size, camera), so coming back finds it as it was left. */
+export const ARRANGE_SETTINGS_STORAGE_KEY = 'arrangeSettings:v1';
+
+/** The Cardioid page's working state (every setting, the run stack, camera), so coming back finds it as it was left. */
+export const CARDIOID_PAGE_STORAGE_KEY = 'cardioidPage:v1';

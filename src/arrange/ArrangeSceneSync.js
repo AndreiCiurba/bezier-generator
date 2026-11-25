@@ -4,7 +4,7 @@ import {
   DEFAULT_BOARD_THICKNESS, DEFAULT_BOARD_COLOR, BOARD_TOP_Y, DEFAULT_NAIL_COLOR, SHAFT_RADIUS, HEAD_RADIUS, buildNailGeometry,
 } from '../three-page/SceneSync.js';
 import { buildClosedWeaveLineObject, assembleWeaveLineObject } from '../three-page/weaveLineBuilder.js';
-import { threadGeometry, connectionStrands, mmToWorld } from '../core/threadWrap.js';
+import { threadGeometry, connectionStrands, mmToWorld, nailHasHead } from '../core/threadWrap.js';
 import { worldColorLayerHeight } from '../core/curveZLayers.js';
 import { isCardioid } from '../models/shapeFromJSON.js';
 import { placedNails, placedSegments } from './placedShape.js';
@@ -24,16 +24,19 @@ import { placedNails, placedSegments } from './placedShape.js';
  * at this scale; worth revisiting only if that assumption stops holding.
  */
 export class ArrangeSceneSync {
-  constructor(scene, boardWidth, boardDepth = boardWidth) {
+  constructor(scene, boardWidth, boardDepth = boardWidth, { color = DEFAULT_BOARD_COLOR, thickness = DEFAULT_BOARD_THICKNESS } = {}) {
     this.scene = scene;
     this.boardWidth = boardWidth;
     this.boardDepth = boardDepth;
+    this.boardColor = color;
+    this.boardThickness = thickness;
     this.lineResolution = new THREE.Vector2(1, 1);
     this.instanceLines = new Map(); // instance id -> LineSegments2
     this.instanceNails = new Map(); // instance id -> InstancedMesh (one nail per resampled outline point)
     // One shared silhouette for every nail - the exact same unit-height
     // geometry/radii the grid page's 3D view uses, scaled per instance in Y.
     this.nailGeometry = buildNailGeometry(SHAFT_RADIUS, HEAD_RADIUS);
+    this.headlessNailGeometry = buildNailGeometry(SHAFT_RADIUS, SHAFT_RADIUS); // 3 mm and wider: plain rods
     this.nailMaterial = new THREE.MeshStandardMaterial({ color: DEFAULT_NAIL_COLOR });
     this.#buildBoard();
   }
@@ -107,7 +110,8 @@ export class ArrangeSceneSync {
           layerSlots: instance.fitLayersToNails ? Math.floor(instance.shapeSnapshot.nailCount / 2) : null,
           reverseLayers: instance.shapeSnapshot.weaveRule === 'legacy',
       });
-    const nailMesh = this.#buildNailMesh(nails, maxHeight, thread.nailRadius / SHAFT_RADIUS);
+    const hasHead = nailHasHead(threadSettings.nailDiameterMm * (instance.nailScale ?? 1));
+    const nailMesh = this.#buildNailMesh(nails, maxHeight, thread.nailRadius / SHAFT_RADIUS, hasHead);
     nailMesh.visible = instance.nailsVisible ?? globalNailsVisible;
     return { lines, nails: nailMesh };
   }
@@ -139,8 +143,8 @@ export class ArrangeSceneSync {
 
 
   /** One standing nail per outline point, as tall as the shape's max string height - same look as the grid page's nails, its shaft widened/narrowed by `thickness` to the real nail diameter. */
-  #buildNailMesh(points, height, thickness) {
-    const mesh = new THREE.InstancedMesh(this.nailGeometry, this.nailMaterial, points.length);
+  #buildNailMesh(points, height, thickness, hasHead = true) {
+    const mesh = new THREE.InstancedMesh(hasHead ? this.nailGeometry : this.headlessNailGeometry, this.nailMaterial, points.length);
     const matrix = new THREE.Matrix4();
     const quaternion = new THREE.Quaternion();
     const scale = new THREE.Vector3(thickness, height, thickness);
@@ -174,6 +178,17 @@ export class ArrangeSceneSync {
   setBoardSize(width, depth) {
     this.boardWidth = width;
     this.boardDepth = depth;
+    this.#rebuildBoard();
+  }
+
+  /** The board's color and thickness (world units, 10 = 1 mm). Its top stays at the nails' base; it grows downwards. */
+  setBoardAppearance(color, thickness) {
+    this.boardColor = color;
+    this.boardThickness = thickness;
+    this.#rebuildBoard();
+  }
+
+  #rebuildBoard() {
     this.scene.remove(this.boardMesh);
     this.boardMesh.geometry.dispose();
     this.boardMesh.material.dispose();
@@ -181,10 +196,10 @@ export class ArrangeSceneSync {
   }
 
   #buildBoard() {
-    const geometry = new THREE.BoxGeometry(this.boardWidth, DEFAULT_BOARD_THICKNESS, this.boardDepth);
-    const material = new THREE.MeshStandardMaterial({ color: DEFAULT_BOARD_COLOR });
+    const geometry = new THREE.BoxGeometry(this.boardWidth, this.boardThickness, this.boardDepth);
+    const material = new THREE.MeshStandardMaterial({ color: this.boardColor });
     this.boardMesh = new THREE.Mesh(geometry, material);
-    this.boardMesh.position.set(0, BOARD_TOP_Y - DEFAULT_BOARD_THICKNESS / 2, 0);
+    this.boardMesh.position.set(0, BOARD_TOP_Y - this.boardThickness / 2, 0);
     this.scene.add(this.boardMesh);
   }
 
@@ -194,6 +209,7 @@ export class ArrangeSceneSync {
     this.boardMesh.material.dispose();
     for (const id of new Set([...this.instanceLines.keys(), ...this.instanceNails.keys()])) this.#disposeInstance(id);
     this.nailGeometry.dispose();
+    this.headlessNailGeometry.dispose();
     this.nailMaterial.dispose();
   }
 }
